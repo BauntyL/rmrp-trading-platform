@@ -1,9 +1,16 @@
-// Запуск сервера для Render.com
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+// Запуск сервера для Render.com через tsx
+import { spawn } from 'child_process';
 
-// Загружаем tsx для выполнения TypeScript
-require('tsx/cjs');
+const server = spawn('npx', ['tsx', 'server/index.ts'], {
+  stdio: 'inherit',
+  env: { ...process.env, NODE_ENV: 'production' }
+});
 
-// Запускаем основной сервер
-import('./server/index.ts');
+server.on('error', (err) => {
+  console.error('Ошибка запуска сервера:', err);
+  process.exit(1);
+});
+
+server.on('exit', (code) => {
+  process.exit(code);
+});
