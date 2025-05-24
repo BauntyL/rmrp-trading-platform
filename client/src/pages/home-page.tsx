@@ -91,8 +91,12 @@ export default function HomePage() {
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async (carId: number) => {
-      const response = await apiRequest("POST", `/api/favorites/toggle/${carId}`);
-      return await response.json();
+      const response = await apiRequest("POST", `/api/favorites/toggle/${carId}`, {});
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result = await response.json();
+      return result;
     },
     onSuccess: (result, carId) => {
       // Принудительно обновляем все кеши
