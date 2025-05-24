@@ -135,15 +135,6 @@
       }
     ],
     [
-      2,
-      {
-        "userId": 1,
-        "carId": 3,
-        "id": 2,
-        "createdAt": "2025-05-24T02:58:18.396Z"
-      }
-    ],
-    [
       3,
       {
         "userId": 2,
@@ -151,12 +142,21 @@
         "id": 3,
         "createdAt": "2025-05-24T03:00:09.481Z"
       }
+    ],
+    [
+      4,
+      {
+        "userId": 1,
+        "carId": 3,
+        "id": 4,
+        "createdAt": "2025-05-24T09:52:10.027Z"
+      }
     ]
   ],
   "counters": {
     "userIdCounter": 3,
     "carIdCounter": 4,
     "carApplicationIdCounter": 5,
-    "favoriteIdCounter": 4
+    "favoriteIdCounter": 5
   }
 }

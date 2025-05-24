@@ -7,15 +7,109 @@ import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import { z } from "zod";
 
+// Система отслеживания попыток входа
+interface LoginAttempt {
+  ip: string;
+  username: string;
+  timestamp: number;
+  success: boolean;
+}
+
+class SecurityManager {
+  private loginAttempts: Map<string, LoginAttempt[]> = new Map();
+  private blockedIPs: Map<string, number> = new Map();
+  private readonly MAX_ATTEMPTS = 5;
+  private readonly BLOCK_DURATION = 15 * 60 * 1000; // 15 минут
+  private readonly ATTEMPT_WINDOW = 5 * 60 * 1000; // 5 минут
+
+  private getKey(ip: string, username: string): string {
+    return `${ip}:${username}`;
+  }
+
+  recordAttempt(ip: string, username: string, success: boolean): void {
+    const key = this.getKey(ip, username);
+    const now = Date.now();
+    
+    if (!this.loginAttempts.has(key)) {
+      this.loginAttempts.set(key, []);
+    }
+    
+    const attempts = this.loginAttempts.get(key)!;
+    
+    // Удаляем старые попытки (старше 5 минут)
+    const recentAttempts = attempts.filter(attempt => 
+      now - attempt.timestamp < this.ATTEMPT_WINDOW
+    );
+    
+    recentAttempts.push({
+      ip,
+      username,
+      timestamp: now,
+      success
+    });
+    
+    this.loginAttempts.set(key, recentAttempts);
+    
+    // Блокируем IP если слишком много неудачных попыток
+    if (!success) {
+      const failedAttempts = recentAttempts.filter(a => !a.success).length;
+      if (failedAttempts >= this.MAX_ATTEMPTS) {
+        this.blockedIPs.set(ip, now + this.BLOCK_DURATION);
+        console.log(`🔒 Заблокирован IP ${ip} на 15 минут (${failedAttempts} неудачных попыток для ${username})`);
+      }
+    }
+  }
+
+  isBlocked(ip: string): boolean {
+    const blockUntil = this.blockedIPs.get(ip);
+    if (!blockUntil) return false;
+    
+    if (Date.now() > blockUntil) {
+      this.blockedIPs.delete(ip);
+      return false;
+    }
+    
+    return true;
+  }
+
+  getAttemptsCount(ip: string, username: string): number {
+    const key = this.getKey(ip, username);
+    const attempts = this.loginAttempts.get(key) || [];
+    const now = Date.now();
+    
+    return attempts.filter(attempt => 
+      now - attempt.timestamp < this.ATTEMPT_WINDOW && !attempt.success
+    ).length;
+  }
+}
+
+const securityManager = new SecurityManager();
+
 declare global {
   namespace Express {
     interface User extends SelectUser {}
   }
 }
 
+// Улучшенная валидация паролей
+const passwordSchema = z.string()
+  .min(8, "Пароль должен содержать минимум 8 символов")
+  .regex(/[A-Z]/, "Пароль должен содержать хотя бы одну заглавную букву")
+  .regex(/[a-z]/, "Пароль должен содержать хотя бы одну строчную букву")
+  .regex(/[0-9]/, "Пароль должен содержать хотя бы одну цифру")
+  .regex(/[^A-Za-z0-9]/, "Пароль должен содержать хотя бы один специальный символ");
+
 const registerSchema = z.object({
-  username: z.string().min(3).max(50),
-  password: z.string().min(6),
+  username: z.string()
+    .min(3, "Имя пользователя должно содержать минимум 3 символа")
+    .max(50, "Имя пользователя не должно превышать 50 символов")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Имя пользователя может содержать только буквы, цифры, дефис и подчеркивание"),
+  password: passwordSchema,
+});
+
+const loginSchema = z.object({
+  username: z.string().min(1, "Введите имя пользователя"),
+  password: z.string().min(1, "Введите пароль"),
 });
 
 export function setupAuth(app: Express) {
@@ -25,9 +119,10 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 2 * 60 * 60 * 1000, // 2 часа (уменьшено для безопасности)
+      sameSite: "strict"
     },
   };
 
@@ -56,11 +151,32 @@ export function setupAuth(app: Express) {
     done(null, user);
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  // Middleware для проверки блокировки IP
+  const checkIPBlock = (req: any, res: any, next: any) => {
+    const clientIP = req.ip || req.connection.remoteAddress || '127.0.0.1';
+    
+    if (securityManager.isBlocked(clientIP)) {
+      console.log(`🚫 Заблокированный IP ${clientIP} пытается войти`);
+      return res.status(429).json({ 
+        message: "Слишком много неудачных попыток входа. Попробуйте через 15 минут.",
+        blocked: true
+      });
+    }
+    
+    next();
+  };
+
+  app.post("/api/register", checkIPBlock, async (req, res, next) => {
     try {
+      const clientIP = req.ip || req.connection.remoteAddress || '127.0.0.1';
+      
       const validation = registerSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ message: "Некорректные данные" });
+        const firstError = validation.error.errors[0];
+        return res.status(400).json({ 
+          message: firstError.message,
+          field: firstError.path[0]
+        });
       }
 
       const { username, password } = validation.data;
@@ -70,12 +186,15 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Пользователь с таким именем уже существует" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      // Увеличиваем сложность хеширования для новых аккаунтов
+      const hashedPassword = await bcrypt.hash(password, 12);
       const user = await storage.createUser({
         username,
         password: hashedPassword,
         role: "user",
       });
+
+      console.log(`✅ Новый пользователь зарегистрирован: ${username} (IP: ${clientIP})`);
 
       req.login(user, (err) => {
         if (err) return next(err);
@@ -91,12 +210,46 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
+  app.post("/api/login", checkIPBlock, async (req, res, next) => {
+    const clientIP = req.ip || req.connection.remoteAddress || '127.0.0.1';
+    
+    // Валидация данных входа
+    const validation = loginSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ message: "Введите имя пользователя и пароль" });
+    }
+    
+    const { username } = validation.data;
+    const attemptsCount = securityManager.getAttemptsCount(clientIP, username);
+    
     passport.authenticate("local", (err: any, user: SelectUser | false) => {
-      if (err) return next(err);
-      if (!user) {
-        return res.status(401).json({ message: "Неверное имя пользователя или пароль" });
+      if (err) {
+        console.log(`❌ Ошибка аутентификации для ${username} (IP: ${clientIP}):`, err);
+        return next(err);
       }
+      
+      if (!user) {
+        // Записываем неудачную попытку
+        securityManager.recordAttempt(clientIP, username, false);
+        const newAttemptsCount = securityManager.getAttemptsCount(clientIP, username);
+        
+        console.log(`🔑 Неудачная попытка входа: ${username} (IP: ${clientIP}, попыток: ${newAttemptsCount})`);
+        
+        const remainingAttempts = Math.max(0, 5 - newAttemptsCount);
+        let message = "Неверное имя пользователя или пароль";
+        
+        if (remainingAttempts <= 2 && remainingAttempts > 0) {
+          message += `. Осталось попыток: ${remainingAttempts}`;
+        } else if (remainingAttempts === 0) {
+          message = "Слишком много неудачных попыток. IP заблокирован на 15 минут.";
+        }
+        
+        return res.status(401).json({ message, attemptsLeft: remainingAttempts });
+      }
+      
+      // Успешный вход
+      securityManager.recordAttempt(clientIP, username, true);
+      console.log(`✅ Успешный вход: ${username} (IP: ${clientIP})`);
       
       req.login(user, (err) => {
         if (err) return next(err);
