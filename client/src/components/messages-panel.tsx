@@ -21,21 +21,39 @@ export function MessagesPanel() {
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const { user } = useAuth();
 
-  // Принудительно очищаем кэш при монтировании компонента
-  useEffect(() => {
-    // Принудительно очищаем кэш и перезагружаем данные
-    queryClient.removeQueries({ queryKey: ["/api/messages"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-  }, []);
-
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["/api/messages", Date.now()], // Добавляем timestamp для принудительного обновления
-    staleTime: 0,
+    queryKey: ["/api/messages"],
+    enabled: !!user,
+    staleTime: 60000,
     refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
   });
 
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-300 rounded w-1/2 mb-4"></div>
+          <div className="h-4 bg-gray-300 rounded w-2/3"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Простая проверка типа данных
+  if (!Array.isArray(messages)) {
+    return (
+      <div className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Сообщения</h2>
+        <p className="text-gray-500">Нет сообщений для отображения</p>
+      </div>
+    );
+  }
+
   // Группируем сообщения по автомобилям и собеседникам
-  const groupedMessages = (messages || []).reduce((groups: Record<string, any>, message: any) => {
+  const groupedMessages = messages.reduce((groups: Record<string, any>, message: any) => {
     // Создаем уникальный ключ для каждого диалога: carId + участники
     const conversationKey = `${message.carId}_${Math.min(message.buyerId, message.sellerId)}_${Math.max(message.buyerId, message.sellerId)}`;
     if (!groups[conversationKey]) {
