@@ -24,7 +24,7 @@ export function DeleteUserModal({ user, open, onOpenChange }: DeleteUserModalPro
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Успешно",
-        description: "Пользователь удален",
+        description: "Пользователь полностью удален из системы",
       });
       onOpenChange(false);
     },
@@ -55,13 +55,17 @@ export function DeleteUserModal({ user, open, onOpenChange }: DeleteUserModalPro
             <br />
             <br />
             <span className="text-red-400 font-medium">
-              Это действие необратимо. Будут также удалены:
+              Аккаунт будет полностью удален из системы. Будут также удалены:
             </span>
             <ul className="list-disc ml-6 mt-2 text-slate-400">
               <li>Все автомобили пользователя</li>
               <li>Все заявки пользователя</li>
               <li>Весь список избранного</li>
             </ul>
+            <br />
+            <span className="text-orange-400 font-medium">
+              Для повторного доступа потребуется новая регистрация.
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
