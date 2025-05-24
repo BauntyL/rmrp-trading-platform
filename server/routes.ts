@@ -485,7 +485,22 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/messages", requireAuth, async (req, res) => {
     try {
       const messages = await storage.getMessagesByUser(req.user!.id);
-      res.json(messages);
+      
+      // Дополняем сообщения информацией о пользователях и автомобилях
+      const enrichedMessages = await Promise.all(messages.map(async (message) => {
+        const car = await storage.getCar(message.carId);
+        const buyer = await storage.getUser(message.buyerId);
+        const seller = await storage.getUser(message.sellerId);
+        
+        return {
+          ...message,
+          carName: car?.name || 'Неизвестный автомобиль',
+          buyerName: buyer?.username || 'Неизвестный покупатель',
+          sellerName: seller?.username || 'Неизвестный продавец'
+        };
+      }));
+      
+      res.json(enrichedMessages);
     } catch (error) {
       console.error("❌ Ошибка при получении сообщений:", error);
       res.status(500).json({ message: "Ошибка при получении сообщений" });

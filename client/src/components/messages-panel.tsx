@@ -7,21 +7,31 @@ import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Clock, User } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { useAuth } from "@/hooks/use-auth";
+
+// Расширенный тип сообщения с дополнительной информацией
+interface EnrichedMessage extends Message {
+  carName: string;
+  buyerName: string;
+  sellerName: string;
+}
 
 export function MessagesPanel() {
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
+  const { user } = useAuth();
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
   });
 
-  // Группируем сообщения по автомобилям
-  const groupedMessages = messages.reduce((groups: Record<number, Message[]>, message: Message) => {
-    const carId = message.carId;
-    if (!groups[carId]) {
-      groups[carId] = [];
+  // Группируем сообщения по автомобилям и собеседникам
+  const groupedMessages = messages.reduce((groups: Record<string, EnrichedMessage[]>, message: EnrichedMessage) => {
+    // Создаем уникальный ключ для каждого диалога: carId + участники
+    const conversationKey = `${message.carId}_${Math.min(message.buyerId, message.sellerId)}_${Math.max(message.buyerId, message.sellerId)}`;
+    if (!groups[conversationKey]) {
+      groups[conversationKey] = [];
     }
-    groups[carId].push(message);
+    groups[conversationKey].push(message);
     return groups;
   }, {});
 
@@ -55,16 +65,21 @@ export function MessagesPanel() {
       </div>
 
       <div className="grid gap-4">
-        {Object.entries(groupedMessages).map(([carId, conversationMessages]) => {
+        {Object.entries(groupedMessages).map(([conversationKey, conversationMessages]) => {
           const latestMessage = conversationMessages[conversationMessages.length - 1];
           
+          // Определяем собеседника (не текущий пользователь)
+          const otherUser = latestMessage.buyerId === user?.id 
+            ? latestMessage.sellerName 
+            : latestMessage.buyerName;
+          
           return (
-            <Card key={carId} className="bg-slate-800 border-slate-700 hover:bg-slate-750 transition-colors cursor-pointer">
+            <Card key={conversationKey} className="bg-slate-800 border-slate-700 hover:bg-slate-750 transition-colors cursor-pointer">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-white flex items-center">
                     <MessageCircle className="h-5 w-5 mr-2 text-blue-400" />
-                    Диалог по автомобилю #{carId}
+                    Диалог по автомобилю {latestMessage.carName} с {otherUser}
                   </CardTitle>
                   <div className="flex items-center text-sm text-slate-400">
                     <Clock className="h-4 w-4 mr-1" />
@@ -80,7 +95,12 @@ export function MessagesPanel() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-300">
-                        {latestMessage.buyerId === latestMessage.sellerId ? "Вы" : `Пользователь #${latestMessage.buyerId}`}
+                        {latestMessage.buyerId === user?.id 
+                          ? "Вы" 
+                          : latestMessage.buyerId === latestMessage.sellerId 
+                            ? "Вы" 
+                            : (latestMessage.buyerId === user?.id ? latestMessage.buyerName : latestMessage.sellerName)
+                        }
                       </p>
                       <p className="text-slate-400 text-sm line-clamp-2">
                         {latestMessage.message}
@@ -103,7 +123,7 @@ export function MessagesPanel() {
                       variant="ghost"
                       size="sm"
                       className="text-blue-400 hover:text-blue-300 hover:bg-blue-950/20"
-                      onClick={() => setSelectedConversation(parseInt(carId))}
+                      onClick={() => setSelectedConversation(latestMessage.carId)}
                     >
                       Открыть диалог
                     </Button>
