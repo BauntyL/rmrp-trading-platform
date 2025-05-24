@@ -316,7 +316,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Update user (admin only)
-  app.patch("/api/users/:id", requireRole(["admin"]), async (req, res) => {
+  app.patch("/api/users/:id", requireAuth, requireRole(["admin"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const { username, role } = req.body;
@@ -352,7 +352,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Delete user (admin only)
-  app.delete("/api/users/:id", requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/users/:id", requireAuth, requireRole(["admin"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       
