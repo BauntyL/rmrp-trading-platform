@@ -6,6 +6,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Приоритетная обработка API запросов ПЕРЕД Vite middleware
+app.use('/api', (req, res, next) => {
+  // Устанавливаем правильный Content-Type для API ответов
+  res.setHeader('Content-Type', 'application/json');
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
