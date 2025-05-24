@@ -32,10 +32,20 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
       try {
         const res = await apiRequest("POST", "/api/messages", data);
         
+        // Проверяем статус ответа
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Ошибка отправки сообщения");
+        }
+
         // Проверяем, что ответ содержит JSON
         const contentType = res.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Ошибка аутентификации. Пожалуйста, войдите в систему заново.");
+          // Если сервер вернул успешный статус без JSON, значит сообщение отправлено
+          if (res.status === 200 || res.status === 201) {
+            return { success: true };
+          }
+          throw new Error("Ошибка формата ответа сервера");
         }
         
         const result = await res.json();

@@ -16,6 +16,7 @@ import {
   LogOut,
   Crown,
   Lock,
+  MessageCircle,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -135,6 +136,19 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               {favorites.length}
             </Badge>
           )}
+        </Button>
+
+        <Button
+          variant={activeSection === "messages" ? "default" : "ghost"}
+          className={`w-full justify-start ${
+            activeSection === "messages" 
+              ? "bg-primary text-white" 
+              : "text-slate-300 hover:bg-slate-700 hover:text-white"
+          }`}
+          onClick={() => onSectionChange("messages")}
+        >
+          <MessageCircle className="h-5 w-5 mr-3" />
+          Сообщения
         </Button>
 
         <Button
