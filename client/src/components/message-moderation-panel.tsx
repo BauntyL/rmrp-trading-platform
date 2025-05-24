@@ -32,13 +32,12 @@ export function MessageModerationPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMessage, setSelectedMessage] = useState<MessageModerationData | null>(null);
 
-  const { data: debugData, isLoading } = useQuery({
-    queryKey: ["/api/debug/messages"],
+  // Используем существующий API для получения всех сообщений
+  const { data: allMessages = [], isLoading } = useQuery<MessageModerationData[]>({
+    queryKey: ["/api/messages"],
     refetchInterval: 10000, // Автообновление каждые 10 секунд
     refetchOnWindowFocus: true,
   });
-
-  const allMessages = debugData?.messages || [];
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (messageId: number) => {
@@ -96,7 +95,6 @@ export function MessageModerationPanel() {
   };
 
   console.log("📊 Данные модерации:", { 
-    debugData,
     allMessages, 
     allMessagesLength: allMessages?.length,
     filteredMessages, 
