@@ -41,7 +41,7 @@ export function MessageModerationPanel() {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (messageId: number) => {
-      const response = await apiRequest("POST", `/api/messages/${messageId}/delete`, {});
+      const response = await apiRequest("POST", "/api/moderation/delete-message", { messageId });
       if (!response.ok) {
         throw new Error("Ошибка при удалении сообщения");
       }

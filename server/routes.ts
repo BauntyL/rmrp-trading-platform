@@ -707,14 +707,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Удаление сообщения (только для модераторов и админов)
-  app.post("/api/messages/:id/delete", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+  app.post("/api/moderation/delete-message", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
     console.log(`🚀 DELETE /api/messages/:id ЗАПРОС ПОЛУЧЕН!`);
     console.log(`📝 Параметры:`, req.params);
     console.log(`👤 Пользователь:`, req.user?.id, req.user?.username, req.user?.role);
     
     try {
-      const messageId = parseInt(req.params.id);
-      console.log(`🗑️ DELETE /api/messages/${messageId} - Модератор: ${req.user!.id} ${req.user!.username}`);
+      const messageId = parseInt(req.body.messageId);
+      console.log(`🗑️ DELETE message ${messageId} - Модератор: ${req.user!.id} ${req.user!.username}`);
       
       // Проверяем, существует ли сообщение ДО удаления
       const messagesBefore = await storage.getAllMessages();
