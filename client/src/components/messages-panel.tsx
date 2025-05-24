@@ -38,6 +38,22 @@ export function MessagesPanel() {
     refetchInterval: 5000, // Обновляем каждые 5 секунд для новых сообщений
   });
 
+  // Мутация для отметки сообщений как прочитанных
+  const markReadMutation = useMutation({
+    mutationFn: async ({ carId, buyerId, sellerId }: { carId: number; buyerId: number; sellerId: number }) => {
+      const res = await apiRequest("POST", "/api/messages/mark-read", { carId, buyerId, sellerId });
+      return res.json();
+    },
+    onSuccess: () => {
+      // Обновляем счетчик непрочитанных сообщений
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+    },
+    onError: (error) => {
+      console.error("Ошибка при отметке сообщений как прочитанных:", error);
+    },
+  });
+
   // Функция автоскролла к последнему сообщению
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -364,7 +380,15 @@ export function MessagesPanel() {
                     
                     <div className="flex flex-col space-y-2">
                       <Button
-                        onClick={() => setSelectedConversation(message.carId)}
+                        onClick={() => {
+                          setSelectedConversation(message.carId);
+                          // Отмечаем сообщения как прочитанные при открытии диалога
+                          markReadMutation.mutate({
+                            carId: message.carId,
+                            buyerId: message.buyerId,
+                            sellerId: message.sellerId
+                          });
+                        }}
                         className={`${
                           isUnread 
                             ? 'bg-blue-500 hover:bg-blue-600 text-white' 

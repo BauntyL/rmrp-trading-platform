@@ -526,6 +526,34 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Отметка сообщений как прочитанных
+  app.post("/api/messages/mark-read", requireAuth, async (req, res) => {
+    try {
+      const { carId, buyerId, sellerId } = req.body;
+      const userId = req.user!.id;
+      
+      console.log("🔍 Отметка сообщений как прочитанных:", { carId, buyerId, sellerId, userId });
+      
+      // Получаем все сообщения для данной беседы
+      const messages = await storage.getMessagesByCarAndUsers(carId, buyerId, sellerId);
+      
+      // Отмечаем как прочитанные все сообщения, которые пришли к текущему пользователю
+      let markedCount = 0;
+      for (const message of messages) {
+        if (message.recipientId === userId && !message.isRead) {
+          await storage.markMessageAsRead(message.id);
+          markedCount++;
+        }
+      }
+      
+      console.log("✅ Отмечено как прочитанных:", markedCount, "сообщений");
+      res.json({ success: true, markedCount });
+    } catch (error) {
+      console.error("Ошибка отметки сообщений как прочитанных:", error);
+      res.status(500).json({ error: "Ошибка сервера" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Настраиваем WebSocket сервер для push-уведомлений
