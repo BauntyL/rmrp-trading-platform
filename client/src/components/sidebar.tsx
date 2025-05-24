@@ -18,6 +18,7 @@ import {
   LogOut,
   Crown,
   Lock,
+  Send,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -242,6 +243,16 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
 
       {/* Theme Toggle & Logout */}
       <div className="p-4 border-t border-slate-700 space-y-2">
+        {/* Кнопка Telegram */}
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+          onClick={() => window.open('https://t.me/bauntyprog', '_blank')}
+        >
+          <Send className="h-5 w-5 mr-3 text-blue-400" />
+          Мы в Telegram
+        </Button>
+        
         <Button
           variant="ghost"
           className="w-full justify-start text-slate-300 hover:bg-slate-700 hover:text-white"
