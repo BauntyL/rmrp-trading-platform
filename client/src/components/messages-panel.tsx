@@ -33,7 +33,7 @@ export function MessagesPanel() {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: false,
+    refetchInterval: 5000, // Обновляем каждые 5 секунд для новых сообщений
   });
 
   const sendMessageMutation = useMutation({

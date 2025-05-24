@@ -390,9 +390,25 @@ export class MemStorage implements IStorage {
 
   // Messages
   async getMessagesByUser(userId: number): Promise<Message[]> {
-    return Array.from(this.messages.values()).filter(
+    const messages = Array.from(this.messages.values()).filter(
       message => message.buyerId === userId || message.sellerId === userId
     ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    // Добавляем имена пользователей и автомобилей к сообщениям
+    const enrichedMessages = messages.map(message => {
+      const buyer = this.users.get(message.buyerId);
+      const seller = this.users.get(message.sellerId);
+      const car = this.cars.get(message.carId);
+      
+      return {
+        ...message,
+        buyerName: buyer?.username || `Пользователь #${message.buyerId}`,
+        sellerName: seller?.username || `Пользователь #${message.sellerId}`,
+        carName: car?.name || `Автомобиль #${message.carId}`
+      };
+    });
+
+    return enrichedMessages as Message[];
   }
 
   async getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]> {
