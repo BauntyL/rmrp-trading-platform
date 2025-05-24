@@ -484,13 +484,17 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/messages", requireAuth, async (req, res) => {
     try {
+      console.log("🔍 Получение сообщений для пользователя:", req.user!.id);
       const messages = await storage.getMessagesByUser(req.user!.id);
+      console.log("📨 Найдено сообщений:", messages.length);
       
       // Дополняем сообщения информацией о пользователях и автомобилях
       const enrichedMessages = await Promise.all(messages.map(async (message) => {
         const car = await storage.getCar(message.carId);
         const buyer = await storage.getUser(message.buyerId);
         const seller = await storage.getUser(message.sellerId);
+        
+        console.log(`📝 Обогащение сообщения ${message.id}: car=${car?.name}, buyer=${buyer?.username}, seller=${seller?.username}`);
         
         return {
           ...message,
@@ -500,6 +504,11 @@ export function registerRoutes(app: Express): Server {
         };
       }));
       
+      console.log("✅ Отправляем обогащенные сообщения:", enrichedMessages.length);
+      // Принудительно отключаем кэширование
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.json(enrichedMessages);
     } catch (error) {
       console.error("❌ Ошибка при получении сообщений:", error);

@@ -23,16 +23,19 @@ export function MessagesPanel() {
 
   // Принудительно очищаем кэш при монтировании компонента
   useEffect(() => {
+    // Принудительно очищаем кэш и перезагружаем данные
+    queryClient.removeQueries({ queryKey: ["/api/messages"] });
     queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
   }, []);
 
-  const { data: messages = [], isLoading } = useQuery<EnrichedMessage[]>({
+  const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
-    staleTime: 0, // Принудительно обновляем данные
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   // Группируем сообщения по автомобилям и собеседникам
-  const groupedMessages = messages.reduce((groups: Record<string, EnrichedMessage[]>, message: EnrichedMessage) => {
+  const groupedMessages = (messages || []).reduce((groups: Record<string, any>, message: any) => {
     // Создаем уникальный ключ для каждого диалога: carId + участники
     const conversationKey = `${message.carId}_${Math.min(message.buyerId, message.sellerId)}_${Math.max(message.buyerId, message.sellerId)}`;
     if (!groups[conversationKey]) {
