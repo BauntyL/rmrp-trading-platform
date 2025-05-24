@@ -73,6 +73,24 @@ export function MessagesPanel() {
     carMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
   );
 
+  // Функция отправки сообщения
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !selectedConversation || !user) return;
+
+    // Находим получателя из выбранного диалога
+    const conversation = conversationsByCarId[selectedConversation];
+    if (!conversation || conversation.length === 0) return;
+
+    const firstMessage = conversation[0];
+    const recipientId = firstMessage.buyerId === user.id ? firstMessage.sellerId : firstMessage.buyerId;
+
+    sendMessageMutation.mutate({
+      carId: selectedConversation,
+      recipientId,
+      content: newMessage.trim(),
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -161,24 +179,6 @@ export function MessagesPanel() {
       </div>
     );
   }
-
-  // Функция отправки сообщения
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation || !user) return;
-
-    // Находим получателя из выбранного диалога
-    const conversation = conversationsByCarId[selectedConversation];
-    if (!conversation || conversation.length === 0) return;
-
-    const firstMessage = conversation[0];
-    const recipientId = firstMessage.buyerId === user.id ? firstMessage.sellerId : firstMessage.buyerId;
-
-    sendMessageMutation.mutate({
-      carId: selectedConversation,
-      recipientId,
-      content: newMessage.trim(),
-    });
-  };
 
   return (
     <div className="p-6">
