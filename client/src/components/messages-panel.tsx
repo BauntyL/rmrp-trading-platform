@@ -80,18 +80,27 @@ export function MessagesPanel() {
                       Диалог по автомобилю {carName} с {otherUserName}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                      {message.content}
+                      <span className="font-medium">Последнее сообщение:</span> {message.content}
                     </p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {!message.isRead && message.recipientId === user?.id && (
-                      <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
-                        Новое
-                      </span>
-                    )}
-                    <time className="text-xs text-gray-400">
-                      {new Date(message.createdAt).toLocaleDateString()}
-                    </time>
+                  <div className="flex flex-col items-end space-y-2">
+                    <div className="flex items-center space-x-2">
+                      {!message.isRead && message.recipientId === user?.id && (
+                        <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                          Новое
+                        </span>
+                      )}
+                      <time className="text-xs text-gray-400">
+                        {new Date(message.createdAt).toLocaleDateString()}
+                      </time>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      Открыть диалог
+                    </Button>
                   </div>
                 </div>
               </div>
