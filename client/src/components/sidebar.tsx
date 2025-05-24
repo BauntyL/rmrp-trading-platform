@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
@@ -12,8 +11,6 @@ import {
   ClipboardList,
   Shield,
   Users,
-  Moon,
-  Sun,
   MessageCircle,
   LogOut,
   Crown,
@@ -28,7 +25,6 @@ interface SidebarProps {
 
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const { user, logoutMutation } = useAuth();
-  const { theme, toggleTheme } = useTheme();
 
   const { data: myApplications = [] } = useQuery<CarApplication[]>({
     queryKey: ["/api/my-applications"],
@@ -259,18 +255,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
           Мы в Telegram
         </Button>
         
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-slate-300 hover:bg-slate-700 hover:text-white"
-          onClick={toggleTheme}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-5 w-5 mr-3" />
-          ) : (
-            <Moon className="h-5 w-5 mr-3" />
-          )}
-          {theme === "dark" ? "Светлая тема" : "Тёмная тема"}
-        </Button>
+
         
         <Button
           variant="ghost"
