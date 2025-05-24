@@ -105,11 +105,13 @@ export class MemStorage implements IStorage {
         cars: Array.from(this.cars.entries()),
         carApplications: Array.from(this.carApplications.entries()),
         favorites: Array.from(this.favorites.entries()),
+        messages: Array.from(this.messages.entries()),
         counters: {
           userIdCounter: this.userIdCounter,
           carIdCounter: this.carIdCounter,
           carApplicationIdCounter: this.carApplicationIdCounter,
           favoriteIdCounter: this.favoriteIdCounter,
+          messageIdCounter: this.messageIdCounter,
         }
       };
       
@@ -129,12 +131,26 @@ export class MemStorage implements IStorage {
         this.cars = new Map(data.cars || []);
         this.carApplications = new Map(data.carApplications || []);
         this.favorites = new Map(data.favorites || []);
+        this.messages = new Map(data.messages || []);
+        
+        // Исправляем старые сообщения, добавляя недостающие поля
+        if (data.messages) {
+          this.messages.forEach((message, id) => {
+            if (!message.senderId || !message.recipientId) {
+              console.log(`🔧 Исправляем сообщение ${id}: добавляем senderId и recipientId`);
+              message.senderId = message.buyerId; // Отправитель - это покупатель
+              message.recipientId = message.sellerId; // Получатель - это продавец
+              this.messages.set(id, message);
+            }
+          });
+        }
         
         if (data.counters) {
           this.userIdCounter = data.counters.userIdCounter || 1;
           this.carIdCounter = data.counters.carIdCounter || 1;
           this.carApplicationIdCounter = data.counters.carApplicationIdCounter || 1;
           this.favoriteIdCounter = data.counters.favoriteIdCounter || 1;
+          this.messageIdCounter = data.counters.messageIdCounter || 1;
         }
       }
     } catch (error) {

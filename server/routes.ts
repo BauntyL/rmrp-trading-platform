@@ -455,7 +455,9 @@ export function registerRoutes(app: Express): Server {
         carId: carIdNum,
         buyerId: req.user!.id,
         sellerId: sellerIdNum,
-        message: message.trim(),
+        senderId: req.user!.id,
+        recipientId: sellerIdNum,
+        content: message.trim(),
       });
       
       console.log("✅ Сообщение отправлено:", newMessage.id);
