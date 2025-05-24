@@ -33,7 +33,7 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
       console.log("🚀 Удаляем автомобиль ID:", carId);
       
       // Отправляем запрос на существующий эндпоинт
-      fetch(window.location.origin + '/api/delete-car-direct', {
+      fetch(window.location.origin + '/api/delete-my-car-completely', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
