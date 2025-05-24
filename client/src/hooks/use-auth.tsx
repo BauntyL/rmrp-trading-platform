@@ -45,7 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      const data = await res.json();
+      
+      // Если ответ содержит сообщение об ошибке - это не пользователь
+      if (data.message && data.message.includes("не существует")) {
+        throw new Error(data.message);
+      }
+      
+      return data;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
