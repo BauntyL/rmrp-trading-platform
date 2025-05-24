@@ -27,6 +27,12 @@ function requireRole(roles: string[]) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // Добавляем debug middleware для всех API запросов
+  app.use('/api', (req, res, next) => {
+    console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
+    next();
+  });
+
   // Настройка аутентификации
   setupAuth(app);
 
@@ -291,7 +297,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.patch("/api/users/:id/role", requireRole(["admin"]), async (req, res) => {
+  app.patch("/api/users/:id/role", requireAuth, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { role } = req.body;
