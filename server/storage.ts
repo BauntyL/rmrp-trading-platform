@@ -288,9 +288,17 @@ export class MemStorage implements IStorage {
   }
 
   async deleteCar(id: number): Promise<boolean> {
+    console.log(`🗃️ Попытка удаления автомобиля ID: ${id} из хранилища`);
+    console.log(`🗃️ Количество автомобилей до удаления: ${this.cars.size}`);
+    console.log(`🗃️ Автомобиль существует: ${this.cars.has(id)}`);
+    
     const deleted = this.cars.delete(id);
+    console.log(`🗃️ Результат delete(): ${deleted}`);
+    console.log(`🗃️ Количество автомобилей после удаления: ${this.cars.size}`);
+    
     if (deleted) {
       this.saveData();
+      console.log(`💾 Данные сохранены в файл`);
     }
     return deleted;
   }
