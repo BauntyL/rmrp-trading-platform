@@ -427,6 +427,62 @@
         "isRead": true,
         "createdAt": "2025-05-24T19:06:36.861Z"
       }
+    ],
+    [
+      23,
+      {
+        "id": 23,
+        "carId": 3,
+        "buyerId": 2,
+        "sellerId": 1,
+        "senderId": 2,
+        "recipientId": 1,
+        "content": "привет",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:07:44.587Z"
+      }
+    ],
+    [
+      24,
+      {
+        "id": 24,
+        "carId": 3,
+        "buyerId": 1,
+        "sellerId": 2,
+        "senderId": 1,
+        "recipientId": 2,
+        "content": "пку",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:08:19.781Z"
+      }
+    ],
+    [
+      25,
+      {
+        "id": 25,
+        "carId": 3,
+        "buyerId": 2,
+        "sellerId": 1,
+        "senderId": 2,
+        "recipientId": 1,
+        "content": "ка",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:08:33.018Z"
+      }
+    ],
+    [
+      26,
+      {
+        "id": 26,
+        "carId": 3,
+        "buyerId": 1,
+        "sellerId": 2,
+        "senderId": 1,
+        "recipientId": 2,
+        "content": "ц",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:08:38.599Z"
+      }
     ]
   ],
   "counters": {
@@ -434,6 +490,6 @@
     "carIdCounter": 4,
     "carApplicationIdCounter": 7,
     "favoriteIdCounter": 1,
-    "messageIdCounter": 23
+    "messageIdCounter": 27
   }
 }

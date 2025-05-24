@@ -227,7 +227,7 @@ export function MessagesPanel() {
           <div className="flex items-center space-x-3">
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-              Диалог по автомобилю {selectedConversation === 1 ? "BMW M5" : `#${selectedConversation}`}
+              Диалог по автомобилю {sortedMessages.length > 0 && sortedMessages[0].carName ? sortedMessages[0].carName : `#${selectedConversation}`}
             </h2>
           </div>
         </div>
