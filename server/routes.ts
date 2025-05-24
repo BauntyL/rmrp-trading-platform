@@ -607,6 +607,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Получение всех сообщений для модерации (только для модераторов и админов)
+  app.get("/api/messages/all", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+    try {
+      console.log(`🔍 GET /api/messages/all - Модератор: ${req.user!.id} ${req.user!.username}`);
+      console.log("🔍 Вызываем storage.getAllMessages()...");
+      const messages = await storage.getAllMessages();
+      console.log(`📊 Получено сообщений для модерации: ${messages.length}`);
+      res.json(messages);
+    } catch (error) {
+      console.error("❌ Ошибка получения всех сообщений:", error);
+      res.status(500).json({ error: "Ошибка получения сообщений" });
+    }
+  });
+
   app.get("/api/messages", requireAuth, async (req, res) => {
     console.log("🎯 Обработка запроса /api/messages для пользователя:", req.user!.id);
     
@@ -649,18 +663,6 @@ export function registerRoutes(app: Express): Server {
       res.json({ count });
     } catch (error) {
       res.status(500).json({ message: "Ошибка при получении счетчика" });
-    }
-  });
-
-  // Получение всех сообщений для модерации (только для модераторов и админов)
-  app.get("/api/messages/all", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
-    try {
-      console.log(`🔍 GET /api/messages/all - Модератор: ${req.user!.id} ${req.user!.username}`);
-      const messages = await storage.getAllMessages();
-      res.json(messages);
-    } catch (error) {
-      console.error("❌ Ошибка получения всех сообщений:", error);
-      res.status(500).json({ error: "Ошибка получения сообщений" });
     }
   });
 
