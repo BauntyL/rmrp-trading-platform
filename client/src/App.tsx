@@ -14,7 +14,10 @@ import { Loader2 } from "lucide-react";
 function Router() {
   const { user, isLoading } = useAuth();
 
+  console.log("Router state:", { user, isLoading, userExists: !!user });
+
   if (isLoading) {
+    console.log("Showing loading screen");
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-900">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -24,10 +27,12 @@ function Router() {
 
   // Если пользователя нет - показываем только страницу авторизации
   if (!user) {
+    console.log("No user, showing auth page");
     return <AuthPage />;
   }
 
   // Если пользователь есть - показываем соответствующие страницы
+  console.log("User exists, showing home page");
   return (
     <Switch>
       <Route path="/auth" component={HomePage} />
