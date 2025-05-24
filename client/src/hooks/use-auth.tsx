@@ -30,6 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    retry: (failureCount, error) => {
+      // Не повторяем запросы при ошибках 401 (неавторизован)
+      if (error?.message?.includes('401')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   const loginMutation = useMutation({

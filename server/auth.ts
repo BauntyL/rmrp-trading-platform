@@ -147,12 +147,18 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    // Если пользователь был удален, завершаем сессию
-    if (!user) {
-      return done(null, false);
+    try {
+      const user = await storage.getUser(id);
+      // Если пользователь был удален, завершаем сессию без ошибки
+      if (!user) {
+        return done(null, null);
+      }
+      done(null, user);
+    } catch (error) {
+      // Логируем ошибку, но не передаем ее дальше
+      console.log('Ошибка при получении пользователя из сессии:', error);
+      done(null, null);
     }
-    done(null, user);
   });
 
   // Middleware для проверки блокировки IP
