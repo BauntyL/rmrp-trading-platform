@@ -136,6 +136,51 @@ function requireRole(roles: string[]) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // НОВЫЙ УНИКАЛЬНЫЙ ОБРАБОТЧИК - ПОЛНОЕ УДАЛЕНИЕ АВТОМОБИЛЯ
+  app.post("/api/delete-my-car-completely", requireAuth, async (req, res) => {
+    console.log(`🟢🟢🟢 УНИКАЛЬНЫЙ DELETE ENDPOINT СРАБОТАЛ! Car ID: ${req.body.carId}, User: ${req.user?.id || 'неавторизован'}`);
+    console.log(`🟢🟢🟢 Полный URL: ${req.originalUrl}, метод: ${req.method}`);
+    
+    try {
+      const carId = parseInt(req.body.carId);
+      console.log(`🗑️ Пользователь ${req.user!.id} удаляет автомобиль ID: ${carId}`);
+      
+      // Проверяем, что автомобиль принадлежит пользователю
+      const car = await storage.getCar(carId);
+      if (!car) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      if (car.createdBy !== req.user!.id) {
+        return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
+      }
+      
+      // Удаляем все сообщения связанные с этим автомобилем
+      const allMessages = await storage.getAllMessages();
+      const messagesToDelete = allMessages.filter((msg: any) => msg.carId === carId);
+      
+      for (const message of messagesToDelete) {
+        await storage.deleteMessage(message.id);
+        console.log(`📨 Удалено сообщение ID: ${message.id}`);
+      }
+      
+      // Удаляем автомобиль
+      const deleted = await storage.deleteCar(carId);
+      if (!deleted) {
+        return res.status(500).json({ message: "Ошибка при удалении автомобиля" });
+      }
+      
+      console.log(`✅ Автомобиль "${car.name}" успешно удален пользователем ${req.user!.id}`);
+      
+      res.json({ 
+        message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.` 
+      });
+    } catch (error) {
+      console.error("❌ Ошибка при снятии автомобиля с продажи:", error);
+      res.status(500).json({ message: "Ошибка при снятии автомобиля с продажи" });
+    }
+  });
+
   // САМЫЙ ПЕРВЫЙ ОБРАБОТЧИК - УДАЛЕНИЕ АВТОМОБИЛЕЙ (POST МЕТОД!)
   app.post("/api/cars/:id/remove", requireAuth, async (req, res) => {
     console.log(`🔥🔥🔥 POST DELETE ENDPOINT СРАБОТАЛ! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
