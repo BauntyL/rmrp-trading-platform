@@ -154,7 +154,7 @@ export function MessagesPanel() {
         </div>
         
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <div className="space-y-4 h-96 overflow-y-auto p-4 flex flex-col">
+          <div className="space-y-4 h-[48rem] overflow-y-auto p-4 flex flex-col">
             {sortedMessages.map((message: Message, index: number) => {
               // Определяем отправителя на основе времени и пользователей в диалоге
               const isFirstMessage = index === 0;
