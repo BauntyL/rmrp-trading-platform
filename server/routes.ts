@@ -140,9 +140,9 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', (req, res, next) => {
     console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
     
-    // Специальная проверка для нашего уникального endpoint
-    if (req.url.includes('/delete-my-car-completely')) {
-      console.log(`🟢🟢🟢 НАЙДЕН УНИКАЛЬНЫЙ DELETE ЗАПРОС! URL: ${req.url}, Method: ${req.method}, Body:`, req.body);
+    // Специальная проверка для нашего финального endpoint
+    if (req.url.includes('/my-car-removal')) {
+      console.log(`🎯🎯🎯 НАЙДЕН ФИНАЛЬНЫЙ DELETE ЗАПРОС! URL: ${req.url}, Method: ${req.method}, Params: ${req.params}`);
     }
     
     next();
