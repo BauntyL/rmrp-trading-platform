@@ -550,6 +550,8 @@ export function registerRoutes(app: Express): Server {
       
       const cars = await storage.getCarsByUser(req.user!.id);
       console.log(`🔍 GET /api/my-cars - Пользователь: ${req.user!.id} ${req.user!.username}`);
+      console.log(`📊 Количество найденных автомобилей: ${cars.length}`);
+      console.log(`📊 Детали автомобилей:`, cars.map(car => ({ id: car.id, name: car.name, status: car.status })));
       res.json(cars);
     } catch (error) {
       res.status(500).json({ message: "Ошибка при получении ваших автомобилей" });
