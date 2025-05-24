@@ -117,8 +117,10 @@ export function MessagesPanel() {
     },
   });
 
-  // Группируем сообщения по автомобилям
-  const conversationsByCarId = (messages as Message[]).reduce((acc: Record<number, Message[]>, message: Message) => {
+  // Фильтруем удаленные модераторами сообщения и группируем по автомобилям
+  const filteredMessages = (messages as Message[]).filter(message => !deletedMessagesStore.has(message.id));
+  
+  const conversationsByCarId = filteredMessages.reduce((acc: Record<number, Message[]>, message: Message) => {
     if (!acc[message.carId]) {
       acc[message.carId] = [];
     }
