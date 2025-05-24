@@ -34,7 +34,7 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
       console.log("🚀 Используем специальный POST запрос для удаления автомобиля ID:", carId);
       
       try {
-        const response = await apiRequest("POST", "/api/remove-car-from-sale", {
+        const response = await apiRequest("POST", "/delete-car-endpoint", {
           carId: carId,
           action: "remove_from_sale",
           timestamp: Date.now()

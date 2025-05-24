@@ -1127,7 +1127,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Удаление автомобиля через POST (обход блокировки)
-  app.post("/api/remove-car-from-sale", (req, res, next) => {
+  app.post("/delete-car-endpoint", (req, res, next) => {
     console.log("🔥 УДАЛЕНИЕ АВТОМОБИЛЯ - НАЧАЛО ОБРАБОТКИ");
     console.log("📥 Тело запроса:", req.body);
     console.log("👤 Аутентификация:", req.isAuthenticated?.(), req.user?.id);
