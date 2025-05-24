@@ -146,33 +146,18 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // Настройка аутентификации СНАЧАЛА
-  setupAuth(app);
-  
-  // УНИВЕРСАЛЬНОЕ ЛОГИРОВАНИЕ ВСЕХ ЗАПРОСОВ
-  app.use((req, res, next) => {
-    if (req.method === 'DELETE') {
-      console.log(`🚨🚨🚨 ЛЮБОЙ DELETE ЗАПРОС: ${req.method} ${req.url} от пользователя: ${req.user?.id || 'неавторизован'}`);
+  // GET роут для удаления автомобилей (САМЫЙ ПЕРВЫЙ ОБРАБОТЧИК!)
+  app.get("/api/cars-remove/:id", async (req, res) => {
+    console.log(`🔥🔥🔥 GET DELETE ENDPOINT! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
+    
+    // Проверяем авторизацию вручную
+    if (!req.user) {
+      return res.status(401).json({ message: "Требуется авторизация" });
     }
-    if (req.url.includes('/api/my-cars/')) {
-      console.log(`🎯🎯🎯 ЗАПРОС К MY-CARS: ${req.method} ${req.url}`);
-    }
-    next();
-  });
-  
-  // Добавляем debug middleware для всех API запросов
-  app.use('/api', (req, res, next) => {
-    console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
-    next();
-  });
-
-  // GET роут для удаления автомобилей (ЕДИНСТВЕННО РАБОТАЮЩИЙ МЕТОД)
-  app.get("/api/cars-remove/:id", requireAuth, async (req, res) => {
-    console.log(`🔥🔥🔥 GET DELETE ENDPOINT! ID: ${req.params.id}, User: ${req.user?.id}`);
     
     try {
       const id = parseInt(req.params.id);
-      console.log(`🗑️ Пользователь ${req.user!.id} удаляет автомобиль ID: ${id}`);
+      console.log(`🗑️ Пользователь ${req.user.id} удаляет автомобиль ID: ${id}`);
       
       // Проверяем, что автомобиль принадлежит пользователю
       const car = await storage.getCar(id);
@@ -180,7 +165,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Автомобиль не найден" });
       }
       
-      if (car.createdBy !== req.user!.id) {
+      if (car.createdBy !== req.user.id) {
         return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
       }
       
@@ -209,6 +194,28 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Ошибка при удалении автомобиля" });
     }
   });
+
+  // Настройка аутентификации СНАЧАЛА
+  setupAuth(app);
+  
+  // УНИВЕРСАЛЬНОЕ ЛОГИРОВАНИЕ ВСЕХ ЗАПРОСОВ
+  app.use((req, res, next) => {
+    if (req.method === 'DELETE') {
+      console.log(`🚨🚨🚨 ЛЮБОЙ DELETE ЗАПРОС: ${req.method} ${req.url} от пользователя: ${req.user?.id || 'неавторизован'}`);
+    }
+    if (req.url.includes('/api/my-cars/')) {
+      console.log(`🎯🎯🎯 ЗАПРОС К MY-CARS: ${req.method} ${req.url}`);
+    }
+    next();
+  });
+  
+  // Добавляем debug middleware для всех API запросов
+  app.use('/api', (req, res, next) => {
+    console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
+    next();
+  });
+
+
 
   // РОУТ МОДЕРАЦИИ СООБЩЕНИЙ - ДОБАВЛЕН В НАЧАЛО
   app.get("/api/messages/all", requireAuth, async (req, res) => {
