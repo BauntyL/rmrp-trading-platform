@@ -49,16 +49,25 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
       return { success: true, carId: carId };
     },
     onSuccess: (data) => {
+      console.log("✅ Мутация успешна, обновляем кеши");
+      
       toast({
         title: "Успешно",
-        description: data.message || "Автомобиль снят с продажи",
+        description: "Автомобиль успешно снят с продажи",
       });
       
-      // Обновляем все связанные кеши
-      queryClient.invalidateQueries({ queryKey: ["/api/my-cars"] });
+      // Принудительно обновляем все кеши
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-applications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      
+      // Принудительно рефетчим данные
+      queryClient.refetchQueries({ queryKey: ["/api/cars"] });
+      queryClient.refetchQueries({ queryKey: ["/api/my-cars"] });
+      
+      console.log("🔄 Кеши обновлены, закрываем модал");
       
       // Закрываем модал и сбрасываем состояние
       onOpenChange(false);
