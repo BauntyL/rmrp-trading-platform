@@ -3,6 +3,7 @@ import {
   cars, 
   carApplications, 
   favorites,
+  messages,
   type User, 
   type InsertUser, 
   type Car, 
@@ -10,7 +11,9 @@ import {
   type CarApplication, 
   type InsertCarApplication, 
   type Favorite, 
-  type InsertFavorite 
+  type InsertFavorite,
+  type Message,
+  type InsertMessage
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -52,6 +55,13 @@ export interface IStorage {
   removeFromFavorites(userId: number, carId: number): Promise<boolean>;
   isFavorite(userId: number, carId: number): Promise<boolean>;
 
+  // Messages
+  getMessagesByUser(userId: number): Promise<Message[]>;
+  getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]>;
+  sendMessage(message: InsertMessage): Promise<Message>;
+  markMessageAsRead(messageId: number): Promise<boolean>;
+  getUnreadMessagesCount(userId: number): Promise<number>;
+
   sessionStore: session.SessionStore;
 }
 
@@ -60,11 +70,13 @@ export class MemStorage implements IStorage {
   private cars: Map<number, Car> = new Map();
   private carApplications: Map<number, CarApplication> = new Map();
   private favorites: Map<number, Favorite> = new Map();
+  private messages: Map<number, Message> = new Map();
   
   private userIdCounter = 1;
   private carIdCounter = 1;
   private carApplicationIdCounter = 1;
   private favoriteIdCounter = 1;
+  private messageIdCounter = 1;
   
   public sessionStore: session.SessionStore;
   private dataDir = path.join(process.cwd(), 'data');
