@@ -263,6 +263,7 @@ export function registerRoutes(app: Express): Server {
   // Снятие автомобиля с продажи пользователем
   app.delete("/api/my-cars/:id", requireAuth, async (req, res) => {
     console.log(`🔥🔥🔥 DELETE ENDPOINT ПОЛУЧЕН! ID: ${req.params.id}, User: ${req.user?.id}`);
+    console.log(`🔥 DELETE ОБРАБОТЧИК НАЧАЛ РАБОТУ!`);
     
     try {
       const id = parseInt(req.params.id);
