@@ -136,6 +136,57 @@ function requireRole(roles: string[]) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // САМЫЙ ПЕРВЫЙ ОБРАБОТЧИК - УДАЛЕНИЕ АВТОМОБИЛЕЙ (КРИТИЧЕСКИ ВАЖНО!)
+  app.get("/api/delete-car-action/:id", async (req, res) => {
+    console.log(`🔥🔥🔥 GET DELETE ENDPOINT СРАБОТАЛ! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
+    console.log(`🔥🔥🔥 Полный URL: ${req.originalUrl}, метод: ${req.method}`);
+    
+    // Проверяем авторизацию вручную
+    if (!req.user) {
+      console.log(`❌ Пользователь не авторизован в DELETE endpoint`);
+      return res.status(401).json({ message: "Требуется авторизация" });
+    }
+    
+    try {
+      const id = parseInt(req.params.id);
+      console.log(`🗑️ Пользователь ${req.user.id} удаляет автомобиль ID: ${id}`);
+      
+      // Проверяем, что автомобиль принадлежит пользователю
+      const car = await storage.getCar(id);
+      if (!car) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      if (car.createdBy !== req.user.id) {
+        return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
+      }
+      
+      // Удаляем все сообщения связанные с этим автомобилем
+      const allMessages = await storage.getAllMessages();
+      const messagesToDelete = allMessages.filter((msg: any) => msg.carId === id);
+      
+      for (const message of messagesToDelete) {
+        await storage.deleteMessage(message.id);
+        console.log(`📨 Удалено сообщение ID: ${message.id}`);
+      }
+      
+      // Удаляем автомобиль
+      const deleted = await storage.deleteCar(id);
+      if (!deleted) {
+        return res.status(500).json({ message: "Ошибка при удалении автомобиля" });
+      }
+      
+      console.log(`✅ Автомобиль "${car.name}" успешно удален пользователем ${req.user.id}`);
+      
+      res.json({ 
+        message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.` 
+      });
+    } catch (error) {
+      console.error("❌ Ошибка при снятии автомобиля с продажи:", error);
+      res.status(500).json({ message: "Ошибка при снятии автомобиля с продажи" });
+    }
+  });
+
   // КРИТИЧЕСКИ ВАЖНО: Специальный обработчик для предотвращения перехвата DELETE запросов
   app.use('/api/my-cars/:id', (req, res, next) => {
     if (req.method === 'DELETE') {
