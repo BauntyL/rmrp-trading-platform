@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { TermsModal } from "@/components/terms-modal";
 
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
@@ -12,7 +13,7 @@ import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
 function Router() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, showTermsModal, acceptTerms } = useAuth();
 
   if (isLoading) {
     return (
@@ -29,11 +30,16 @@ function Router() {
 
   // Если пользователь есть - показываем соответствующие страницы
   return (
-    <Switch>
-      <Route path="/auth" component={HomePage} />
-      <Route path="/" component={HomePage} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <Switch>
+        <Route path="/auth" component={HomePage} />
+        <Route path="/" component={HomePage} />
+        <Route component={NotFound} />
+      </Switch>
+      
+      {/* Модальное окно с условиями для новых пользователей */}
+      <TermsModal open={showTermsModal} onAccept={acceptTerms} />
+    </>
   );
 }
 
