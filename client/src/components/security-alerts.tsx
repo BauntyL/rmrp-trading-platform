@@ -121,7 +121,6 @@ export function SecurityAlerts() {
                     <p className="text-sm text-white">{event.details}</p>
                     <p className="text-xs text-slate-400">
                       {new Date(event.timestamp).toLocaleString('ru-RU')}
-                      {event.ip && ` • IP: ${event.ip}`}
                     </p>
                   </div>
                 </div>
