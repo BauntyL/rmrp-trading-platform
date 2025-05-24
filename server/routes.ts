@@ -707,7 +707,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Удаление сообщения (только для модераторов и админов)
-  app.delete("/api/messages/:id", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+  app.post("/api/messages/:id/delete", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
     console.log(`🚀 DELETE /api/messages/:id ЗАПРОС ПОЛУЧЕН!`);
     console.log(`📝 Параметры:`, req.params);
     console.log(`👤 Пользователь:`, req.user?.id, req.user?.username, req.user?.role);
