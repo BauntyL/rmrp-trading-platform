@@ -409,10 +409,14 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
+      console.log("🔍 POST /api/messages - Пользователь:", req.user?.id, req.user?.username);
+      console.log("🔍 POST /api/messages - Данные:", req.body);
+      
       const { carId, sellerId, message } = req.body;
       
       // Валидация данных
       if (!carId || !sellerId || !message) {
+        console.log("❌ Валидация: отсутствуют поля");
         return res.status(400).json({ message: "Все поля обязательны" });
       }
       
@@ -420,19 +424,26 @@ export function registerRoutes(app: Express): Server {
       const sellerIdNum = parseInt(sellerId);
       
       if (isNaN(carIdNum) || isNaN(sellerIdNum)) {
+        console.log("❌ Валидация: некорректные ID");
         return res.status(400).json({ message: "Некорректные ID" });
       }
       
       // Проверяем, что автомобиль существует
       const car = await storage.getCar(carIdNum);
       if (!car) {
+        console.log("❌ Автомобиль не найден:", carIdNum);
         return res.status(404).json({ message: "Автомобиль не найден" });
       }
       
+      console.log("🚗 Автомобиль найден:", car.name, "владелец:", car.createdBy);
+      
       // Проверяем, что пользователь не пишет сам себе
       if (req.user!.id === sellerIdNum) {
+        console.log("❌ Пользователь пытается писать самому себе");
         return res.status(400).json({ message: "Нельзя писать самому себе" });
       }
+      
+      console.log("✅ Отправка сообщения от", req.user!.id, "к", sellerIdNum);
       
       const newMessage = await storage.sendMessage({
         carId: carIdNum,
@@ -441,9 +452,10 @@ export function registerRoutes(app: Express): Server {
         message: message.trim(),
       });
       
+      console.log("✅ Сообщение отправлено:", newMessage.id);
       res.status(201).json(newMessage);
     } catch (error) {
-      console.error("Ошибка при отправке сообщения:", error);
+      console.error("❌ Ошибка при отправке сообщения:", error);
       res.status(500).json({ message: "Ошибка при отправке сообщения" });
     }
   });
