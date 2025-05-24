@@ -47,7 +47,6 @@ export function MessageModerationPanel() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       toast({
         title: "Успешно",
