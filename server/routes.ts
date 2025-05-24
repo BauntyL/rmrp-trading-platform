@@ -1146,7 +1146,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const userId = req.user!.id;
       const count = await storage.getUnreadMessagesCount(userId);
-      console.log(`📊 Счетчик непрочитанных сообщений для пользователя ${userId}: ${count}`);
+      console.log(`📊 Счетчик непрочитанных сообщений для пользователя ${userId} (${req.user?.username}): ${count}`);
       
       // Отключаем кеширование для точного счетчика
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

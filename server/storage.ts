@@ -81,6 +81,9 @@ export class MemStorage implements IStorage {
   private favoriteIdCounter = 1;
   private messageIdCounter = 1;
   
+  // Кэш счетчиков для предотвращения скачков
+  private unreadCountCache = new Map<number, { count: number; lastUpdate: number }>();
+  
   public sessionStore: session.SessionStore;
   private dataDir = path.join(process.cwd(), 'data');
 
@@ -477,6 +480,11 @@ export class MemStorage implements IStorage {
     };
     
     this.messages.set(message.id, message);
+    
+    // Сбрасываем кэш счетчиков для всех участников
+    this.unreadCountCache.delete(message.senderId);
+    this.unreadCountCache.delete(message.recipientId);
+    
     this.saveData();
     return message;
   }
@@ -485,6 +493,11 @@ export class MemStorage implements IStorage {
     const message = this.messages.get(messageId);
     if (message) {
       message.isRead = true;
+      
+      // Сбрасываем кэш счетчиков при изменении статуса прочтения
+      this.unreadCountCache.delete(message.senderId);
+      this.unreadCountCache.delete(message.recipientId);
+      
       this.saveData();
       return true;
     }
@@ -513,9 +526,27 @@ export class MemStorage implements IStorage {
   }
 
   async getUnreadMessagesCount(userId: number): Promise<number> {
-    return Array.from(this.messages.values()).filter(
-      message => message.recipientId === userId && !message.isRead
-    ).length;
+    const now = Date.now();
+    const cached = this.unreadCountCache.get(userId);
+    
+    // Используем кэш если он свежий (менее 1 секунды)
+    if (cached && (now - cached.lastUpdate) < 1000) {
+      console.log(`📊 Кэш для пользователя ${userId}: ${cached.count}`);
+      return cached.count;
+    }
+    
+    const allMessages = Array.from(this.messages.values());
+    const userMessages = allMessages.filter(message => message.recipientId === userId);
+    const unreadMessages = userMessages.filter(message => !message.isRead);
+    
+    const count = unreadMessages.length;
+    
+    // Обновляем кэш
+    this.unreadCountCache.set(userId, { count, lastUpdate: now });
+    
+    console.log(`🔍 Новый подсчет для пользователя ${userId}: ${count}`);
+    
+    return count;
   }
 
   async getAllMessages(): Promise<any[]> {
