@@ -59,7 +59,11 @@ export default function HomePage() {
       await apiRequest("DELETE", `/api/cars/${carId}`);
     },
     onSuccess: () => {
+      // Принудительно обновляем все связанные кеши
+      queryClient.removeQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
       toast({
         title: "Автомобиль удален",
         description: "Автомобиль успешно удален из каталога",

@@ -112,8 +112,11 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
       return await res.json();
     },
     onSuccess: () => {
+      // Принудительно обновляем все связанные кеши
+      queryClient.removeQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
       toast({
         title: "Автомобиль обновлен",
         description: "Изменения успешно сохранены",
