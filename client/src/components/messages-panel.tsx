@@ -29,7 +29,7 @@ export function MessagesPanel() {
   }, []);
 
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["/api/messages"],
+    queryKey: ["/api/messages", Date.now()], // Добавляем timestamp для принудительного обновления
     staleTime: 0,
     refetchOnMount: true,
   });
