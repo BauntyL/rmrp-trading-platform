@@ -112,9 +112,8 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onAddToFavorites
           className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white dark:hover:bg-slate-800"
           onClick={(e) => {
             e.stopPropagation();
-            toggleFavoriteMutation.mutate();
+            handleToggleFavorite();
           }}
-          disabled={toggleFavoriteMutation.isPending}
         >
           <Heart 
             className={`h-4 w-4 transition-colors ${
