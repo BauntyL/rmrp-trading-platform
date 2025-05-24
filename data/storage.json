@@ -107,6 +107,25 @@
         "reviewedAt": "2025-05-24T14:24:30.543Z",
         "createdAt": "2025-05-24T14:24:12.947Z"
       }
+    ],
+    [
+      3,
+      {
+        "name": "Ferrari 488 GTB",
+        "price": 1111,
+        "maxSpeed": 1111,
+        "acceleration": "3232",
+        "drive": "RWD",
+        "category": "sport",
+        "server": "rublevka",
+        "isPremium": true,
+        "createdBy": 2,
+        "id": 3,
+        "status": "rejected",
+        "reviewedBy": 1,
+        "reviewedAt": "2025-05-24T14:27:03.493Z",
+        "createdAt": "2025-05-24T14:26:27.545Z"
+      }
     ]
   ],
   "favorites": [],
@@ -171,7 +190,7 @@
   "counters": {
     "userIdCounter": 3,
     "carIdCounter": 3,
-    "carApplicationIdCounter": 3,
+    "carApplicationIdCounter": 4,
     "favoriteIdCounter": 1,
     "messageIdCounter": 5
   }
