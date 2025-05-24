@@ -483,6 +483,8 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/messages", requireAuth, async (req, res) => {
+    console.log("🎯 Обработка запроса /api/messages для пользователя:", req.user!.id);
+    
     // Отключаем кэширование заранее
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -490,6 +492,7 @@ export function registerRoutes(app: Express): Server {
     
     try {
       const messages = await storage.getMessagesByUser(req.user!.id);
+      console.log("📨 Получено сообщений из базы:", messages.length);
       
       // Обогащаем сообщения информацией о пользователях и автомобилях
       const enrichedMessages = [];
