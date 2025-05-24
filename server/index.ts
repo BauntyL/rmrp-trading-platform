@@ -8,6 +8,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // Приоритетная обработка API запросов ПЕРЕД Vite middleware
 app.use('/api', (req, res, next) => {
+  console.log(`🚀 Ранний перехват API: ${req.method} ${req.originalUrl}`);
   // Устанавливаем правильный Content-Type для API ответов
   res.setHeader('Content-Type', 'application/json');
   next();
