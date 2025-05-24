@@ -173,10 +173,8 @@ export default function HomePage() {
   };
 
   const handleRemoveCar = (car: Car) => {
-    console.log("handleRemoveCar вызвана для автомобиля:", car.name);
     setCarToRemove(car);
     setShowRemoveCarModal(true);
-    console.log("Состояние модального окна установлено в true");
   };
 
   const renderContent = () => {

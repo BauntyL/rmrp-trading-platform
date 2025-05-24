@@ -29,7 +29,15 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
       const response = await apiRequest("DELETE", `/api/my-cars/${carId}`);
-      return await response.json();
+      
+      // Проверяем, что ответ действительно содержит JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        // Если ответ не JSON, возвращаем объект с сообщением
+        return { message: "Автомобиль успешно снят с продажи" };
+      }
     },
     onSuccess: (data) => {
       toast({
