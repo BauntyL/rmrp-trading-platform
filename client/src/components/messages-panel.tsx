@@ -173,7 +173,7 @@ export function MessagesPanel() {
                         {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </p>
                     </div>
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p className="text-sm leading-relaxed">{message.content || message.message || "Сообщение"}</p>
                   </div>
                 </div>
               );
