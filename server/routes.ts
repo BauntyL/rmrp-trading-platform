@@ -1,6 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+
+// Декларация типов для global функции
+declare global {
+  var sendNotification: (userId: number, notification: any) => void;
+}
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertCarSchema, insertCarApplicationSchema } from "@shared/schema";
@@ -454,6 +459,22 @@ export function registerRoutes(app: Express): Server {
       });
       
       console.log("✅ Сообщение отправлено:", newMessage.id);
+      
+      // Отправляем push-уведомление получателю в реальном времени
+      if (global.sendNotification) {
+        const senderName = req.user!.username;
+        global.sendNotification(sellerIdNum, {
+          type: "new_message",
+          data: {
+            carId: carIdNum,
+            carName: car.name,
+            senderName: senderName,
+            message: message.trim(),
+          }
+        });
+        console.log("📨 Push-уведомление отправлено пользователю:", sellerIdNum);
+      }
+      
       res.status(201).json(newMessage);
     } catch (error) {
       console.error("❌ Ошибка при отправке сообщения:", error);
@@ -507,13 +528,12 @@ export function registerRoutes(app: Express): Server {
 
     ws.on('close', () => {
       // Удаляем соединение при отключении
-      for (const [userId, connection] of userConnections.entries()) {
+      userConnections.forEach((connection, userId) => {
         if (connection === ws) {
           userConnections.delete(userId);
           console.log(`👤 Пользователь ${userId} отключен от WebSocket`);
-          break;
         }
-      }
+      });
     });
 
     ws.on('error', (error) => {
