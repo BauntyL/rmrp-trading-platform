@@ -11,6 +11,109 @@ import { storage } from "./storage";
 import { insertCarSchema, insertCarApplicationSchema } from "@shared/schema";
 import { z } from "zod";
 
+// Система модерации сообщений
+interface ModerationResult {
+  allowed: boolean;
+  reason?: string;
+  cleanContent: string;
+}
+
+function moderateMessage(content: string): ModerationResult {
+  const message = content.toLowerCase();
+  
+  // Список запрещенных слов (мат, оскорбления)
+  const profanity = [
+    'блядь', 'сука', 'пизда', 'хуй', 'ебать', 'гавно', 'говно', 'дерьмо',
+    'козел', 'козёл', 'дебил', 'идиот', 'тварь', 'уебан', 'уёбан',
+    'мразь', 'гнида', 'падла', 'сволочь', 'ублюдок', 'мудак', 'дурак'
+  ];
+  
+  // Политические термины
+  const political = [
+    'путин', 'зеленский', 'biden', 'украина', 'россия',
+    'война', 'санкции', 'политика', 'выборы', 'президент'
+  ];
+  
+  // Межнациональная рознь
+  const ethnic = [
+    'хохол', 'москаль', 'русня', 'укроп', 'ватник', 'бандера',
+    'кацап', 'америкос', 'пиндос', 'негр', 'азиат'
+  ];
+  
+  // Подозрительные ссылки и контакты
+  const links = [
+    'http://', 'https://', 'www.', '.com', '.ru', '.ua', '.org',
+    'telegram', 'whatsapp', 'viber', 'skype', '+7', '+380', '+1'
+  ];
+  
+  // Проверка на мат
+  for (const word of profanity) {
+    if (message.includes(word)) {
+      return {
+        allowed: false,
+        reason: "недопустимые выражения",
+        cleanContent: content
+      };
+    }
+  }
+  
+  // Проверка на политику
+  for (const word of political) {
+    if (message.includes(word)) {
+      return {
+        allowed: false,
+        reason: "политические темы запрещены",
+        cleanContent: content
+      };
+    }
+  }
+  
+  // Проверка на межнациональную рознь
+  for (const word of ethnic) {
+    if (message.includes(word)) {
+      return {
+        allowed: false,
+        reason: "межнациональная рознь недопустима",
+        cleanContent: content
+      };
+    }
+  }
+  
+  // Проверка на ссылки и контакты
+  for (const link of links) {
+    if (message.includes(link)) {
+      return {
+        allowed: false,
+        reason: "ссылки и контакты запрещены в чате",
+        cleanContent: content
+      };
+    }
+  }
+  
+  // Проверка на спам (повторяющиеся символы)
+  if (/(.)\1{4,}/.test(message)) {
+    return {
+      allowed: false,
+      reason: "спам недопустим",
+      cleanContent: content
+    };
+  }
+  
+  // Проверка на длину сообщения
+  if (content.length > 500) {
+    return {
+      allowed: false,
+      reason: "сообщение слишком длинное (максимум 500 символов)",
+      cleanContent: content
+    };
+  }
+  
+  return {
+    allowed: true,
+    cleanContent: content
+  };
+}
+
 // Middleware для проверки аутентификации
 function requireAuth(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) {
@@ -449,6 +552,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ message: "Нельзя писать самому себе" });
       }
       
+      // Модерация сообщений
+      const moderationResult = moderateMessage(message.trim());
+      if (!moderationResult.allowed) {
+        console.log("🚫 Сообщение заблокировано:", moderationResult.reason);
+        return res.status(400).json({ 
+          message: `Сообщение заблокировано: ${moderationResult.reason}`,
+          blocked: true 
+        });
+      }
+      
       console.log("✅ Отправка сообщения от", req.user!.id, "к", sellerIdNum);
       
       const newMessage = await storage.sendMessage({
@@ -457,7 +570,7 @@ export function registerRoutes(app: Express): Server {
         sellerId: sellerIdNum,
         senderId: req.user!.id,
         recipientId: sellerIdNum,
-        content: message.trim(),
+        content: moderationResult.cleanContent,
       });
       
       console.log("✅ Сообщение отправлено:", newMessage.id);

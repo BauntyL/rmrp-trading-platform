@@ -64,12 +64,23 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Ошибка отправки",
-        description: error.message || "Не удалось отправить сообщение",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      // Проверяем, если это ошибка модерации
+      const errorMessage = error.message || "Не удалось отправить сообщение";
+      
+      if (errorMessage.includes("заблокировано")) {
+        toast({
+          title: "🚫 Сообщение заблокировано",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Ошибка отправки",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -111,9 +122,11 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
               required
               className="resize-none"
             />
-            <p className="text-sm text-muted-foreground">
-              Будьте вежливы и конкретны в своем сообщении
-            </p>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mt-2">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                ⚠️ <strong>Правила общения:</strong> Запрещены мат, политика, межнациональная рознь, ссылки и контакты. Максимум 500 символов.
+              </p>
+            </div>
           </div>
           
           <DialogFooter>
