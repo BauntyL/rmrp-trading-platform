@@ -283,7 +283,7 @@ export default function AuthPage() {
                               />
                             </FormControl>
                             <p className="text-xs text-slate-400 mt-1">
-                              Строго формат: Имя Фамилия (только буквы и один пробел между именем и фамилией)
+                              Пример: Иван Иванов
                             </p>
                             <FormMessage />
                           </FormItem>
