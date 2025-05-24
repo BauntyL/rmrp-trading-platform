@@ -28,15 +28,26 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
-      const response = await apiRequest("DELETE", `/api/my-cars/${carId}`);
+      console.log("🚀 Начинаем DELETE запрос для автомобиля ID:", carId);
       
-      // Проверяем, что ответ действительно содержит JSON
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json();
-      } else {
-        // Если ответ не JSON, возвращаем объект с сообщением
-        return { message: "Автомобиль успешно снят с продажи" };
+      try {
+        const response = await apiRequest("DELETE", `/api/my-cars/${carId}`);
+        console.log("🚀 Получен ответ от сервера:", response.status, response.statusText);
+        
+        // Проверяем, что ответ действительно содержит JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          console.log("🚀 JSON данные из ответа:", data);
+          return data;
+        } else {
+          // Если ответ не JSON, возвращаем объект с сообщением
+          console.log("🚀 Ответ не содержит JSON, возвращаем стандартное сообщение");
+          return { message: "Автомобиль успешно снят с продажи" };
+        }
+      } catch (error) {
+        console.error("🚀 Ошибка при выполнении DELETE запроса:", error);
+        throw error;
       }
     },
     onSuccess: (data) => {
