@@ -28,17 +28,17 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
-      console.log("🟢 Начинаем POST REMOVE запрос для автомобиля ID:", carId);
+      console.log("🟡 Начинаем SPECIAL REMOVE запрос для автомобиля ID:", carId);
       
       try {
-        const response = await apiRequest("POST", `/api/my-cars/${carId}/remove`, {});
-        console.log("🟢 Получен ответ от сервера:", response.status, response.statusText);
+        const response = await apiRequest("POST", "/api/remove-car", { carId });
+        console.log("🟡 Получен ответ от сервера:", response.status, response.statusText);
         
         const data = await response.json();
-        console.log("🟢 JSON данные из ответа:", data);
+        console.log("🟡 JSON данные из ответа:", data);
         return data;
       } catch (error) {
-        console.error("🟢 Ошибка при выполнении POST REMOVE запроса:", error);
+        console.error("🟡 Ошибка при выполнении SPECIAL REMOVE запроса:", error);
         throw error;
       }
     },

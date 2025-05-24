@@ -270,12 +270,12 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // АЛЬТЕРНАТИВНЫЙ POST роут для снятия автомобиля с продажи (обход проблемы с DELETE)
-  app.post("/api/my-cars/:id/remove", requireAuth, async (req, res) => {
-    console.log(`🟢🟢🟢 POST REMOVE ENDPOINT! ID: ${req.params.id}, User: ${req.user?.id}`);
+  // СПЕЦИАЛЬНЫЙ роут для снятия автомобиля с продажи (обход конфликтов маршрутизации)
+  app.post("/api/remove-car", requireAuth, async (req, res) => {
+    console.log(`🟡🟡🟡 SPECIAL REMOVE ENDPOINT! Car ID: ${req.body.carId}, User: ${req.user?.id}`);
     
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.body.carId);
       console.log(`🚗 Пользователь ${req.user!.id} (${req.user!.username}) снимает с продажи автомобиль ID: ${id}`);
       
       // Проверяем, что автомобиль принадлежит пользователю
