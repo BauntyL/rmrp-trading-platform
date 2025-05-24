@@ -136,6 +136,18 @@ function requireRole(roles: string[]) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // КРИТИЧЕСКИ ВАЖНО: Добавляем debug middleware В САМОМ НАЧАЛЕ
+  app.use('/api', (req, res, next) => {
+    console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
+    
+    // Специальная проверка для нашего уникального endpoint
+    if (req.url.includes('/delete-my-car-completely')) {
+      console.log(`🟢🟢🟢 НАЙДЕН УНИКАЛЬНЫЙ DELETE ЗАПРОС! URL: ${req.url}, Method: ${req.method}, Body:`, req.body);
+    }
+    
+    next();
+  });
+
   // НОВЫЙ УНИКАЛЬНЫЙ ОБРАБОТЧИК - ПОЛНОЕ УДАЛЕНИЕ АВТОМОБИЛЯ
   app.post("/api/delete-my-car-completely", requireAuth, async (req, res) => {
     console.log(`🟢🟢🟢 УНИКАЛЬНЫЙ DELETE ENDPOINT СРАБОТАЛ! Car ID: ${req.body.carId}, User: ${req.user?.id || 'неавторизован'}`);
@@ -307,22 +319,7 @@ export function registerRoutes(app: Express): Server {
     next();
   });
   
-  // Добавляем debug middleware для всех API запросов
-  app.use('/api', (req, res, next) => {
-    console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
-    
-    // Специальная проверка для нашего delete endpoint
-    if (req.url.includes('/remove')) {
-      console.log(`🎯 НАЙДЕН REMOVE ЗАПРОС! URL: ${req.url}, Method: ${req.method}`);
-    }
-    
-    // Специальная проверка для нашего уникального endpoint
-    if (req.url.includes('/delete-my-car-completely')) {
-      console.log(`🟢🟢🟢 НАЙДЕН УНИКАЛЬНЫЙ DELETE ЗАПРОС! URL: ${req.url}, Method: ${req.method}, Body:`, req.body);
-    }
-    
-    next();
-  });
+
 
 
 
