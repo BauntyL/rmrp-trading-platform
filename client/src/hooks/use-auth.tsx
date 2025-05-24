@@ -52,7 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
-      // Очищаем сохраненные данные при неудачном входе
+      // Полностью очищаем данные пользователя при неудачном входе
+      queryClient.setQueryData(["/api/user"], null);
+      queryClient.removeQueries({ queryKey: ["/api/user"] });
       localStorage.removeItem("rememberedCredentials");
       
       toast({
