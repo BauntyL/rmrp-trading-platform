@@ -21,7 +21,31 @@
       }
     ]
   ],
-  "cars": [],
+  "cars": [
+    [
+      1,
+      {
+        "name": "BMW M5",
+        "imageUrl": "https://iy.kommersant.ru/Issues.photo/RADIO/2024/07/10/KMO_111307_58244_1_t218_162945.jpg",
+        "price": 10000000,
+        "maxSpeed": 200,
+        "acceleration": "5",
+        "drive": "RWD",
+        "category": "sport",
+        "server": "patriki",
+        "serverId": "477-554",
+        "phone": "+7 (999) 123-45-67",
+        "telegram": "@tg",
+        "discord": "aaaa#2222",
+        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
+        "isPremium": true,
+        "createdBy": 3,
+        "createdAt": "2025-05-24T11:29:56.456Z",
+        "id": 1,
+        "status": "active"
+      }
+    ]
+  ],
   "carApplications": [
     [
       2,
@@ -60,13 +84,38 @@
         "reviewedAt": "2025-05-24T02:58:00.058Z",
         "createdAt": "2025-05-24T02:57:49.250Z"
       }
+    ],
+    [
+      4,
+      {
+        "name": "BMW M5",
+        "imageUrl": "https://iy.kommersant.ru/Issues.photo/RADIO/2024/07/10/KMO_111307_58244_1_t218_162945.jpg",
+        "price": 10000000,
+        "maxSpeed": 200,
+        "acceleration": "5",
+        "drive": "RWD",
+        "category": "sport",
+        "server": "patriki",
+        "serverId": "477-554",
+        "phone": "+7 (999) 123-45-67",
+        "telegram": "@tg",
+        "discord": "aaaa#2222",
+        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
+        "isPremium": true,
+        "createdBy": 3,
+        "id": 4,
+        "status": "approved",
+        "reviewedBy": 1,
+        "reviewedAt": "2025-05-24T11:29:56.456Z",
+        "createdAt": "2025-05-24T11:29:49.268Z"
+      }
     ]
   ],
   "favorites": [],
   "counters": {
     "userIdCounter": 4,
-    "carIdCounter": 1,
-    "carApplicationIdCounter": 4,
+    "carIdCounter": 2,
+    "carApplicationIdCounter": 5,
     "favoriteIdCounter": 1
   }
 }

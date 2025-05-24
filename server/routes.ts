@@ -410,14 +410,40 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
       const { carId, sellerId, message } = req.body;
+      
+      // Валидация данных
+      if (!carId || !sellerId || !message) {
+        return res.status(400).json({ message: "Все поля обязательны" });
+      }
+      
+      const carIdNum = parseInt(carId);
+      const sellerIdNum = parseInt(sellerId);
+      
+      if (isNaN(carIdNum) || isNaN(sellerIdNum)) {
+        return res.status(400).json({ message: "Некорректные ID" });
+      }
+      
+      // Проверяем, что автомобиль существует
+      const car = await storage.getCar(carIdNum);
+      if (!car) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      // Проверяем, что пользователь не пишет сам себе
+      if (req.user!.id === sellerIdNum) {
+        return res.status(400).json({ message: "Нельзя писать самому себе" });
+      }
+      
       const newMessage = await storage.sendMessage({
-        carId: parseInt(carId),
+        carId: carIdNum,
         buyerId: req.user!.id,
-        sellerId: parseInt(sellerId),
-        message: message,
+        sellerId: sellerIdNum,
+        message: message.trim(),
       });
+      
       res.status(201).json(newMessage);
     } catch (error) {
+      console.error("Ошибка при отправке сообщения:", error);
       res.status(500).json({ message: "Ошибка при отправке сообщения" });
     }
   });

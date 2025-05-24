@@ -29,8 +29,21 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
-      const res = await apiRequest("POST", "/api/messages", data);
-      return await res.json();
+      try {
+        const res = await apiRequest("POST", "/api/messages", data);
+        
+        // Проверяем, что ответ содержит JSON
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Ошибка аутентификации. Пожалуйста, войдите в систему заново.");
+        }
+        
+        const result = await res.json();
+        return result;
+      } catch (error) {
+        console.error("Ошибка отправки сообщения:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({
@@ -44,7 +57,7 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
     onError: (error: Error) => {
       toast({
         title: "Ошибка отправки",
-        description: error.message,
+        description: error.message || "Не удалось отправить сообщение",
         variant: "destructive",
       });
     },
