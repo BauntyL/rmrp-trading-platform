@@ -17,7 +17,6 @@ import {
   LogOut,
   Crown,
   Lock,
-  MessageCircle,
 } from "lucide-react";
 
 interface SidebarProps {
