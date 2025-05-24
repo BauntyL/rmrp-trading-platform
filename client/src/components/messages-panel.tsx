@@ -41,35 +41,16 @@ export function MessagesPanel() {
   // Мутация для отметки сообщений как прочитанных
   const markReadMutation = useMutation({
     mutationFn: async ({ carId, buyerId, sellerId }: { carId: number; buyerId: number; sellerId: number }) => {
-      console.log("📨 Отправляем запрос на отметку сообщений:", { carId, buyerId, sellerId });
-      try {
-        const res = await apiRequest("POST", "/api/messages/mark-read", { carId, buyerId, sellerId });
-        
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        
-        const result = await res.json();
-        console.log("✅ Ответ сервера:", result);
-        return result;
-      } catch (error) {
-        console.error("❌ Ошибка в запросе:", error);
-        throw error;
-      }
+      const res = await apiRequest("POST", "/api/messages/mark-read", { carId, buyerId, sellerId });
+      return res.json();
     },
-    onSuccess: (data) => {
-      console.log("🎉 Успешно отмечено сообщений:", data?.markedCount || 0);
+    onSuccess: () => {
       // Обновляем счетчик непрочитанных сообщений
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
     },
     onError: (error) => {
       console.error("Ошибка при отметке сообщений как прочитанных:", error);
-      toast({
-        title: "Ошибка", 
-        description: "Не удалось отметить сообщения как прочитанные",
-        variant: "destructive",
-      });
     },
   });
 
