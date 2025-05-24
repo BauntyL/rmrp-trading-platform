@@ -716,8 +716,18 @@ export function registerRoutes(app: Express): Server {
       const messageId = parseInt(req.params.id);
       console.log(`🗑️ DELETE /api/messages/${messageId} - Модератор: ${req.user!.id} ${req.user!.username}`);
       
+      // Проверяем, существует ли сообщение ДО удаления
+      const messagesBefore = await storage.getAllMessages();
+      console.log(`📊 Сообщений ДО удаления: ${messagesBefore.length}`);
+      const targetMessage = messagesBefore.find(m => m.id === messageId);
+      console.log(`🎯 Целевое сообщение:`, targetMessage);
+      
       const success = await storage.deleteMessage(messageId);
       console.log(`✅ Результат удаления:`, success);
+      
+      // Проверяем количество сообщений ПОСЛЕ удаления
+      const messagesAfter = await storage.getAllMessages();
+      console.log(`📊 Сообщений ПОСЛЕ удаления: ${messagesAfter.length}`);
       
       if (success) {
         console.log(`✅ Сообщение ${messageId} успешно удалено`);
