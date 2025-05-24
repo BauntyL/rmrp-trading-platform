@@ -30,40 +30,59 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
-      // Версия 2.0 - используем POST вместо WebSocket
-      console.log("🚀 Используем специальный POST запрос для удаления автомобиля ID:", carId);
+      // Версия 3.0 - используем WebSocket для обхода Vite
+      console.log("📡 Используем WebSocket для удаления автомобиля ID:", carId);
       
-      try {
-        const response = await apiRequest("POST", "/delete-car-endpoint", {
-          carId: carId,
-          action: "remove_from_sale",
-          timestamp: Date.now()
-        });
+      return new Promise((resolve, reject) => {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const ws = new WebSocket(wsUrl);
         
-        console.log("🔥 Получен ответ от сервера:", response.status, response.statusText);
+        const timeoutId = setTimeout(() => {
+          ws.close();
+          reject(new Error("Таймаут удаления автомобиля"));
+        }, 10000);
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.log("❌ Текст ошибки от сервера:", errorText);
-          throw new Error(`Ошибка сервера: ${response.status} - ${errorText}`);
-        }
+        ws.onopen = () => {
+          console.log("📡 WebSocket соединение для удаления установлено");
+          ws.send(JSON.stringify({
+            type: 'DELETE_CAR',
+            carId: carId
+          }));
+        };
         
-        const responseText = await response.text();
-        console.log("📄 Сырой ответ сервера:", responseText);
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log("📩 Получено сообщение через WebSocket:", data);
+            
+            if (data.type === 'DELETE_CAR_SUCCESS') {
+              clearTimeout(timeoutId);
+              ws.close();
+              console.log("✅ Автомобиль успешно удален через WebSocket");
+              resolve(data);
+            } else if (data.type === 'DELETE_CAR_ERROR') {
+              clearTimeout(timeoutId);
+              ws.close();
+              console.log("❌ Ошибка удаления через WebSocket:", data.message);
+              reject(new Error(data.message || "Ошибка удаления автомобиля"));
+            }
+          } catch (parseError) {
+            console.log("❌ Ошибка парсинга WebSocket сообщения:", parseError);
+          }
+        };
         
-        try {
-          const data = JSON.parse(responseText);
-          console.log("✅ Автомобиль успешно удален:", data);
-          return data;
-        } catch (parseError) {
-          console.log("❌ Ошибка парсинга JSON:", parseError);
-          console.log("📄 Ответ не является JSON:", responseText);
-          throw new Error("Сервер вернул некорректный ответ");
-        }
-      } catch (error) {
-        console.error("❌ Ошибка при удалении автомобиля:", error);
-        throw error;
-      }
+        ws.onerror = (error) => {
+          clearTimeout(timeoutId);
+          console.log("❌ Ошибка WebSocket соединения:", error);
+          reject(new Error("Ошибка соединения с сервером"));
+        };
+        
+        ws.onclose = () => {
+          clearTimeout(timeoutId);
+          console.log("📡 WebSocket соединение закрыто");
+        };
+      });
     },
     onSuccess: (data) => {
       toast({
