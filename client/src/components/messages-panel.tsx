@@ -42,15 +42,23 @@ export function MessagesPanel() {
   const markReadMutation = useMutation({
     mutationFn: async ({ carId, buyerId, sellerId }: { carId: number; buyerId: number; sellerId: number }) => {
       const res = await apiRequest("POST", "/api/messages/mark-read", { carId, buyerId, sellerId });
+      if (!res.ok) {
+        throw new Error(`Ошибка HTTP: ${res.status}`);
+      }
       return res.json();
     },
-    onSuccess: () => {
-      // Обновляем счетчик непрочитанных сообщений
+    onSuccess: (data) => {
+      console.log("✅ Сообщения отмечены как прочитанные:", data);
+      // Принудительно обновляем данные
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      // Дополнительно обновляем через небольшую задержку
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      }, 500);
     },
     onError: (error) => {
-      console.error("Ошибка при отметке сообщений как прочитанных:", error);
+      console.error("❌ Ошибка при отметке сообщений:", error);
     },
   });
 
