@@ -23,23 +23,6 @@
   ],
   "cars": [
     [
-      3,
-      {
-        "name": "МБ Гелик 65",
-        "price": 1,
-        "maxSpeed": 1,
-        "acceleration": "5",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "isPremium": false,
-        "createdBy": 1,
-        "createdAt": "2025-05-24T02:58:00.058Z",
-        "id": 3,
-        "status": "active"
-      }
-    ],
-    [
       4,
       {
         "name": "BMW M5",

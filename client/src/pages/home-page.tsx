@@ -8,6 +8,7 @@ import { AddCarModal } from "@/components/add-car-modal";
 import { EditCarModal } from "@/components/edit-car-modal";
 import { DeleteCarModal } from "@/components/delete-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
+import { SecurityAlerts } from "@/components/security-alerts";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus } from "lucide-react";
 
-type ActiveSection = "catalog" | "favorites" | "my-cars" | "applications" | "moderation" | "users";
+type ActiveSection = "catalog" | "favorites" | "security" | "my-cars" | "applications" | "moderation" | "users";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -294,6 +295,18 @@ export default function HomePage() {
                 ))}
               </div>
             )}
+          </div>
+        );
+
+      case "security":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Безопасность аккаунта</h2>
+              <p className="text-slate-400">Настройки и статус защиты вашего аккаунта</p>
+            </div>
+            
+            <SecurityAlerts />
           </div>
         );
 
