@@ -34,7 +34,7 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
       console.log("🚀 Используем прямой fetch для удаления автомобиля ID:", carId);
       
       try {
-        const response = await fetch(window.location.origin + '/remove-car-direct', {
+        const response = await fetch(window.location.origin + '/api/delete-my-car-completely', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
