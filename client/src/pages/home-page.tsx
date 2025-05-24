@@ -7,6 +7,7 @@ import { CarDetailsModal } from "@/components/car-details-modal";
 import { AddCarModal } from "@/components/add-car-modal";
 import { EditCarModal } from "@/components/edit-car-modal";
 import { DeleteCarModal } from "@/components/delete-car-modal";
+import { RemoveCarModal } from "@/components/remove-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
 import { MessageModerationPanel } from "@/components/message-moderation-panel";
 import { SecurityAlerts } from "@/components/security-alerts";
@@ -34,6 +35,8 @@ export default function HomePage() {
   const [carToEdit, setCarToEdit] = useState<Car | null>(null);
   const [showDeleteCarModal, setShowDeleteCarModal] = useState(false);
   const [carToDelete, setCarToDelete] = useState<Car | null>(null);
+  const [showRemoveCarModal, setShowRemoveCarModal] = useState(false);
+  const [carToRemove, setCarToRemove] = useState<Car | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedServer, setSelectedServer] = useState<string>("all");
@@ -352,6 +355,10 @@ export default function HomePage() {
                     key={car.id}
                     car={car}
                     onViewDetails={setSelectedCar}
+                    onRemove={(car) => {
+                      setCarToRemove(car);
+                      setShowRemoveCarModal(true);
+                    }}
                   />
                 ))}
               </div>
@@ -521,6 +528,12 @@ export default function HomePage() {
         onOpenChange={setShowDeleteCarModal}
         onConfirm={confirmDeleteCar}
         isLoading={deleteCarMutation.isPending}
+      />
+
+      <RemoveCarModal
+        car={carToRemove}
+        open={showRemoveCarModal}
+        onOpenChange={setShowRemoveCarModal}
       />
     </div>
   );

@@ -249,6 +249,55 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Снятие автомобиля с продажи пользователем
+  app.delete("/api/my-cars/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log(`🚗 Пользователь ${req.user!.id} (${req.user!.username}) снимает с продажи автомобиль ID: ${id}`);
+      
+      // Проверяем, что автомобиль принадлежит пользователю
+      const car = await storage.getCar(id);
+      if (!car) {
+        console.log("❌ Автомобиль не найден");
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      if (car.createdBy !== req.user!.id) {
+        console.log("❌ Попытка удалить чужой автомобиль");
+        return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
+      }
+      
+      // Сначала удаляем все сообщения связанные с этим автомобилем
+      console.log(`🗑️ Удаляем все сообщения для автомобиля ID: ${id}`);
+      const allMessages = await storage.getAllMessages();
+      const messagesToDelete = allMessages.filter((msg: any) => msg.carId === id);
+      
+      for (const message of messagesToDelete) {
+        await storage.deleteMessage(message.id);
+        console.log(`📨 Удалено сообщение ID: ${message.id}`);
+      }
+      
+      // Удаляем автомобиль из избранного у всех пользователей
+      console.log(`❤️ Удаляем автомобиль из избранного всех пользователей`);
+      // Это будет обработано автоматически при удалении автомобиля в хранилище
+      
+      // Удаляем сам автомобиль
+      const deleted = await storage.deleteCar(id);
+      if (!deleted) {
+        console.log("❌ Ошибка при удалении автомобиля");
+        return res.status(500).json({ message: "Ошибка при удалении автомобиля" });
+      }
+      
+      console.log(`✅ Автомобиль ${car.name} успешно снят с продажи`);
+      res.status(200).json({ 
+        message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.` 
+      });
+    } catch (error) {
+      console.error("❌ Ошибка при снятии автомобиля с продажи:", error);
+      res.status(500).json({ message: "Ошибка при снятии автомобиля с продажи" });
+    }
+  });
+
   app.delete("/api/cars/:id", requireRole(["moderator", "admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
