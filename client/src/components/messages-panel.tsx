@@ -37,7 +37,7 @@ export function MessagesPanel() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (data: { carId: number; recipientId: number; content: string }) => {
+    mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
       const response = await apiRequest("POST", "/api/messages", data);
       return response.json();
     },
@@ -90,12 +90,12 @@ export function MessagesPanel() {
     if (!conversation || conversation.length === 0) return;
 
     const firstMessage = conversation[0];
-    const recipientId = firstMessage.buyerId === user.id ? firstMessage.sellerId : firstMessage.buyerId;
+    const sellerId = firstMessage.buyerId === user.id ? firstMessage.sellerId : firstMessage.buyerId;
 
     sendMessageMutation.mutate({
       carId: selectedConversation,
-      recipientId,
-      content: newMessage.trim(),
+      sellerId,
+      message: newMessage.trim(),
     });
   };
 
