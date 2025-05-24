@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: avtokatalog
+    name: autocatalog
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -11,6 +11,6 @@ services:
       - key: SESSION_SECRET
         generateValue: true
     disk:
-      name: avtokatalog-data
+      name: autocatalog-data
       mountPath: /opt/render/project/src/data
       sizeGB: 1
