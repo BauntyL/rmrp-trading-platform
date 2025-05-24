@@ -9,6 +9,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { deletedMessagesStore } from "@/lib/deleted-messages";
 
 interface MessageModerationData {
   id: number;
@@ -44,7 +45,10 @@ export function MessageModerationPanel() {
     mutationFn: async (messageId: number) => {
       console.log(`🗑️ Удаляем сообщение ID: ${messageId}`);
       
-      // Добавляем сообщение в список удаленных
+      // Добавляем сообщение в глобальное хранилище удаленных сообщений
+      deletedMessagesStore.add(messageId);
+      
+      // Также добавляем в локальное состояние для немедленного обновления интерфейса
       setDeletedMessages(prev => new Set(prev).add(messageId));
       
       // Симулируем API запрос

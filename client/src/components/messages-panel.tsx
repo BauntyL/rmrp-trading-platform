@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { UserStatus } from "@/components/user-status";
+import { deletedMessagesStore } from "@/lib/deleted-messages";
 
 interface Message {
   id: number;
@@ -30,8 +31,17 @@ export function MessagesPanel() {
     return saved ? parseInt(saved, 10) : null;
   });
   const [newMessage, setNewMessage] = useState("");
+  const [deletedMessagesUpdate, setDeletedMessagesUpdate] = useState(0);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Подписываемся на изменения в глобальном хранилище удаленных сообщений
+  useEffect(() => {
+    const unsubscribe = deletedMessagesStore.subscribe(() => {
+      setDeletedMessagesUpdate(prev => prev + 1);
+    });
+    return unsubscribe;
+  }, []);
 
   const { data: messages = [], isLoading, error } = useQuery({
     queryKey: ["/api/messages"],
