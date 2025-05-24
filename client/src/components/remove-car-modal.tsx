@@ -72,11 +72,15 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
         ws.addEventListener('message', handleMessage);
 
         // Отправляем сообщение об удалении
-        console.log("📡 Отправляем запрос на удаление через существующее WebSocket");
-        ws.send(JSON.stringify({
+        const message = {
           type: 'DELETE_CAR',
           carId: carId
-        }));
+        };
+        console.log("📡 Отправляем запрос на удаление через существующее WebSocket");
+        console.log("📦 Отправляемое сообщение:", message);
+        console.log("🔌 WebSocket состояние:", ws.readyState, "OPEN =", WebSocket.OPEN);
+        
+        ws.send(JSON.stringify(message));
       });
     },
     onSuccess: (data) => {
