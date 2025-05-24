@@ -533,6 +533,31 @@ export function registerRoutes(app: Express): Server {
   
   // Храним активные WebSocket соединения пользователей
   const userConnections = new Map<number, WebSocket>();
+  
+  // Храним статус пользователей (онлайн/оффлайн)
+  const userStatus = new Map<number, { isOnline: boolean; lastSeen: Date }>();
+
+  // Функция для рассылки статуса пользователя всем подключенным клиентам
+  function broadcastUserStatus(userId: number, isOnline: boolean) {
+    const statusUpdate = {
+      type: 'user_status_update',
+      data: {
+        userId,
+        isOnline,
+        lastSeen: userStatus.get(userId)?.lastSeen || new Date()
+      }
+    };
+
+    userConnections.forEach((connection, connectedUserId) => {
+      if (connection.readyState === WebSocket.OPEN) {
+        try {
+          connection.send(JSON.stringify(statusUpdate));
+        } catch (error) {
+          console.error('Ошибка отправки статуса пользователя:', error);
+        }
+      }
+    });
+  }
 
   wss.on('connection', (ws) => {
     console.log('📡 Новое WebSocket соединение');
@@ -544,7 +569,11 @@ export function registerRoutes(app: Express): Server {
         if (message.type === 'authenticate' && message.userId) {
           // Регистрируем пользователя
           userConnections.set(message.userId, ws);
+          userStatus.set(message.userId, { isOnline: true, lastSeen: new Date() });
           console.log(`👤 Пользователь ${message.userId} подключен к WebSocket`);
+          
+          // Уведомляем других пользователей об изменении статуса
+          broadcastUserStatus(message.userId, true);
         }
       } catch (error) {
         console.error('Ошибка обработки WebSocket сообщения:', error);
@@ -556,7 +585,11 @@ export function registerRoutes(app: Express): Server {
       userConnections.forEach((connection, userId) => {
         if (connection === ws) {
           userConnections.delete(userId);
+          userStatus.set(userId, { isOnline: false, lastSeen: new Date() });
           console.log(`👤 Пользователь ${userId} отключен от WebSocket`);
+          
+          // Уведомляем других пользователей об изменении статуса
+          broadcastUserStatus(userId, false);
         }
       });
     });
@@ -564,6 +597,22 @@ export function registerRoutes(app: Express): Server {
     ws.on('error', (error) => {
       console.error('WebSocket ошибка:', error);
     });
+  });
+
+  // API endpoint для получения статуса пользователей
+  app.get("/api/users/status", requireAuth, async (req, res) => {
+    try {
+      const statusData: { [key: number]: { isOnline: boolean; lastSeen: Date } } = {};
+      
+      userStatus.forEach((status, userId) => {
+        statusData[userId] = status;
+      });
+      
+      res.json(statusData);
+    } catch (error) {
+      console.error("Ошибка при получении статуса пользователей:", error);
+      res.status(500).json({ message: "Ошибка при получении статуса пользователей" });
+    }
   });
 
   // Экспортируем функцию для отправки уведомлений
