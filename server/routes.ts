@@ -238,6 +238,59 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ПРЯМОЙ ЭНДПОИНТ В ОБХОД VITE MIDDLEWARE
+  app.post("/remove-car-direct", requireAuth, async (req, res) => {
+    console.log("🔥 ПРЯМОЕ УДАЛЕНИЕ: Получен запрос на удаление автомобиля");
+    console.log("🔥 Данные запроса:", req.body);
+    console.log("🔥 Пользователь:", req.user);
+
+    try {
+      const { carId } = req.body;
+      
+      if (!carId) {
+        console.log("❌ ПРЯМОЕ УДАЛЕНИЕ: ID автомобиля не указан");
+        return res.status(400).json({ message: "ID автомобиля обязателен" });
+      }
+
+      const car = await storage.getCar(carId);
+      if (!car) {
+        console.log("❌ ПРЯМОЕ УДАЛЕНИЕ: Автомобиль не найден");
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+
+      // Проверяем права: только владелец или админ может удалить
+      if (car.createdBy !== req.user.id && req.user.role !== "admin") {
+        console.log("❌ ПРЯМОЕ УДАЛЕНИЕ: Нет прав на удаление");
+        return res.status(403).json({ message: "Нет прав на удаление этого автомобиля" });
+      }
+
+      // Удаляем все сообщения связанные с этим автомобилем
+      const allMessages = await storage.getAllMessages();
+      const messagesToDelete = allMessages.filter((msg: any) => msg.carId === carId);
+      
+      for (const message of messagesToDelete) {
+        await storage.deleteMessage(message.id);
+        console.log(`📨 Удалено сообщение ID: ${message.id}`);
+      }
+
+      const success = await storage.deleteCar(carId);
+      if (success) {
+        console.log(`✅ ПРЯМОЕ УДАЛЕНИЕ: Автомобиль "${car.name}" успешно удален пользователем ${req.user.id}`);
+        res.json({ 
+          success: true, 
+          message: `Автомобиль "${car.name}" успешно удален`,
+          carId: carId
+        });
+      } else {
+        console.log("❌ ПРЯМОЕ УДАЛЕНИЕ: Не удалось удалить автомобиль из хранилища");
+        res.status(500).json({ message: "Не удалось удалить автомобиль" });
+      }
+    } catch (error) {
+      console.error("❌ ПРЯМОЕ УДАЛЕНИЕ: Ошибка при удалении автомобиля:", error);
+      res.status(500).json({ message: "Внутренняя ошибка сервера" });
+    }
+  });
+
   // НОВЫЙ УНИКАЛЬНЫЙ ОБРАБОТЧИК - ПОЛНОЕ УДАЛЕНИЕ АВТОМОБИЛЯ
   app.post("/api/delete-my-car-completely", requireAuth, async (req, res) => {
     console.log(`🟢🟢🟢 УНИКАЛЬНЫЙ DELETE ENDPOINT СРАБОТАЛ! Car ID: ${req.body.carId}, User: ${req.user?.id || 'неавторизован'}`);
