@@ -25,6 +25,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserRole(id: number, role: "user" | "moderator" | "admin"): Promise<User | undefined>;
+  updateUser(id: number, updates: { username?: string; role?: "user" | "moderator" | "admin" }): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
   getAllUsers(): Promise<User[]>;
 
   // Cars
@@ -176,6 +178,46 @@ export class MemStorage implements IStorage {
       return user;
     }
     return undefined;
+  }
+
+  async updateUser(id: number, updates: { username?: string; role?: "user" | "moderator" | "admin" }): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (user) {
+      if (updates.username) {
+        user.username = updates.username;
+      }
+      if (updates.role) {
+        user.role = updates.role;
+      }
+      this.users.set(id, user);
+      this.saveData();
+      return user;
+    }
+    return undefined;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const existed = this.users.has(id);
+    if (existed) {
+      // Удаляем пользователя
+      this.users.delete(id);
+      
+      // Удаляем все связанные данные пользователя
+      // Удаляем автомобили пользователя
+      const userCars = Array.from(this.cars.values()).filter(car => car.userId === id);
+      userCars.forEach(car => this.cars.delete(car.id));
+      
+      // Удаляем заявки пользователя
+      const userApplications = Array.from(this.carApplications.values()).filter(app => app.userId === id);
+      userApplications.forEach(app => this.carApplications.delete(app.id));
+      
+      // Удаляем избранное пользователя
+      const userFavorites = Array.from(this.favorites.values()).filter(fav => fav.userId === id);
+      userFavorites.forEach(fav => this.favorites.delete(fav.id));
+      
+      this.saveData();
+    }
+    return existed;
   }
 
   async getAllUsers(): Promise<User[]> {

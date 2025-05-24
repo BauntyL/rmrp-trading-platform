@@ -315,6 +315,63 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update user (admin only)
+  app.patch("/api/users/:id", requireRole(["admin"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { username, role } = req.body;
+      
+      if (!username || !role) {
+        return res.status(400).json({ message: "Укажите имя пользователя и роль" });
+      }
+
+      // Проверяем, что пользователь существует
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      // Проверяем, что новое имя пользователя не занято (если оно изменилось)
+      if (username !== existingUser.username) {
+        const userWithSameName = await storage.getUserByUsername(username);
+        if (userWithSameName && userWithSameName.id !== userId) {
+          return res.status(400).json({ message: "Имя пользователя уже занято" });
+        }
+      }
+
+      const updatedUser = await storage.updateUser(userId, { username, role });
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      const { password, ...safeUser } = updatedUser;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при обновлении пользователя" });
+    }
+  });
+
+  // Delete user (admin only)
+  app.delete("/api/users/:id", requireRole(["admin"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      
+      // Нельзя удалить самого себя
+      if (userId === req.user!.id) {
+        return res.status(400).json({ message: "Нельзя удалить собственный аккаунт" });
+      }
+
+      const deleted = await storage.deleteUser(userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      res.json({ message: "Пользователь успешно удален" });
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при удалении пользователя" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
