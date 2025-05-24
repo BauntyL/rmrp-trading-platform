@@ -3,7 +3,7 @@ services:
     name: autocatalog
     env: node
     plan: free
-    buildCommand: npm install && npx vite build --outDir server/public
+    buildCommand: npm install && npm run build
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
