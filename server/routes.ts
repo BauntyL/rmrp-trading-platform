@@ -166,8 +166,8 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // PATCH роут для удаления автомобилей (ВЫСШИЙ ПРИОРИТЕТ)
-  app.patch("/api/my-cars/:id", requireAuth, async (req, res) => {
+  // PATCH роут для удаления автомобилей (АБСОЛЮТНЫЙ ПРИОРИТЕТ)
+  app.patch("/api/cars-remove/:id", requireAuth, async (req, res) => {
     console.log(`🔥 PATCH DELETE ENDPOINT! ID: ${req.params.id}, Body:`, req.body);
     
     try {
