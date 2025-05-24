@@ -148,6 +148,10 @@ export function setupAuth(app: Express) {
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
     const user = await storage.getUser(id);
+    // Если пользователь был удален, завершаем сессию
+    if (!user) {
+      return done(null, false);
+    }
     done(null, user);
   });
 
