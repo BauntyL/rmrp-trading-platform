@@ -21,15 +21,38 @@ export function UnreadMessagesCounter() {
       setShowAnimation(true);
       setTimeout(() => setShowAnimation(false), 2000);
 
-      // Воспроизводим звук уведомления
+      // Воспроизводим приятный звук колокольчика
       try {
-        const audio = new Audio('data:audio/wav;base64,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');
-        audio.volume = 0.3;
-        audio.play().catch(() => {
-          // Игнорируем ошибки воспроизведения (например, если браузер требует взаимодействия пользователя)
-        });
+        // Создаем звук колокольчика с помощью Web Audio API
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const now = audioContext.currentTime;
+        
+        // Основной тон колокольчика
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioContext.destination);
+        osc1.frequency.setValueAtTime(880, now); // A5
+        osc1.frequency.exponentialRampToValueAtTime(440, now + 0.3);
+        gain1.gain.setValueAtTime(0.15, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 1);
+        osc1.start(now);
+        osc1.stop(now + 1);
+        
+        // Гармоника для более богатого звука
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        osc2.frequency.setValueAtTime(1320, now); // E6
+        osc2.frequency.exponentialRampToValueAtTime(660, now + 0.2);
+        gain2.gain.setValueAtTime(0.08, now);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+        osc2.start(now);
+        osc2.stop(now + 0.6);
       } catch (error) {
-        // Игнорируем ошибки создания аудио
+        // Fallback для старых браузеров
+        console.log("🔔 Новое сообщение!");
       }
     }
     setLastCount(unreadCount);
