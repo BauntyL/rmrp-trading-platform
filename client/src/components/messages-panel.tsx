@@ -167,7 +167,7 @@ export function MessagesPanel() {
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
                       : 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600'
                   }`}>
-                    <div className="mb-2">
+                    <div className="mb-3 pb-2 border-b border-white/20 dark:border-gray-500/30">
                       <p className="text-sm font-medium opacity-90">{senderName}</p>
                     </div>
                     <p className="text-sm leading-relaxed mb-2">{message.content || message.message || "Сообщение"}</p>
