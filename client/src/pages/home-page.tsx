@@ -299,6 +299,9 @@ export default function HomePage() {
           </div>
         );
 
+      case "messages":
+        return <MessagesPanel />;
+
       case "security":
         return (
           <div className="space-y-6">

@@ -13,6 +13,7 @@ import {
   Users,
   Moon,
   Sun,
+  MessageCircle,
   LogOut,
   Crown,
   Lock,
