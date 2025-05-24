@@ -9,6 +9,16 @@
         "role": "admin",
         "createdAt": "2025-05-24T01:11:03.227Z"
       }
+    ],
+    [
+      2,
+      {
+        "id": 2,
+        "username": "Баунти Миллер",
+        "password": "$2b$12$HGfQUc8YUUEwI3bExeP9NOo8TYgm4R3FzGxBK9vnD3Dk5Rz3FKNaS",
+        "role": "user",
+        "createdAt": "2025-05-24T10:55:42.000Z"
+      }
     ]
   ],
   "cars": [],
@@ -54,7 +64,7 @@
   ],
   "favorites": [],
   "counters": {
-    "userIdCounter": 2,
+    "userIdCounter": 3,
     "carIdCounter": 1,
     "carApplicationIdCounter": 4,
     "favoriteIdCounter": 1
