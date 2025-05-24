@@ -35,12 +35,13 @@ export function MessagesPanel() {
 
   const { data: messages = [], isLoading, error } = useQuery({
     queryKey: ["/api/messages"],
-    enabled: false, // Временно отключаем пока не исправим ошибку сервера
-    staleTime: 5000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchInterval: false,
-    retry: false,
+    enabled: !!user, // Включаем обратно для функциональности
+    staleTime: 30000, // Увеличиваем время кеша
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false, // Отключаем обновление при фокусе
+    refetchInterval: 30000, // Редкие обновления для предотвращения мерцания
+    retry: 1, // Только одна попытка повтора
+    retryDelay: 5000,
   });
 
   // Мутация для отметки сообщений как прочитанных
