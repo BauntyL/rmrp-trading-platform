@@ -543,7 +543,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Отсутствуют обязательные параметры" });
       }
       
-      const markedCount = await storage.markConversationAsRead(carId, buyerId, sellerId);
+      const markedCount = await storage.markConversationAsRead(carId, buyerId, sellerId, userId);
       res.json({ success: true, markedCount });
     } catch (error) {
       console.error("❌ Ошибка отметки сообщений как прочитанных:", error);

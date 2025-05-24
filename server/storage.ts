@@ -60,7 +60,7 @@ export interface IStorage {
   getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]>;
   sendMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(messageId: number): Promise<boolean>;
-  markConversationAsRead(carId: number, buyerId: number, sellerId: number): Promise<number>;
+  markConversationAsRead(carId: number, buyerId: number, sellerId: number, userId: number): Promise<number>;
   getUnreadMessagesCount(userId: number): Promise<number>;
 
   sessionStore: session.SessionStore;
@@ -443,13 +443,14 @@ export class MemStorage implements IStorage {
     return false;
   }
 
-  async markConversationAsRead(carId: number, buyerId: number, sellerId: number): Promise<number> {
+  async markConversationAsRead(carId: number, buyerId: number, sellerId: number, userId: number): Promise<number> {
     let markedCount = 0;
     
     Array.from(this.messages.values()).forEach(message => {
       if (message.carId === carId && 
           ((message.buyerId === buyerId && message.sellerId === sellerId) ||
            (message.buyerId === sellerId && message.sellerId === buyerId)) &&
+          message.recipientId === userId && 
           !message.isRead) {
         message.isRead = true;
         markedCount++;
@@ -465,7 +466,7 @@ export class MemStorage implements IStorage {
 
   async getUnreadMessagesCount(userId: number): Promise<number> {
     return Array.from(this.messages.values()).filter(
-      message => message.sellerId === userId && !message.isRead
+      message => message.recipientId === userId && !message.isRead
     ).length;
   }
 }
