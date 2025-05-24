@@ -31,9 +31,7 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
       console.log("🚀 Удаляем автомобиль ID:", carId);
-      
-      // Просто возвращаем успешный результат - удаление происходит через кеш
-      return { success: true, carId: carId };
+      await apiRequest("DELETE", `/api/my-cars/${carId}`);
     },
     onSuccess: (data) => {
       console.log("✅ Мутация успешна, обновляем кеши");
