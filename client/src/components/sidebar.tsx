@@ -15,6 +15,7 @@ import {
   Sun,
   LogOut,
   Crown,
+  Lock,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -134,6 +135,19 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               {favorites.length}
             </Badge>
           )}
+        </Button>
+
+        <Button
+          variant={activeSection === "security" ? "default" : "ghost"}
+          className={`w-full justify-start ${
+            activeSection === "security" 
+              ? "bg-primary text-white" 
+              : "text-slate-300 hover:bg-slate-700 hover:text-white"
+          }`}
+          onClick={() => onSectionChange("security")}
+        >
+          <Lock className="h-5 w-5 mr-3" />
+          Безопасность
         </Button>
 
         <Button

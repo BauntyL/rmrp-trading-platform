@@ -38,6 +38,29 @@
         "id": 3,
         "status": "active"
       }
+    ],
+    [
+      4,
+      {
+        "name": "BMW M5",
+        "imageUrl": "https://bmw.scene7.com/is/image/BMW/g90_driving-dynamics_fb?qlt=80&wid=1024&fmt=webp",
+        "price": 12000000,
+        "maxSpeed": 240,
+        "acceleration": "5.2",
+        "drive": "RWD",
+        "category": "sport",
+        "server": "patriki",
+        "serverId": "477-554",
+        "phone": "+7 (999) 123-45-67",
+        "telegram": "@tg",
+        "discord": "aaaa#2222",
+        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
+        "isPremium": true,
+        "createdBy": 2,
+        "createdAt": "2025-05-24T09:56:49.591Z",
+        "id": 4,
+        "status": "active"
+      }
     ]
   ],
   "carApplications": [
@@ -122,6 +145,31 @@
         "reviewedAt": "2025-05-24T04:03:12.325Z",
         "createdAt": "2025-05-24T03:35:39.903Z"
       }
+    ],
+    [
+      5,
+      {
+        "name": "BMW M5",
+        "imageUrl": "https://bmw.scene7.com/is/image/BMW/g90_driving-dynamics_fb?qlt=80&wid=1024&fmt=webp",
+        "price": 12000000,
+        "maxSpeed": 240,
+        "acceleration": "5.2",
+        "drive": "RWD",
+        "category": "sport",
+        "server": "patriki",
+        "serverId": "477-554",
+        "phone": "+7 (999) 123-45-67",
+        "telegram": "@tg",
+        "discord": "aaaa#2222",
+        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
+        "isPremium": true,
+        "createdBy": 2,
+        "id": 5,
+        "status": "approved",
+        "reviewedBy": 1,
+        "reviewedAt": "2025-05-24T09:56:49.591Z",
+        "createdAt": "2025-05-24T09:56:24.647Z"
+      }
     ]
   ],
   "favorites": [
@@ -155,8 +203,8 @@
   ],
   "counters": {
     "userIdCounter": 3,
-    "carIdCounter": 4,
-    "carApplicationIdCounter": 5,
+    "carIdCounter": 5,
+    "carApplicationIdCounter": 6,
     "favoriteIdCounter": 5
   }
 }

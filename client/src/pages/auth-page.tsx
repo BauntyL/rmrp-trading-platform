@@ -8,8 +8,68 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Car, Shield, Users } from "lucide-react";
+import { Car, Shield, Users, Check, X } from "lucide-react";
 import { Redirect } from "wouter";
+
+// Компонент индикатора силы пароля
+const PasswordStrengthIndicator = ({ password }: { password: string }) => {
+  const requirements = [
+    { regex: /.{8,}/, text: "Минимум 8 символов" },
+    { regex: /[A-Z]/, text: "Заглавная буква" },
+    { regex: /[a-z]/, text: "Строчная буква" },
+    { regex: /[0-9]/, text: "Цифра" },
+    { regex: /[^A-Za-z0-9]/, text: "Специальный символ" },
+  ];
+
+  const metRequirements = requirements.filter(req => req.regex.test(password));
+  const strength = metRequirements.length;
+
+  const getStrengthColor = () => {
+    if (strength <= 1) return "bg-red-500";
+    if (strength <= 3) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
+  const getStrengthText = () => {
+    if (strength <= 1) return "Слабый";
+    if (strength <= 3) return "Средний";
+    return "Сильный";
+  };
+
+  if (!password) return null;
+
+  return (
+    <div className="space-y-2 mt-2">
+      <div className="flex items-center space-x-2">
+        <div className="flex-1 bg-slate-600 rounded-full h-2">
+          <div 
+            className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor()}`}
+            style={{ width: `${(strength / 5) * 100}%` }}
+          />
+        </div>
+        <span className={`text-sm font-medium ${
+          strength <= 1 ? "text-red-400" : 
+          strength <= 3 ? "text-yellow-400" : "text-green-400"
+        }`}>
+          {getStrengthText()}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-1">
+        {requirements.map((req, index) => {
+          const met = req.regex.test(password);
+          return (
+            <div key={index} className={`flex items-center space-x-2 text-xs ${
+              met ? "text-green-400" : "text-slate-400"
+            }`}>
+              {met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+              <span>{req.text}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const loginSchema = z.object({
   username: z.string().min(1, "Введите имя пользователя"),
@@ -181,6 +241,7 @@ export default function AuthPage() {
                                 className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
                               />
                             </FormControl>
+                            <PasswordStrengthIndicator password={field.value || ""} />
                             <FormMessage />
                           </FormItem>
                         )}
