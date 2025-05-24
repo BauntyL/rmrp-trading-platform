@@ -60,6 +60,7 @@ export interface IStorage {
   getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]>;
   sendMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(messageId: number): Promise<boolean>;
+  markConversationAsRead(carId: number, buyerId: number, sellerId: number): Promise<number>;
   getUnreadMessagesCount(userId: number): Promise<number>;
 
   sessionStore: session.SessionStore;
@@ -440,6 +441,26 @@ export class MemStorage implements IStorage {
       return true;
     }
     return false;
+  }
+
+  async markConversationAsRead(carId: number, buyerId: number, sellerId: number): Promise<number> {
+    let markedCount = 0;
+    
+    Array.from(this.messages.values()).forEach(message => {
+      if (message.carId === carId && 
+          ((message.buyerId === buyerId && message.sellerId === sellerId) ||
+           (message.buyerId === sellerId && message.sellerId === buyerId)) &&
+          !message.isRead) {
+        message.isRead = true;
+        markedCount++;
+      }
+    });
+    
+    if (markedCount > 0) {
+      this.saveData();
+    }
+    
+    return markedCount;
   }
 
   async getUnreadMessagesCount(userId: number): Promise<number> {
