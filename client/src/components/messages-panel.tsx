@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: number;
@@ -21,6 +24,8 @@ interface Message {
 export function MessagesPanel() {
   const { user } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const { toast } = useToast();
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
@@ -29,6 +34,29 @@ export function MessagesPanel() {
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchInterval: false,
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (data: { carId: number; recipientId: number; content: string }) => {
+      const response = await apiRequest("POST", "/api/messages", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      setNewMessage("");
+      toast({
+        title: "Сообщение отправлено",
+        description: "Ваше сообщение успешно доставлено",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Группируем сообщения по автомобилям
@@ -106,9 +134,51 @@ export function MessagesPanel() {
             );
           })}
         </div>
+        
+        {/* Форма для отправки нового сообщения */}
+        <div className="mt-4 p-4 border-t">
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Введите сообщение..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim() || sendMessageMutation.isPending}
+            >
+              {sendMessageMutation.isPending ? "Отправка..." : "Отправить"}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
+
+  // Функция отправки сообщения
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !selectedConversation || !user) return;
+
+    // Находим получателя из выбранного диалога
+    const conversation = conversationsByCarId[selectedConversation];
+    if (!conversation || conversation.length === 0) return;
+
+    const firstMessage = conversation[0];
+    const recipientId = firstMessage.buyerId === user.id ? firstMessage.sellerId : firstMessage.buyerId;
+
+    sendMessageMutation.mutate({
+      carId: selectedConversation,
+      recipientId,
+      content: newMessage.trim(),
+    });
+  };
 
   return (
     <div className="p-6">
