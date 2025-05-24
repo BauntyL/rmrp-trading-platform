@@ -12,7 +12,7 @@ interface CarCardProps {
   onViewDetails: (car: Car) => void;
   onEdit?: (car: Car) => void;
   onDelete?: (car: Car) => void;
-  onToggleFavorite?: (currentStatus: boolean) => void;
+  onToggleFavorite?: () => void;
 }
 
 const categoryNames = {
@@ -54,9 +54,7 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onToggleFavorite
   });
 
   const handleToggleFavorite = () => {
-    if (onToggleFavorite) {
-      onToggleFavorite(favoriteCheck?.isFavorite || false);
-    }
+    onToggleFavorite?.();
   };
 
   const formatPrice = (price: number) => {

@@ -90,19 +90,14 @@ export default function HomePage() {
   });
 
   const toggleFavoriteMutation = useMutation({
-    mutationFn: async ({ carId, currentStatus }: { carId: number; currentStatus: boolean }) => {
-      if (currentStatus) {
-        await apiRequest("DELETE", `/api/favorites/${carId}`);
-        return { action: "removed", carId };
-      } else {
-        await apiRequest("POST", "/api/favorites", { carId });
-        return { action: "added", carId };
-      }
+    mutationFn: async (carId: number) => {
+      const response = await apiRequest("POST", `/api/favorites/toggle/${carId}`);
+      return await response.json();
     },
-    onSuccess: (result) => {
-      // Сразу обновляем все кеши
+    onSuccess: (result, carId) => {
+      // Обновляем статус избранного в кеше
+      queryClient.setQueryData(["/api/favorites/check", carId], { isFavorite: result.isFavorite });
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
       
       toast({
         title: result.action === "added" ? "Добавлено в избранное" : "Удалено из избранного",
@@ -112,10 +107,6 @@ export default function HomePage() {
       });
     },
     onError: (error: any) => {
-      // Полностью обновляем кеши при ошибке
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
-      
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось обновить избранное",
@@ -243,8 +234,8 @@ export default function HomePage() {
                     onViewDetails={setSelectedCar}
                     onEdit={handleEditCar}
                     onDelete={handleDeleteCar}
-                    onToggleFavorite={(currentStatus: boolean) => 
-                      toggleFavoriteMutation.mutate({ carId: car.id, currentStatus })
+                    onToggleFavorite={() => 
+                      toggleFavoriteMutation.mutate(car.id)
                     }
                   />
                 ))}

@@ -245,6 +245,34 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/favorites/toggle/:carId", requireAuth, async (req, res) => {
+    try {
+      const carId = parseInt(req.params.carId);
+      const car = await storage.getCar(carId);
+      
+      if (!car) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+
+      const isFavorite = await storage.isFavorite(req.user!.id, carId);
+      
+      if (isFavorite) {
+        // Удаляем из избранного
+        await storage.removeFromFavorites(req.user!.id, carId);
+        res.json({ action: "removed", isFavorite: false });
+      } else {
+        // Добавляем в избранное
+        await storage.addToFavorites({
+          userId: req.user!.id,
+          carId: carId,
+        });
+        res.json({ action: "added", isFavorite: true });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при обновлении избранного" });
+    }
+  });
+
   // User management routes (admin only)
   app.get("/api/users", requireRole(["admin"]), async (req, res) => {
     try {
