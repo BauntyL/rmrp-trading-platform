@@ -135,8 +135,8 @@ export default function AuthPage() {
     },
   });
 
-  // Redirect if already logged in
-  if (user) {
+  // Redirect if already logged in and not loading
+  if (user && !isLoading) {
     return <Redirect to="/" />;
   }
 
