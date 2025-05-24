@@ -19,6 +19,16 @@
         "id": 2,
         "createdAt": "2025-05-24T01:14:12.776Z"
       }
+    ],
+    [
+      3,
+      {
+        "username": "001-001",
+        "password": "$2b$10$LgxGr3LkrRBEEPcaZwLqwe818gqcqpIr8.si0EaUvyIC9poKtS.Ba",
+        "role": "user",
+        "id": 3,
+        "createdAt": "2025-05-24T10:00:51.779Z"
+      }
     ]
   ],
   "cars": [
@@ -185,7 +195,7 @@
     ]
   ],
   "counters": {
-    "userIdCounter": 3,
+    "userIdCounter": 4,
     "carIdCounter": 5,
     "carApplicationIdCounter": 6,
     "favoriteIdCounter": 5

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Car, Shield, Users, Check, X } from "lucide-react";
 import { Redirect } from "wouter";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Компонент индикатора силы пароля
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
@@ -74,6 +75,7 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
 const loginSchema = z.object({
   username: z.string().min(1, "Введите имя пользователя"),
   password: z.string().min(1, "Введите пароль"),
+  rememberMe: z.boolean().optional(),
 });
 
 const registerSchema = z.object({
@@ -96,11 +98,32 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [activeTab, setActiveTab] = useState("login");
 
+  // Функции для работы с сохраненными данными
+  const getSavedCredentials = () => {
+    try {
+      const saved = localStorage.getItem("rememberedCredentials");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveCredentials = (username: string, password: string) => {
+    localStorage.setItem("rememberedCredentials", JSON.stringify({ username, password }));
+  };
+
+  const clearSavedCredentials = () => {
+    localStorage.removeItem("rememberedCredentials");
+  };
+
+  const savedCredentials = getSavedCredentials();
+
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
-      password: "",
+      username: savedCredentials?.username || "",
+      password: savedCredentials?.password || "",
+      rememberMe: !!savedCredentials,
     },
   });
 
@@ -118,7 +141,18 @@ export default function AuthPage() {
   }
 
   const onLoginSubmit = (data: LoginFormData) => {
-    loginMutation.mutate(data);
+    // Сохраняем или очищаем данные в зависимости от выбора пользователя
+    if (data.rememberMe) {
+      saveCredentials(data.username, data.password);
+    } else {
+      clearSavedCredentials();
+    }
+    
+    // Отправляем только username и password на сервер
+    loginMutation.mutate({
+      username: data.username,
+      password: data.password
+    });
   };
 
   const onRegisterSubmit = (data: RegisterFormData) => {
@@ -196,6 +230,31 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
+                      
+                      <FormField
+                        control={loginForm.control}
+                        name="rememberMe"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="border-slate-600 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="text-slate-300 text-sm font-normal cursor-pointer">
+                                Запомнить данные для входа
+                              </FormLabel>
+                              <p className="text-xs text-slate-500">
+                                Данные будут сохранены в браузере для удобства
+                              </p>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
                       <Button
                         type="submit"
                         className="w-full bg-primary hover:bg-primary/90"
