@@ -138,7 +138,7 @@ function requireRole(roles: string[]) {
 export function registerRoutes(app: Express): Server {
   // САМЫЙ ПЕРВЫЙ ОБРАБОТЧИК - УДАЛЕНИЕ АВТОМОБИЛЕЙ (POST МЕТОД!)
   app.post("/api/cars/:id/remove", requireAuth, async (req, res) => {
-    console.log(`🔥🔥🔥 GET DELETE ENDPOINT СРАБОТАЛ! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
+    console.log(`🔥🔥🔥 POST DELETE ENDPOINT СРАБОТАЛ! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
     console.log(`🔥🔥🔥 Полный URL: ${req.originalUrl}, метод: ${req.method}`);
     
     // Проверяем авторизацию вручную
