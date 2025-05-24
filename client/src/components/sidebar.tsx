@@ -32,15 +32,21 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
 
   const { data: myApplications = [] } = useQuery<CarApplication[]>({
     queryKey: ["/api/my-applications"],
+    refetchInterval: 5000, // Автообновление каждые 5 секунд
+    refetchOnWindowFocus: true,
   });
 
   const { data: pendingApplications = [] } = useQuery<CarApplication[]>({
     queryKey: ["/api/applications/pending"],
     enabled: user?.role === "moderator" || user?.role === "admin",
+    refetchInterval: 5000, // Автообновление заявок для модераторов каждые 5 секунд
+    refetchOnWindowFocus: true,
   });
 
   const { data: favorites = [] } = useQuery({
     queryKey: ["/api/favorites"],
+    refetchInterval: 10000, // Автообновление избранного каждые 10 секунд
+    refetchOnWindowFocus: true,
   });
 
   const handleLogout = () => {
