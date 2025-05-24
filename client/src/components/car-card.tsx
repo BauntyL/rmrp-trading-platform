@@ -189,7 +189,11 @@ export function CarCard({ car, onViewDetails }: CarCardProps) {
             onClick={(e) => {
               e.stopPropagation();
               if (car.phone) {
-                window.open(`tel:${car.phone}`, '_blank');
+                navigator.clipboard.writeText(car.phone);
+                toast({
+                  title: "Телефон скопирован",
+                  description: `${car.phone} скопирован в буфер обмена`,
+                });
               } else {
                 toast({
                   title: "Контакт недоступен",

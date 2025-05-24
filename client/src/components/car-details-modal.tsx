@@ -105,7 +105,11 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
   const handleContactClick = (type: "phone" | "telegram" | "discord", value: string) => {
     switch (type) {
       case "phone":
-        window.open(`tel:${value}`, '_blank');
+        navigator.clipboard.writeText(value);
+        toast({
+          title: "Телефон скопирован",
+          description: `${value} скопирован в буфер обмена`,
+        });
         break;
       case "telegram":
         window.open(`https://t.me/${value.replace('@', '')}`, '_blank');
@@ -251,7 +255,7 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
                   onClick={() => handleContactClick("phone", car.phone!)}
                 >
                   <Phone className="h-4 w-4 mr-2" />
-                  Связаться с продавцом
+                  Скопировать телефон
                 </Button>
               )}
               <Button 
