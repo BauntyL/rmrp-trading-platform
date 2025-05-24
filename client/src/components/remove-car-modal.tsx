@@ -15,6 +15,7 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { Car } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 interface RemoveCarModalProps {
   car: Car | null;
@@ -25,6 +26,7 @@ interface RemoveCarModalProps {
 export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps) {
   const [confirmText, setConfirmText] = useState("");
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
@@ -37,10 +39,21 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
         
         socket.onopen = () => {
           console.log("🔌 WebSocket соединение для удаления установлено");
+          
+          // Сначала аутентифицируемся
           socket.send(JSON.stringify({
-            type: "DELETE_CAR",
-            carId: carId
+            type: "authenticate",
+            userId: user?.id
           }));
+          
+          // Затем отправляем команду удаления через небольшую задержку
+          setTimeout(() => {
+            console.log("📤 Отправляем команду DELETE_CAR");
+            socket.send(JSON.stringify({
+              type: "DELETE_CAR",
+              carId: carId
+            }));
+          }, 100);
         };
         
         socket.onmessage = (event) => {
