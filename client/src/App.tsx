@@ -22,15 +22,16 @@ function Router() {
     );
   }
 
-  // Простая логика: если пользователь есть - главная страница, если нет - авторизация
+  // Если пользователя нет - показываем только страницу авторизации
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  // Если пользователь есть - показываем соответствующие страницы
   return (
     <Switch>
-      <Route path="/auth">
-        {user ? <HomePage /> : <AuthPage />}
-      </Route>
-      <Route path="/">
-        {user ? <HomePage /> : <AuthPage />}
-      </Route>
+      <Route path="/auth" component={HomePage} />
+      <Route path="/" component={HomePage} />
       <Route component={NotFound} />
     </Switch>
   );
