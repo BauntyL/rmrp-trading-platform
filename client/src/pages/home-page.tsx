@@ -93,8 +93,9 @@ export default function HomePage() {
     mutationFn: async (carId: number) => {
       await apiRequest("POST", "/api/favorites", { carId });
     },
-    onSuccess: () => {
+    onSuccess: (_, carId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
       toast({
         title: "Добавлено в избранное",
         description: "Автомобиль успешно добавлен в избранное",
@@ -113,8 +114,9 @@ export default function HomePage() {
     mutationFn: async (carId: number) => {
       await apiRequest("DELETE", `/api/favorites/${carId}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, carId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
       toast({
         title: "Удалено из избранного",
         description: "Автомобиль успешно удален из избранного",

@@ -49,8 +49,9 @@ const serverColors = {
 export function CarCard({ car, onViewDetails, onEdit, onDelete, onAddToFavorites, onRemoveFromFavorites }: CarCardProps) {
   const { user } = useAuth();
 
-  const { data: favoriteCheck } = useQuery({
+  const { data: favoriteCheck } = useQuery<{ isFavorite: boolean }>({
     queryKey: ["/api/favorites/check", car.id],
+    enabled: !!user,
   });
 
   const handleToggleFavorite = () => {
