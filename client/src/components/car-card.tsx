@@ -12,8 +12,7 @@ interface CarCardProps {
   onViewDetails: (car: Car) => void;
   onEdit?: (car: Car) => void;
   onDelete?: (car: Car) => void;
-  onAddToFavorites?: () => void;
-  onRemoveFromFavorites?: () => void;
+  onToggleFavorite?: (currentStatus: boolean) => void;
 }
 
 const categoryNames = {
@@ -46,7 +45,7 @@ const serverColors = {
   tverskoy: "bg-yellow-500 text-yellow-900",
 };
 
-export function CarCard({ car, onViewDetails, onEdit, onDelete, onAddToFavorites, onRemoveFromFavorites }: CarCardProps) {
+export function CarCard({ car, onViewDetails, onEdit, onDelete, onToggleFavorite }: CarCardProps) {
   const { user } = useAuth();
 
   const { data: favoriteCheck } = useQuery<{ isFavorite: boolean }>({
@@ -55,10 +54,8 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onAddToFavorites
   });
 
   const handleToggleFavorite = () => {
-    if (favoriteCheck?.isFavorite) {
-      onRemoveFromFavorites?.();
-    } else {
-      onAddToFavorites?.();
+    if (onToggleFavorite) {
+      onToggleFavorite(favoriteCheck?.isFavorite || false);
     }
   };
 

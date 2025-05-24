@@ -89,49 +89,36 @@ export default function HomePage() {
     },
   });
 
-  const addToFavoritesMutation = useMutation({
-    mutationFn: async (carId: number) => {
-      await apiRequest("POST", "/api/favorites", { carId });
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async ({ carId, currentStatus }: { carId: number; currentStatus: boolean }) => {
+      if (currentStatus) {
+        await apiRequest("DELETE", `/api/favorites/${carId}`);
+        return { action: "removed", carId };
+      } else {
+        await apiRequest("POST", "/api/favorites", { carId });
+        return { action: "added", carId };
+      }
     },
-    onSuccess: (_, carId) => {
-      // Обновляем кеш оптимистично
-      queryClient.setQueryData(["/api/favorites/check", carId], { isFavorite: true });
+    onSuccess: (result) => {
+      // Сразу обновляем все кеши
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
+      
       toast({
-        title: "Добавлено в избранное",
-        description: "Автомобиль успешно добавлен в избранное",
+        title: result.action === "added" ? "Добавлено в избранное" : "Удалено из избранного",
+        description: result.action === "added" 
+          ? "Автомобиль успешно добавлен в избранное"
+          : "Автомобиль успешно удален из избранного",
       });
     },
-    onError: (error: any, carId) => {
-      // Возвращаем старое состояние при ошибке
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
+    onError: (error: any) => {
+      // Полностью обновляем кеши при ошибке
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
+      
       toast({
         title: "Ошибка",
-        description: error.message || "Не удалось добавить в избранное",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const removeFromFavoritesMutation = useMutation({
-    mutationFn: async (carId: number) => {
-      await apiRequest("DELETE", `/api/favorites/${carId}`);
-    },
-    onSuccess: (_, carId) => {
-      // Обновляем кеш оптимистично
-      queryClient.setQueryData(["/api/favorites/check", carId], { isFavorite: false });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      toast({
-        title: "Удалено из избранного",
-        description: "Автомобиль успешно удален из избранного",
-      });
-    },
-    onError: (error: any, carId) => {
-      // Возвращаем старое состояние при ошибке
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось удалить из избранного",
+        description: error.message || "Не удалось обновить избранное",
         variant: "destructive",
       });
     },
@@ -256,8 +243,9 @@ export default function HomePage() {
                     onViewDetails={setSelectedCar}
                     onEdit={handleEditCar}
                     onDelete={handleDeleteCar}
-                    onAddToFavorites={() => addToFavoritesMutation.mutate(car.id)}
-                    onRemoveFromFavorites={() => removeFromFavoritesMutation.mutate(car.id)}
+                    onToggleFavorite={(currentStatus: boolean) => 
+                      toggleFavoriteMutation.mutate({ carId: car.id, currentStatus })
+                    }
                   />
                 ))}
               </div>
