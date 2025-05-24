@@ -135,8 +135,13 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-          return done(null, false);
+        if (!user) {
+          // Пользователь не найден (возможно, удален)
+          return done(null, false, { message: "user_not_found" });
+        }
+        if (!(await bcrypt.compare(password, user.password))) {
+          // Неверный пароль
+          return done(null, false, { message: "wrong_password" });
         }
         return done(null, user);
       } catch (error) {
@@ -232,7 +237,7 @@ export function setupAuth(app: Express) {
     const { username } = validation.data;
     const attemptsCount = securityManager.getAttemptsCount(clientIP, username);
     
-    passport.authenticate("local", (err: any, user: SelectUser | false) => {
+    passport.authenticate("local", (err: any, user: SelectUser | false, info?: any) => {
       if (err) {
         console.log(`❌ Ошибка аутентификации для ${username} (IP: ${clientIP}):`, err);
         return next(err);
@@ -246,12 +251,19 @@ export function setupAuth(app: Express) {
         console.log(`🔑 Неудачная попытка входа: ${username} (IP: ${clientIP}, попыток: ${newAttemptsCount})`);
         
         const remainingAttempts = Math.max(0, 5 - newAttemptsCount);
-        let message = "Неверное имя пользователя или пароль";
+        let message: string;
         
-        if (remainingAttempts <= 2 && remainingAttempts > 0) {
-          message += `. Осталось попыток: ${remainingAttempts}`;
-        } else if (remainingAttempts === 0) {
-          message = "Слишком много неудачных попыток. IP заблокирован на 15 минут.";
+        // Определяем тип ошибки на основе info от passport
+        if (info?.message === "user_not_found") {
+          message = "Аккаунт с таким именем не существует или был удален. Для доступа необходимо зарегистрироваться заново.";
+        } else {
+          message = "Неверное имя пользователя или пароль";
+          
+          if (remainingAttempts <= 2 && remainingAttempts > 0) {
+            message += `. Осталось попыток: ${remainingAttempts}`;
+          } else if (remainingAttempts === 0) {
+            message = "Слишком много неудачных попыток. IP заблокирован на 15 минут.";
+          }
         }
         
         return res.status(401).json({ message, attemptsLeft: remainingAttempts });
