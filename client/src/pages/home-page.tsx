@@ -38,6 +38,11 @@ export default function HomePage() {
     enabled: activeSection === "my-cars",
   });
 
+  const { data: myApplications = [], isLoading: applicationsLoading } = useQuery({
+    queryKey: ["/api/my-applications"],
+    enabled: activeSection === "applications",
+  });
+
   const renderContent = () => {
     switch (activeSection) {
       case "catalog":
@@ -202,6 +207,118 @@ export default function HomePage() {
                     car={car}
                     onViewDetails={setSelectedCar}
                   />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case "applications":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Мои заявки</h2>
+              <p className="text-slate-400">Статус ваших заявок на добавление автомобилей</p>
+            </div>
+            
+            {applicationsLoading ? (
+              <div className="text-center py-8">
+                <div className="text-slate-400">Загрузка заявок...</div>
+              </div>
+            ) : myApplications.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-slate-400 text-lg mb-2">У вас нет заявок</div>
+                <p className="text-slate-500 mb-4">Создайте заявку на добавление автомобиля</p>
+                <Button onClick={() => setShowAddCarModal(true)} className="bg-primary hover:bg-primary/90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Добавить автомобиль
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myApplications.map((application: any) => (
+                  <div key={application.id} className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white mb-1">{application.name}</h3>
+                        <p className="text-slate-400 text-sm">
+                          Подано: {new Date(application.createdAt).toLocaleDateString("ru-RU", {
+                            day: "2-digit",
+                            month: "2-digit", 
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={`${
+                          application.status === "pending" ? "bg-yellow-500 text-yellow-900" :
+                          application.status === "approved" ? "bg-green-500 text-green-100" :
+                          "bg-red-500 text-red-100"
+                        }`}>
+                          {application.status === "pending" ? "На рассмотрении" :
+                           application.status === "approved" ? "Одобрено" :
+                           "Отклонено"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <span className="text-slate-400 text-sm">Категория:</span>
+                        <div className="text-white font-medium">
+                          {application.category === "standard" ? "Стандарт" :
+                           application.category === "sport" ? "Спорт" :
+                           application.category === "coupe" ? "Купе" :
+                           application.category === "suv" ? "Внедорожник" :
+                           "Мотоцикл"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-sm">Сервер:</span>
+                        <div className="text-white font-medium">
+                          {application.server === "arbat" ? "Арбат" :
+                           application.server === "patriki" ? "Патрики" :
+                           application.server === "rublevka" ? "Рублёвка" :
+                           "Тверской"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-sm">Цена:</span>
+                        <div className="text-emerald-400 font-medium">
+                          {new Intl.NumberFormat("ru-RU", {
+                            style: "currency",
+                            currency: "RUB",
+                            minimumFractionDigits: 0,
+                          }).format(application.price)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-sm">Макс. скорость:</span>
+                        <div className="text-white font-medium">{application.maxSpeed} км/ч</div>
+                      </div>
+                    </div>
+
+                    {application.description && (
+                      <div className="mb-4">
+                        <span className="text-slate-400 text-sm">Описание:</span>
+                        <p className="text-slate-300 text-sm mt-1">{application.description}</p>
+                      </div>
+                    )}
+
+                    {application.status === "approved" && (
+                      <div className="text-sm text-green-400">
+                        ✓ Ваш автомобиль добавлен в каталог
+                      </div>
+                    )}
+
+                    {application.status === "rejected" && application.reviewedAt && (
+                      <div className="text-sm text-red-400">
+                        ✗ Заявка отклонена {new Date(application.reviewedAt).toLocaleDateString("ru-RU")}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

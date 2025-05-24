@@ -9,15 +9,51 @@
         "role": "admin",
         "createdAt": "2025-05-24T01:11:03.227Z"
       }
+    ],
+    [
+      2,
+      {
+        "username": "Баунти Миллер",
+        "password": "$2b$10$B1iv8KUdvLJD/BZYsFRZNuxml0UVWsvMZPPLCv6EnnHnfwwXQIJ32",
+        "role": "user",
+        "id": 2,
+        "createdAt": "2025-05-24T01:14:12.776Z"
+      }
     ]
   ],
   "cars": [],
-  "carApplications": [],
+  "carApplications": [
+    [
+      1,
+      {
+        "name": "BMW M5",
+        "imageUrl": "https://avatars.mds.yandex.net/get-autoru-vos/5541977/a6250e30ddc876dd833714fde3e4667f/456x342",
+        "price": 15000000,
+        "maxSpeed": 230,
+        "acceleration": "5",
+        "drive": "RWD",
+        "category": "sport",
+        "server": "patriki",
+        "serverId": "477-554",
+        "phone": "+7 (999) 123-45-67",
+        "telegram": "@tg",
+        "discord": "aaaa#2222",
+        "description": "BMW M5 — культовая спортивная версия седана BMW 5-й серии, оснащенная мощнейшим двигателем V8 с двойным турбонаддувом.",
+        "isPremium": true,
+        "createdBy": 2,
+        "id": 1,
+        "status": "pending",
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "createdAt": "2025-05-24T01:16:01.424Z"
+      }
+    ]
+  ],
   "favorites": [],
   "counters": {
-    "userIdCounter": 2,
+    "userIdCounter": 3,
     "carIdCounter": 1,
-    "carApplicationIdCounter": 1,
+    "carApplicationIdCounter": 2,
     "favoriteIdCounter": 1
   }
 }
