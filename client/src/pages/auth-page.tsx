@@ -278,10 +278,13 @@ export default function AuthPage() {
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="Введите имя пользователя"
+                                placeholder="Например: Баунти Миллер"
                                 className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
                               />
                             </FormControl>
+                            <p className="text-xs text-slate-400 mt-1">
+                              Используйте формат: Имя Фамилия (как на сервере). Разрешены буквы, цифры, пробелы, дефис и подчеркивание.
+                            </p>
                             <FormMessage />
                           </FormItem>
                         )}

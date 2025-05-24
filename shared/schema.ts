@@ -65,6 +65,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
 }).extend({
+  username: z.string()
+    .min(3, "Имя пользователя должно содержать минимум 3 символа")
+    .max(50, "Имя пользователя не должно превышать 50 символов")
+    .regex(/^[a-zA-Zа-яА-Я0-9\s\-_]+$/, "Имя пользователя может содержать только буквы, цифры, пробелы, дефис и подчеркивание"),
   role: z.enum(["user", "moderator", "admin"]).optional(),
 });
 
