@@ -60,7 +60,7 @@ export function MessagesPanel() {
   });
 
   // Группируем сообщения по автомобилям
-  const conversationsByCarId = messages.reduce((acc: Record<number, Message[]>, message) => {
+  const conversationsByCarId = (messages as Message[]).reduce((acc: Record<number, Message[]>, message: Message) => {
     if (!acc[message.carId]) {
       acc[message.carId] = [];
     }
@@ -69,8 +69,8 @@ export function MessagesPanel() {
   }, {});
 
   // Получаем последнее сообщение для каждого диалога
-  const latestMessages = Object.values(conversationsByCarId).map(carMessages => 
-    carMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+  const latestMessages = Object.values(conversationsByCarId).map((carMessages: Message[]) => 
+    carMessages.sort((a: Message, b: Message) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
   );
 
   // Функция отправки сообщения
@@ -106,74 +106,82 @@ export function MessagesPanel() {
   // Если выбран конкретный диалог, показываем его
   if (selectedConversation) {
     const conversationMessages = conversationsByCarId[selectedConversation] || [];
-    const sortedMessages = conversationMessages.sort((a, b) => 
+    const sortedMessages = conversationMessages.sort((a: Message, b: Message) => 
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
 
     return (
-      <div className="p-6">
-        <div className="flex items-center mb-4">
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="flex items-center mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-lg">
           <Button 
             variant="outline" 
             onClick={() => setSelectedConversation(null)}
-            className="mr-4"
+            className="mr-4 hover:bg-white dark:hover:bg-gray-600"
           >
             ← Назад к списку
           </Button>
-          <h2 className="text-xl font-semibold">
-            Диалог по автомобилю {selectedConversation === 1 ? "BMW M5" : `#${selectedConversation}`}
-          </h2>
+          <div className="flex items-center space-x-3">
+            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+              Диалог по автомобилю {selectedConversation === 1 ? "BMW M5" : `#${selectedConversation}`}
+            </h2>
+          </div>
         </div>
         
-        <div className="space-y-4 max-h-96 overflow-y-auto">
-          {sortedMessages.map((message) => {
-            const isMyMessage = message.senderId === user?.id;
-            const senderName = message.senderId === 3 ? "Баунти Миллер" : 
-                             message.senderId === 1 ? "477-554" : 
-                             `Пользователь #${message.senderId}`;
-            
-            return (
-              <div 
-                key={message.id}
-                className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  isMyMessage 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                }`}>
-                  <p className="text-sm font-medium mb-1">{senderName}</p>
-                  <p>{message.content}</p>
-                  <p className="text-xs opacity-75 mt-1">
-                    {new Date(message.createdAt).toLocaleString()}
-                  </p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="space-y-4 max-h-96 overflow-y-auto p-4">
+            {sortedMessages.map((message: Message) => {
+              const isMyMessage = message.senderId === user?.id;
+              const senderName = message.senderId === 3 ? "Баунти Миллер" : 
+                               message.senderId === 1 ? "477-554" : 
+                               `Пользователь #${message.senderId}`;
+              
+              return (
+                <div 
+                  key={message.id}
+                  className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                >
+                  <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
+                    isMyMessage 
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
+                      : 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium opacity-90">{senderName}</p>
+                      <p className="text-xs opacity-75">
+                        {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </p>
+                    </div>
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-        
-        {/* Форма для отправки нового сообщения */}
-        <div className="mt-4 p-4 border-t">
-          <div className="flex space-x-2">
-            <Input
-              placeholder="Введите сообщение..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              className="flex-1"
-            />
-            <Button 
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || sendMessageMutation.isPending}
-            >
-              {sendMessageMutation.isPending ? "Отправка..." : "Отправить"}
-            </Button>
+              );
+            })}
+          </div>
+          
+          {/* Форма для отправки нового сообщения */}
+          <div className="mt-4 p-4 border-t bg-gray-50 dark:bg-gray-700 rounded-b-lg">
+            <div className="flex space-x-3">
+              <Input
+                placeholder="Введите сообщение..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                className="flex-1 bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <Button 
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-6"
+              >
+                {sendMessageMutation.isPending ? "Отправка..." : "Отправить"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -181,13 +189,29 @@ export function MessagesPanel() {
   }
 
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-semibold mb-6">Сообщения</h2>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <span className="text-white text-lg">💬</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Мои диалоги</h2>
+        </div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          {latestMessages.length} активных диалогов
+        </div>
+      </div>
       
       {!Array.isArray(messages) || latestMessages.length === 0 ? (
-        <p className="text-gray-500">У вас пока нет сообщений</p>
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <span className="text-2xl">📭</span>
+          </div>
+          <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">Пока нет сообщений</h3>
+          <p className="text-gray-500 dark:text-gray-400">Начните диалог с продавцом, связавшись по любому автомобилю</p>
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4">
           {latestMessages.map((message: Message) => {
             // Определяем имя автомобиля - используем BMW M5 для carId=1
             const carName = message.carId === 1 ? "BMW M5" : 
@@ -207,39 +231,83 @@ export function MessagesPanel() {
                             message.buyerName || `Пользователь #${message.buyerId}`;
             }
             
+            const isUnread = !message.isRead && message.recipientId === user?.id;
+            
             return (
               <div
                 key={message.id}
-                className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
+                  isUnread 
+                    ? 'border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-200 dark:border-gray-700'
+                }`}
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-medium">
-                      Диалог по автомобилю {carName} с {otherUserName}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                      <span className="font-medium">Последнее сообщение:</span> {message.content}
-                    </p>
+                {isUnread && (
+                  <div className="absolute top-4 right-4">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
                   </div>
-                  <div className="flex flex-col items-end space-y-2">
-                    <div className="flex items-center space-x-2">
-                      {!message.isRead && message.recipientId === user?.id && (
-                        <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
-                          Новое
+                )}
+                
+                <div className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 pr-4">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">🚗</span>
+                        </div>
+                        <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
+                          {carName}
+                        </h3>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 mb-3">
+                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                          <span className="text-xs">👤</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                          Диалог с {otherUserName}
                         </span>
-                      )}
-                      <time className="text-xs text-gray-400">
-                        {new Date(message.createdAt).toLocaleDateString()}
-                      </time>
+                      </div>
+                      
+                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 mb-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                          <span className="font-medium text-gray-800 dark:text-gray-200">Последнее сообщение:</span>
+                          <br />
+                          "{message.content}"
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                          <span>🕒</span>
+                          <time>{new Date(message.createdAt).toLocaleDateString('ru-RU', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}</time>
+                        </div>
+                        
+                        {isUnread && (
+                          <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">
+                            Новое сообщение
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => setSelectedConversation(message.carId)}
-                    >
-                      Открыть диалог
-                    </Button>
+                    
+                    <div className="flex flex-col space-y-2">
+                      <Button
+                        onClick={() => setSelectedConversation(message.carId)}
+                        className={`${
+                          isUnread 
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                            : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
+                        } px-6 py-2 rounded-lg font-medium transition-colors`}
+                      >
+                        {isUnread ? 'Ответить' : 'Открыть диалог'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
