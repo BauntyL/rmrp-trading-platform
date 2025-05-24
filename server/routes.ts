@@ -146,12 +146,14 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
-  // GET роут для удаления автомобилей (САМЫЙ ПЕРВЫЙ ОБРАБОТЧИК!)
-  app.get("/api/cars-remove/:id", async (req, res) => {
-    console.log(`🔥🔥🔥 GET DELETE ENDPOINT! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
+  // GET роут для удаления автомобилей (УНИКАЛЬНЫЙ ПУТЬ!)
+  app.get("/api/delete-car-action/:id", async (req, res) => {
+    console.log(`🔥🔥🔥 GET DELETE ENDPOINT СРАБОТАЛ! ID: ${req.params.id}, User: ${req.user?.id || 'неавторизован'}`);
+    console.log(`🔥🔥🔥 Полный URL: ${req.originalUrl}, метод: ${req.method}`);
     
     // Проверяем авторизацию вручную
     if (!req.user) {
+      console.log(`❌ Пользователь не авторизован в DELETE endpoint`);
       return res.status(401).json({ message: "Требуется авторизация" });
     }
     
