@@ -7,8 +7,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // КРИТИЧЕСКИЙ HOTFIX: Прямой обработчик удаления автомобилей
-app.post("/api/remove-car", async (req, res) => {
-  console.log(`🔥🔥🔥 HOTFIX REMOVE ENDPOINT! Car ID: ${req.body?.carId}, Body:`, req.body);
+app.post("/delete-car-endpoint", async (req, res) => {
+  console.log(`🔥🔥🔥 DELETE CAR ENDPOINT! Car ID: ${req.body?.carId}, Body:`, req.body);
   
   // Простейшая реализация без аутентификации для тестирования
   try {
@@ -19,7 +19,7 @@ app.post("/api/remove-car", async (req, res) => {
     });
     return; // Явно завершаем обработку
   } catch (error) {
-    console.error("🔥 HOTFIX ERROR:", error);
+    console.error("🔥 DELETE CAR ERROR:", error);
     res.status(500).json({ message: "Ошибка", error: String(error) });
   }
 });
