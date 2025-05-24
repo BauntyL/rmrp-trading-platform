@@ -32,21 +32,32 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
     mutationFn: async (carId: number) => {
       console.log("🚀 Удаляем автомобиль ID:", carId);
       
-      // Отправляем запрос на существующий эндпоинт
-      fetch(window.location.origin + '/api/delete-my-car-completely', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ carId: carId })
-      }).catch(() => {
-        // Игнорируем ошибки - главное что запрос отправлен
-        console.log("📤 Запрос на удаление отправлен");
-      });
-
-      // Возвращаем успешный результат для UI
-      return { success: true, carId: carId };
+      const url = window.location.origin + '/api/delete-my-car-completely';
+      console.log("📡 URL запроса:", url);
+      
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ carId: carId })
+        });
+        
+        console.log("📊 Ответ сервера - статус:", response.status);
+        const responseText = await response.text();
+        console.log("📊 Ответ сервера - текст:", responseText);
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка ${response.status}: ${responseText}`);
+        }
+        
+        return { success: true, carId: carId };
+      } catch (error) {
+        console.error("❌ Ошибка при удалении:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       console.log("✅ Мутация успешна, обновляем кеши");
