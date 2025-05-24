@@ -21,48 +21,7 @@
       }
     ]
   ],
-  "cars": [
-    [
-      1,
-      {
-        "name": "БМВ М5",
-        "imageUrl": "https://cdn.kodixauto.ru/media/image/6019267ad655fc0001710e25",
-        "price": 12000000,
-        "maxSpeed": 230,
-        "acceleration": "5",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "serverId": "477-554",
-        "phone": "+7 (999) 123-45-67",
-        "telegram": "@tg",
-        "discord": "aaaa#2222",
-        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
-        "isPremium": true,
-        "createdBy": 2,
-        "createdAt": "2025-05-24T14:18:04.568Z",
-        "id": 1,
-        "status": "active"
-      }
-    ],
-    [
-      2,
-      {
-        "name": "МБ Гелик 63",
-        "price": 11,
-        "maxSpeed": 11,
-        "acceleration": "11",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "isPremium": false,
-        "createdBy": 2,
-        "createdAt": "2025-05-24T14:24:30.543Z",
-        "id": 2,
-        "status": "active"
-      }
-    ]
-  ],
+  "cars": [],
   "carApplications": [
     [
       1,
@@ -167,64 +126,7 @@
     ]
   ],
   "favorites": [],
-  "messages": [
-    [
-      1,
-      {
-        "id": 1,
-        "carId": 1,
-        "buyerId": 1,
-        "sellerId": 2,
-        "senderId": 1,
-        "recipientId": 2,
-        "content": "йоу",
-        "isRead": true,
-        "createdAt": "2025-05-24T14:18:21.886Z"
-      }
-    ],
-    [
-      2,
-      {
-        "id": 2,
-        "carId": 1,
-        "buyerId": 2,
-        "sellerId": 1,
-        "senderId": 2,
-        "recipientId": 1,
-        "content": "привет",
-        "isRead": true,
-        "createdAt": "2025-05-24T14:18:32.063Z"
-      }
-    ],
-    [
-      3,
-      {
-        "id": 3,
-        "carId": 1,
-        "buyerId": 2,
-        "sellerId": 1,
-        "senderId": 2,
-        "recipientId": 1,
-        "content": "Залупа",
-        "isRead": true,
-        "createdAt": "2025-05-24T14:18:48.867Z"
-      }
-    ],
-    [
-      4,
-      {
-        "id": 4,
-        "carId": 1,
-        "buyerId": 1,
-        "sellerId": 2,
-        "senderId": 1,
-        "recipientId": 2,
-        "content": "Привет! Какая цена?",
-        "isRead": true,
-        "createdAt": "2025-05-24T14:20:14.297Z"
-      }
-    ]
-  ],
+  "messages": [],
   "counters": {
     "userIdCounter": 3,
     "carIdCounter": 3,

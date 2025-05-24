@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCircle } from "lucide-react";
+import { playNotificationSound } from "./notification-sound";
 
 interface NotificationMessage {
   type: "new_message";
