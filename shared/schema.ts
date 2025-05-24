@@ -66,7 +66,9 @@ export const messages = pgTable("messages", {
   carId: integer("car_id").notNull(),
   buyerId: integer("buyer_id").notNull(),
   sellerId: integer("seller_id").notNull(),
-  message: text("message").notNull(),
+  senderId: integer("sender_id").notNull(),
+  recipientId: integer("recipient_id").notNull(),
+  content: text("content").notNull(),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

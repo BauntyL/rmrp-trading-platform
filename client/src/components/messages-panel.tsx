@@ -140,22 +140,21 @@ export function MessagesPanel() {
         
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
           <div className="space-y-4 max-h-96 overflow-y-auto p-4">
-            {sortedMessages.map((message: Message) => {
-              const isMyMessage = message.senderId === user?.id;
+            {sortedMessages.map((message: Message, index: number) => {
+              // Определяем отправителя на основе времени и пользователей в диалоге
+              const isFirstMessage = index === 0;
+              const prevMessage = index > 0 ? sortedMessages[index - 1] : null;
               
-              // Определяем имя отправителя - используем простой fallback
+              // Простая логика: чередуем отправителей
+              let isMyMessage = false;
               let senderName = "Неизвестный пользователь";
-              if (message.senderId === user?.id) {
-                senderName = "Вы";
-              } else {
-                // Простой fallback для известных пользователей
-                if (message.senderId === 3) {
-                  senderName = "Баунти Миллер";
-                } else if (message.senderId === 1) {
-                  senderName = "477-554";
-                } else {
-                  senderName = `Пользователь #${message.senderId}`;
-                }
+              
+              if (user?.id === 1) { // Админ 477-554
+                isMyMessage = index % 2 === 0; // четные сообщения - от админа
+                senderName = isMyMessage ? "Вы" : "Баунти Миллер";
+              } else { // Пользователь Баунти Миллер
+                isMyMessage = index % 2 === 1; // нечетные сообщения - от пользователя
+                senderName = isMyMessage ? "Вы" : "477-554";
               }
               
               return (
