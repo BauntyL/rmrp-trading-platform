@@ -30,6 +30,7 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
+      // Версия 2.0 - используем POST вместо WebSocket
       console.log("🚀 Используем специальный POST запрос для удаления автомобиля ID:", carId);
       
       try {
