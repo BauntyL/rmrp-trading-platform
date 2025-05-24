@@ -225,6 +225,19 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               )}
             </Button>
 
+            <Button
+              variant={activeSection === "message-moderation" ? "default" : "ghost"}
+              className={`w-full justify-start ${
+                activeSection === "message-moderation" 
+                  ? "bg-primary text-white" 
+                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+              onClick={() => onSectionChange("message-moderation")}
+            >
+              <MessageCircle className="h-5 w-5 mr-3" />
+              Модерация сообщений
+            </Button>
+
             {user?.role === "admin" && (
               <Button
                 variant={activeSection === "users" ? "default" : "ghost"}

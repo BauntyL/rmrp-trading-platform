@@ -62,6 +62,8 @@ export interface IStorage {
   markMessageAsRead(messageId: number): Promise<boolean>;
   markConversationAsRead(carId: number, buyerId: number, sellerId: number, userId: number): Promise<number>;
   getUnreadMessagesCount(userId: number): Promise<number>;
+  getAllMessages(): Promise<any[]>;
+  deleteMessage(messageId: number): Promise<boolean>;
 
   sessionStore: session.SessionStore;
 }
@@ -499,6 +501,47 @@ export class MemStorage implements IStorage {
     return Array.from(this.messages.values()).filter(
       message => message.recipientId === userId && !message.isRead
     ).length;
+  }
+
+  async getAllMessages(): Promise<any[]> {
+    console.log("🔍 Получение всех сообщений для модерации");
+    const messages = Array.from(this.messages.values());
+    
+    const enrichedMessages = [];
+    
+    for (const message of messages) {
+      const car = await this.getCar(message.carId);
+      const buyer = await this.getUser(message.buyerId);
+      const seller = await this.getUser(message.sellerId);
+      const sender = await this.getUser(message.senderId);
+      const recipient = await this.getUser(message.recipientId);
+      
+      enrichedMessages.push({
+        ...message,
+        carName: car?.name || null,
+        buyerName: buyer?.username || null,
+        sellerName: seller?.username || null,
+        senderName: sender?.username || null,
+        recipientName: recipient?.username || null,
+      });
+    }
+    
+    console.log(`📨 Найдено сообщений для модерации: ${enrichedMessages.length}`);
+    return enrichedMessages;
+  }
+
+  async deleteMessage(messageId: number): Promise<boolean> {
+    console.log(`🗑️ Удаление сообщения: ${messageId}`);
+    
+    if (this.messages.has(messageId)) {
+      this.messages.delete(messageId);
+      this.saveData();
+      console.log(`✅ Сообщение ${messageId} удалено`);
+      return true;
+    } else {
+      console.log(`❌ Сообщение ${messageId} не найдено`);
+      return false;
+    }
   }
 }
 

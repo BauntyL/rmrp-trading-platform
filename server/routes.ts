@@ -652,6 +652,36 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Получение всех сообщений для модерации (только для модераторов и админов)
+  app.get("/api/messages/all", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+    try {
+      console.log(`🔍 GET /api/messages/all - Модератор: ${req.user!.id} ${req.user!.username}`);
+      const messages = await storage.getAllMessages();
+      res.json(messages);
+    } catch (error) {
+      console.error("❌ Ошибка получения всех сообщений:", error);
+      res.status(500).json({ error: "Ошибка получения сообщений" });
+    }
+  });
+
+  // Удаление сообщения (только для модераторов и админов)
+  app.delete("/api/messages/:id", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+    try {
+      const messageId = parseInt(req.params.id);
+      console.log(`🗑️ DELETE /api/messages/${messageId} - Модератор: ${req.user!.id} ${req.user!.username}`);
+      
+      const success = await storage.deleteMessage(messageId);
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Сообщение не найдено" });
+      }
+    } catch (error) {
+      console.error("❌ Ошибка удаления сообщения:", error);
+      res.status(500).json({ error: "Ошибка удаления сообщения" });
+    }
+  });
+
   // Отметка сообщений как прочитанных
   app.post("/api/messages/mark-read", requireAuth, async (req, res) => {
     console.log("🚀 POST /api/messages/mark-read - Начало обработки");
