@@ -133,14 +133,31 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-800 border-slate-700">
         <DialogHeader>
-          <div className="flex items-center space-x-4">
-            <DialogTitle className="text-2xl font-bold text-white">{car.name}</DialogTitle>
-            {car.isPremium && (
-              <Badge className="bg-amber-500 text-amber-900 hover:bg-amber-500">
-                <Crown className="h-3 w-3 mr-1" />
-                Премиум
-              </Badge>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <DialogTitle className="text-2xl font-bold text-white">{car.name}</DialogTitle>
+              {car.isPremium && (
+                <Badge className="bg-amber-500 text-amber-900 hover:bg-amber-500">
+                  <Crown className="h-3 w-3 mr-1" />
+                  Премиум
+                </Badge>
+              )}
+            </div>
+            
+            {/* Кнопка "В избранное" в заголовке */}
+            <Button 
+              variant="secondary"
+              className="bg-slate-700 hover:bg-slate-600"
+              onClick={() => toggleFavoriteMutation.mutate()}
+              disabled={toggleFavoriteMutation.isPending}
+            >
+              <Heart 
+                className={`h-4 w-4 mr-2 ${
+                  favoriteCheck?.isFavorite ? "fill-current text-red-500" : ""
+                }`} 
+              />
+              {favoriteCheck?.isFavorite ? "Убрать из избранного" : "В избранное"}
+            </Button>
           </div>
         </DialogHeader>
 
@@ -275,20 +292,6 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
                   Написать продавцу
                 </Button>
               )}
-              
-              <Button 
-                variant="secondary"
-                className="bg-slate-700 hover:bg-slate-600"
-                onClick={() => toggleFavoriteMutation.mutate()}
-                disabled={toggleFavoriteMutation.isPending}
-              >
-                <Heart 
-                  className={`h-4 w-4 mr-2 ${
-                    favoriteCheck?.isFavorite ? "fill-current text-red-500" : ""
-                  }`} 
-                />
-                {favoriteCheck?.isFavorite ? "Удалить из избранного" : "В избранное"}
-              </Button>
             </div>
           </div>
         </div>
