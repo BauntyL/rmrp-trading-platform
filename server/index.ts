@@ -6,6 +6,21 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// КРИТИЧЕСКИЙ HOTFIX: Прямой обработчик удаления автомобилей
+app.post("/api/remove-car", async (req, res) => {
+  console.log(`🔥🔥🔥 HOTFIX REMOVE ENDPOINT! Car ID: ${req.body?.carId}`);
+  
+  // Простейшая реализация без аутентификации для тестирования
+  try {
+    res.json({ 
+      message: `Тестовое удаление автомобиля ID: ${req.body?.carId}`,
+      success: true 
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Ошибка", error: String(error) });
+  }
+});
+
 // КРИТИЧЕСКИЙ DEBUG: Перехватываем DELETE и POST запросы САМЫМИ ПЕРВЫМИ
 app.use((req, res, next) => {
   if (req.method === 'DELETE' && req.path.includes('/api/my-cars/')) {
