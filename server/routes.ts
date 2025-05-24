@@ -317,6 +317,7 @@ export function registerRoutes(app: Express): Server {
 
   // Update user (admin only)
   app.patch("/api/users/:id", requireAuth, requireRole(["admin"]), async (req, res) => {
+    console.log('🔧 PATCH /api/users/:id - Запрос получен', req.params.id, req.body);
     try {
       const userId = parseInt(req.params.id);
       const { username, role } = req.body;
@@ -351,6 +352,7 @@ export function registerRoutes(app: Express): Server {
         createdAt: updatedUser.createdAt.toISOString()
       };
       console.log('Отправляем обновленного пользователя:', safeUser);
+      res.setHeader('Content-Type', 'application/json');
       res.json(safeUser);
     } catch (error) {
       console.error('Ошибка при обновлении пользователя:', error);
