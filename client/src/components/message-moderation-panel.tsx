@@ -93,10 +93,28 @@ export function MessageModerationPanel() {
     deleteMessageMutation.mutate(messageId);
   };
 
+  console.log("📊 Данные модерации:", { allMessages, filteredMessages, sortedDialogues });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-slate-400">Загрузка сообщений...</div>
+      </div>
+    );
+  }
+
+  if (!allMessages || allMessages.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Модерация сообщений</h2>
+          <p className="text-slate-400">Контроль всех диалогов пользователей</p>
+        </div>
+        
+        <div className="text-center py-12">
+          <div className="text-slate-400 text-lg mb-2">Сообщений не найдено</div>
+          <p className="text-slate-500">Пока что пользователи не отправляли сообщений</p>
+        </div>
       </div>
     );
   }
