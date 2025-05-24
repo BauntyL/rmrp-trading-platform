@@ -95,9 +95,11 @@ export default function HomePage() {
       return await response.json();
     },
     onSuccess: (result, carId) => {
-      // Обновляем статус избранного в кеше
+      // Принудительно обновляем все кеши
       queryClient.setQueryData(["/api/favorites/check", carId], { isFavorite: result.isFavorite });
+      queryClient.removeQueries({ queryKey: ["/api/favorites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
       
       toast({
         title: result.action === "added" ? "Добавлено в избранное" : "Удалено из избранного",
