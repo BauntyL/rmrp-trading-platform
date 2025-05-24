@@ -383,11 +383,13 @@ export function MessagesPanel() {
                         onClick={() => {
                           setSelectedConversation(message.carId);
                           // Отмечаем сообщения как прочитанные при открытии диалога
-                          markReadMutation.mutate({
-                            carId: message.carId,
-                            buyerId: message.buyerId,
-                            sellerId: message.sellerId
-                          });
+                          if (isUnread) {
+                            markReadMutation.mutate({
+                              carId: message.carId,
+                              buyerId: message.buyerId,
+                              sellerId: message.sellerId
+                            });
+                          }
                         }}
                         className={`${
                           isUnread 
