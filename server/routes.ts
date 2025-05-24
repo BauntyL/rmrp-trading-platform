@@ -608,9 +608,16 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Получение всех сообщений для модерации (только для модераторов и админов)
-  app.get("/api/messages/all", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+  app.get("/api/messages/all", requireAuth, async (req, res) => {
     try {
-      console.log(`🔍 GET /api/messages/all - Модератор: ${req.user!.id} ${req.user!.username}`);
+      console.log(`🔍 GET /api/messages/all - Пользователь: ${req.user!.id} ${req.user!.username} (${req.user!.role})`);
+      
+      // Проверяем роль
+      if (req.user!.role !== "moderator" && req.user!.role !== "admin") {
+        console.log("❌ Недостаточно прав для модерации сообщений");
+        return res.status(403).json({ error: "Недостаточно прав" });
+      }
+      
       console.log("🔍 Вызываем storage.getAllMessages()...");
       const messages = await storage.getAllMessages();
       console.log(`📊 Получено сообщений для модерации: ${messages.length}`);
