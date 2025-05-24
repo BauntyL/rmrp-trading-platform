@@ -9,6 +9,16 @@
         "role": "admin",
         "createdAt": "2025-05-24T01:11:03.227Z"
       }
+    ],
+    [
+      4,
+      {
+        "username": "testuser",
+        "password": "$2b$12$5bCW0twHW.koaMvmVCcK6eBGwg9Xfz9gDN4yC4A4.wqWP4L5LVGJ6",
+        "role": "user",
+        "id": 4,
+        "createdAt": "2025-05-24T10:27:54.440Z"
+      }
     ]
   ],
   "cars": [
@@ -166,7 +176,7 @@
     ]
   ],
   "counters": {
-    "userIdCounter": 4,
+    "userIdCounter": 5,
     "carIdCounter": 5,
     "carApplicationIdCounter": 6,
     "favoriteIdCounter": 5
