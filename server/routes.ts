@@ -1199,6 +1199,81 @@ export function registerRoutes(app: Express): Server {
           
           // Уведомляем других пользователей об изменении статуса
           broadcastUserStatus(message.userId, true);
+        } else if (message.type === 'DELETE_CAR') {
+          console.log(`🚗🚗🚗 WebSocket УДАЛЕНИЕ АВТОМОБИЛЯ! Car ID: ${message.carId}`);
+          
+          try {
+            // Найдем пользователя по WebSocket соединению
+            let userId = null;
+            userConnections.forEach((connection, id) => {
+              if (connection === ws) {
+                userId = id;
+              }
+            });
+            
+            if (!userId) {
+              console.log("❌ Пользователь не найден в WebSocket соединениях");
+              ws.send(JSON.stringify({
+                type: "DELETE_CAR_ERROR",
+                message: "Пользователь не авторизован"
+              }));
+              return;
+            }
+            
+            console.log(`🗑️ Пользователь ${userId} удаляет автомобиль ID: ${message.carId} через WebSocket`);
+            
+            // Проверяем, что автомобиль принадлежит пользователю
+            const car = await storage.getCar(message.carId);
+            if (!car) {
+              ws.send(JSON.stringify({
+                type: "DELETE_CAR_ERROR",
+                message: "Автомобиль не найден"
+              }));
+              return;
+            }
+            
+            if (car.createdBy !== userId) {
+              ws.send(JSON.stringify({
+                type: "DELETE_CAR_ERROR",
+                message: "Вы можете удалять только свои автомобили"
+              }));
+              return;
+            }
+            
+            // Удаляем все сообщения связанные с этим автомобилем
+            const allMessages = await storage.getAllMessages();
+            const messagesToDelete = allMessages.filter((msg: any) => msg.carId === message.carId);
+            
+            for (const msgToDelete of messagesToDelete) {
+              await storage.deleteMessage(msgToDelete.id);
+              console.log(`📨 Удалено сообщение ID: ${msgToDelete.id}`);
+            }
+            
+            // Удаляем автомобиль
+            const deleted = await storage.deleteCar(message.carId);
+            if (!deleted) {
+              ws.send(JSON.stringify({
+                type: "DELETE_CAR_ERROR",
+                message: "Ошибка при удалении автомобиля"
+              }));
+              return;
+            }
+            
+            console.log(`✅ Автомобиль "${car.name}" успешно удален пользователем ${userId} через WebSocket`);
+            
+            // Отправляем успешный ответ
+            ws.send(JSON.stringify({
+              type: "DELETE_CAR_SUCCESS",
+              message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.`
+            }));
+            
+          } catch (error) {
+            console.error("❌ Ошибка при удалении автомобиля через WebSocket:", error);
+            ws.send(JSON.stringify({
+              type: "DELETE_CAR_ERROR",
+              message: "Ошибка при удалении автомобиля"
+            }));
+          }
         }
       } catch (error) {
         console.error('Ошибка обработки WebSocket сообщения:', error);

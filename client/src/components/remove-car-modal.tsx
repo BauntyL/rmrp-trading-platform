@@ -28,19 +28,56 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
-      console.log("🔥 Используем POST удаление для автомобиля ID:", carId);
+      console.log("🚀 Используем WebSocket для удаления автомобиля ID:", carId);
       
-      try {
-        const response = await apiRequest("GET", `/api/remove-car?carId=${carId}`);
-        console.log("🔥 Получен ответ от сервера:", response.status, response.statusText);
+      return new Promise((resolve, reject) => {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const socket = new WebSocket(wsUrl);
         
-        const data = await response.json();
-        console.log("🔥 JSON данные из ответа:", data);
-        return data;
-      } catch (error) {
-        console.error("🔥 Ошибка при выполнении PATCH удаления:", error);
-        throw error;
-      }
+        socket.onopen = () => {
+          console.log("🔌 WebSocket соединение для удаления установлено");
+          socket.send(JSON.stringify({
+            type: "DELETE_CAR",
+            carId: carId
+          }));
+        };
+        
+        socket.onmessage = (event) => {
+          try {
+            const response = JSON.parse(event.data);
+            console.log("📨 Получен ответ через WebSocket:", response);
+            
+            if (response.type === "DELETE_CAR_SUCCESS") {
+              console.log("✅ Автомобиль успешно удален через WebSocket");
+              socket.close();
+              resolve(response);
+            } else if (response.type === "DELETE_CAR_ERROR") {
+              console.log("❌ Ошибка удаления через WebSocket:", response.message);
+              socket.close();
+              reject(new Error(response.message));
+            }
+          } catch (error) {
+            console.log("❌ Ошибка парсинга WebSocket ответа:", error);
+            socket.close();
+            reject(error);
+          }
+        };
+        
+        socket.onerror = (error) => {
+          console.log("❌ Ошибка WebSocket соединения:", error);
+          socket.close();
+          reject(new Error("Ошибка WebSocket соединения"));
+        };
+        
+        // Таймаут для предотвращения зависания
+        setTimeout(() => {
+          if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) {
+            socket.close();
+            reject(new Error("Таймаут операции удаления"));
+          }
+        }, 10000);
+      });
     },
     onSuccess: (data) => {
       toast({
