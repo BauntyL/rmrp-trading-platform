@@ -91,10 +91,23 @@ export default function HomePage() {
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async (carId: number) => {
+      if (!user) {
+        throw new Error("Необходимо войти в систему");
+      }
+      
       const response = await apiRequest("POST", `/api/favorites/toggle/${carId}`, {});
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Необходимо войти в систему");
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Получен неверный формат данных");
+      }
+      
       const result = await response.json();
       return result;
     },
