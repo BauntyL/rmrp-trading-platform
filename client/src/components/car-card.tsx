@@ -209,6 +209,38 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete }: CarCardProps) 
           >
             <Phone className="h-4 w-4" />
           </Button>
+          
+          {/* Admin/Moderator controls */}
+          {user && (user.role === "admin" || user.role === "moderator") && (
+            <>
+              {onEdit && (
+                <Button 
+                  variant="secondary"
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(car);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button 
+                  variant="secondary"
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(car);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

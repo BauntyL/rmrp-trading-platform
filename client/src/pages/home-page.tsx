@@ -1,24 +1,32 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Car } from "@shared/schema";
 import { Sidebar } from "@/components/sidebar";
 import { CarCard } from "@/components/car-card";
 import { CarDetailsModal } from "@/components/car-details-modal";
 import { AddCarModal } from "@/components/add-car-modal";
+import { EditCarModal } from "@/components/edit-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Search, Plus } from "lucide-react";
 
 type ActiveSection = "catalog" | "favorites" | "my-cars" | "applications" | "moderation" | "users";
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeSection, setActiveSection] = useState<ActiveSection>("catalog");
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [showAddCarModal, setShowAddCarModal] = useState(false);
+  const [showEditCarModal, setShowEditCarModal] = useState(false);
+  const [carToEdit, setCarToEdit] = useState<Car | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedServer, setSelectedServer] = useState<string>("all");
@@ -42,6 +50,37 @@ export default function HomePage() {
     queryKey: ["/api/my-applications"],
     enabled: activeSection === "applications",
   });
+
+  const deleteCarMutation = useMutation({
+    mutationFn: async (carId: number) => {
+      await apiRequest("DELETE", `/api/cars/${carId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
+      toast({
+        title: "Автомобиль удален",
+        description: "Автомобиль успешно удален из каталога",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditCar = (car: Car) => {
+    setCarToEdit(car);
+    setShowEditCarModal(true);
+  };
+
+  const handleDeleteCar = (car: Car) => {
+    if (confirm(`Вы уверены, что хотите удалить автомобиль "${car.name}"?`)) {
+      deleteCarMutation.mutate(car.id);
+    }
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -142,6 +181,8 @@ export default function HomePage() {
                     key={car.id}
                     car={car}
                     onViewDetails={setSelectedCar}
+                    onEdit={handleEditCar}
+                    onDelete={handleDeleteCar}
                   />
                 ))}
               </div>
