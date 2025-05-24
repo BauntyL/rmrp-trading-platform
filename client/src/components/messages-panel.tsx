@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export function MessagesPanel() {
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
@@ -35,6 +36,18 @@ export function MessagesPanel() {
     refetchOnWindowFocus: true,
     refetchInterval: 5000, // Обновляем каждые 5 секунд для новых сообщений
   });
+
+  // Функция автоскролла к последнему сообщению
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Автоскролл при изменении сообщений или выборе диалога
+  useEffect(() => {
+    if (selectedConversation && messages.length > 0) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [selectedConversation, messages]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
@@ -51,6 +64,8 @@ export function MessagesPanel() {
         title: "Сообщение отправлено",
         description: "Ваше сообщение успешно доставлено",
       });
+      // Скролл к новому сообщению
+      setTimeout(scrollToBottom, 200);
     },
     onError: (error: Error) => {
       toast({
@@ -139,7 +154,7 @@ export function MessagesPanel() {
         </div>
         
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <div className="space-y-4 max-h-96 overflow-y-auto p-4">
+          <div className="space-y-4 h-96 overflow-y-auto p-4 flex flex-col">
             {sortedMessages.map((message: Message, index: number) => {
               // Определяем отправителя на основе времени и пользователей в диалоге
               const isFirstMessage = index === 0;
@@ -203,6 +218,8 @@ export function MessagesPanel() {
                 </div>
               );
             })}
+            {/* Элемент для автоскролла */}
+            <div ref={messagesEndRef} />
           </div>
           
           {/* Форма для отправки нового сообщения */}
