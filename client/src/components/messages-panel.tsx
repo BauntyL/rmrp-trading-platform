@@ -20,6 +20,7 @@ interface Message {
 
 export function MessagesPanel() {
   const { user } = useAuth();
+  const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
@@ -29,6 +30,20 @@ export function MessagesPanel() {
     refetchOnWindowFocus: true,
     refetchInterval: false,
   });
+
+  // Группируем сообщения по автомобилям
+  const conversationsByCarId = messages.reduce((acc: Record<number, Message[]>, message) => {
+    if (!acc[message.carId]) {
+      acc[message.carId] = [];
+    }
+    acc[message.carId].push(message);
+    return acc;
+  }, {});
+
+  // Получаем последнее сообщение для каждого диалога
+  const latestMessages = Object.values(conversationsByCarId).map(carMessages => 
+    carMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+  );
 
   if (isLoading) {
     return (
@@ -42,15 +57,68 @@ export function MessagesPanel() {
     );
   }
 
+  // Если выбран конкретный диалог, показываем его
+  if (selectedConversation) {
+    const conversationMessages = conversationsByCarId[selectedConversation] || [];
+    const sortedMessages = conversationMessages.sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    return (
+      <div className="p-6">
+        <div className="flex items-center mb-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setSelectedConversation(null)}
+            className="mr-4"
+          >
+            ← Назад к списку
+          </Button>
+          <h2 className="text-xl font-semibold">
+            Диалог по автомобилю {selectedConversation === 1 ? "BMW M5" : `#${selectedConversation}`}
+          </h2>
+        </div>
+        
+        <div className="space-y-4 max-h-96 overflow-y-auto">
+          {sortedMessages.map((message) => {
+            const isMyMessage = message.senderId === user?.id;
+            const senderName = message.senderId === 3 ? "Баунти Миллер" : 
+                             message.senderId === 1 ? "477-554" : 
+                             `Пользователь #${message.senderId}`;
+            
+            return (
+              <div 
+                key={message.id}
+                className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  isMyMessage 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                }`}>
+                  <p className="text-sm font-medium mb-1">{senderName}</p>
+                  <p>{message.content}</p>
+                  <p className="text-xs opacity-75 mt-1">
+                    {new Date(message.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <h2 className="text-xl font-semibold mb-6">Сообщения</h2>
       
-      {!Array.isArray(messages) || messages.length === 0 ? (
+      {!Array.isArray(messages) || latestMessages.length === 0 ? (
         <p className="text-gray-500">У вас пока нет сообщений</p>
       ) : (
         <div className="space-y-4">
-          {messages.map((message: Message) => {
+          {latestMessages.map((message: Message) => {
             // Определяем имя автомобиля - используем BMW M5 для carId=1
             const carName = message.carId === 1 ? "BMW M5" : 
                           message.carName || `Автомобиль #${message.carId}`;
@@ -98,6 +166,7 @@ export function MessagesPanel() {
                       variant="outline"
                       size="sm"
                       className="text-xs"
+                      onClick={() => setSelectedConversation(message.carId)}
                     >
                       Открыть диалог
                     </Button>
