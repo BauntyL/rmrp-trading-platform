@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { RefreshIndicator } from "@/components/refresh-indicator";
+
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
@@ -44,7 +44,6 @@ function App() {
         <ThemeProvider>
           <TooltipProvider>
             <Toaster />
-            <RefreshIndicator />
             <Router />
           </TooltipProvider>
         </ThemeProvider>
