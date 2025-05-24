@@ -68,10 +68,18 @@ export function MessagesPanel() {
     return acc;
   }, {});
 
-  // Получаем последнее сообщение для каждого диалога
-  const latestMessages = Object.values(conversationsByCarId).map((carMessages: Message[]) => 
-    carMessages.sort((a: Message, b: Message) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-  );
+  // Получаем последнее сообщение для каждого диалога и сортируем по времени
+  const latestMessages = Object.values(conversationsByCarId)
+    .map((carMessages: Message[]) => {
+      // Сортируем сообщения по времени создания (новые сверху)
+      const sorted = [...carMessages].sort((a: Message, b: Message) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      return sorted[0]; // Берем самое новое сообщение
+    })
+    .sort((a: Message, b: Message) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ); // Сортируем диалоги по времени последнего сообщения
 
   // Функция отправки сообщения
   const handleSendMessage = () => {
@@ -132,9 +140,18 @@ export function MessagesPanel() {
           <div className="space-y-4 max-h-96 overflow-y-auto p-4">
             {sortedMessages.map((message: Message) => {
               const isMyMessage = message.senderId === user?.id;
-              const senderName = message.senderId === 3 ? "Баунти Миллер" : 
-                               message.senderId === 1 ? "477-554" : 
-                               `Пользователь #${message.senderId}`;
+              
+              // Определяем имя отправителя из данных сообщения или используем fallback
+              let senderName = "Неизвестный пользователь";
+              if (message.senderId === user?.id) {
+                senderName = "Вы";
+              } else if (message.senderId === message.buyerId) {
+                senderName = message.buyerName || (message.buyerId === 3 ? "Баунти Миллер" : 
+                           message.buyerId === 1 ? "477-554" : `Покупатель #${message.buyerId}`);
+              } else if (message.senderId === message.sellerId) {
+                senderName = message.sellerName || (message.sellerId === 3 ? "Баунти Миллер" : 
+                           message.sellerId === 1 ? "477-554" : `Продавец #${message.sellerId}`);
+              }
               
               return (
                 <div 
@@ -217,18 +234,20 @@ export function MessagesPanel() {
             const carName = message.carId === 1 ? "BMW M5" : 
                           message.carName || `Автомобиль #${message.carId}`;
             
-            // Определяем имя собеседника - используем правильные имена пользователей
-            let otherUserName;
+            // Определяем имя собеседника из данных сообщения
+            let otherUserName = "Неизвестный пользователь";
             if (message.buyerId === user?.id) {
               // Мы покупатель, собеседник - продавец
-              otherUserName = message.sellerId === 3 ? "Баунти Миллер" : 
-                            message.sellerId === 1 ? "477-554" :
-                            message.sellerName || `Пользователь #${message.sellerId}`;
+              otherUserName = message.sellerName || 
+                            (message.sellerId === 3 ? "Баунти Миллер" : 
+                             message.sellerId === 1 ? "477-554" : 
+                             `Продавец #${message.sellerId}`);
             } else {
               // Мы продавец, собеседник - покупатель  
-              otherUserName = message.buyerId === 3 ? "Баунти Миллер" : 
-                            message.buyerId === 1 ? "477-554" :
-                            message.buyerName || `Пользователь #${message.buyerId}`;
+              otherUserName = message.buyerName || 
+                            (message.buyerId === 3 ? "Баунти Миллер" : 
+                             message.buyerId === 1 ? "477-554" : 
+                             `Покупатель #${message.buyerId}`);
             }
             
             const isUnread = !message.isRead && message.recipientId === user?.id;
