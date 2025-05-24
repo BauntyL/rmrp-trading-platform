@@ -143,23 +143,18 @@ export function MessagesPanel() {
             {sortedMessages.map((message: Message) => {
               const isMyMessage = message.senderId === user?.id;
               
-              // Определяем имя отправителя
+              // Определяем имя отправителя - используем простой fallback
               let senderName = "Неизвестный пользователь";
               if (message.senderId === user?.id) {
                 senderName = "Вы";
               } else {
-                // Используем имена из API или fallback
-                if (message.senderId === message.buyerId) {
-                  senderName = message.buyerName || (message.buyerId === 3 ? "Баунти Миллер" : 
-                             message.buyerId === 1 ? "477-554" : `Покупатель #${message.buyerId}`);
-                } else if (message.senderId === message.sellerId) {
-                  senderName = message.sellerName || (message.sellerId === 3 ? "Баунти Миллер" : 
-                             message.sellerId === 1 ? "477-554" : `Продавец #${message.sellerId}`);
+                // Простой fallback для известных пользователей
+                if (message.senderId === 3) {
+                  senderName = "Баунти Миллер";
+                } else if (message.senderId === 1) {
+                  senderName = "477-554";
                 } else {
-                  // Fallback
-                  senderName = message.senderId === 3 ? "Баунти Миллер" : 
-                             message.senderId === 1 ? "477-554" : 
-                             `Пользователь #${message.senderId}`;
+                  senderName = `Пользователь #${message.senderId}`;
                 }
               }
               
