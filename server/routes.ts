@@ -506,6 +506,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
       
+      console.log("📤 Отправляем обогащенные сообщения:", JSON.stringify(enrichedMessages, null, 2));
       res.json(enrichedMessages);
     } catch (error) {
       console.error("Ошибка при получении сообщений:", error);
