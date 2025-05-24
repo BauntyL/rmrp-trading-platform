@@ -167,13 +167,13 @@ export function MessagesPanel() {
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
                       : 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600'
                   }`}>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2">
                       <p className="text-sm font-medium opacity-90">{senderName}</p>
-                      <p className="text-xs opacity-75">
-                        {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </p>
                     </div>
-                    <p className="text-sm leading-relaxed">{message.content || message.message || "Сообщение"}</p>
+                    <p className="text-sm leading-relaxed mb-2">{message.content || message.message || "Сообщение"}</p>
+                    <p className="text-xs opacity-75 text-right">
+                      {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </p>
                   </div>
                 </div>
               );
@@ -296,7 +296,7 @@ export function MessagesPanel() {
                         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                           <span className="font-medium text-gray-800 dark:text-gray-200">Последнее сообщение:</span>
                           <br />
-                          "{message.content}"
+                          "{message.content || message.message || "Сообщение"}"
                         </p>
                       </div>
                       
