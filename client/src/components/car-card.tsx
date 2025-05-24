@@ -5,13 +5,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Heart, Phone, Crown, Edit, Trash2 } from "lucide-react";
+import { Heart, Phone, Crown, Edit, Trash2, X } from "lucide-react";
 
 interface CarCardProps {
   car: Car;
   onViewDetails: (car: Car) => void;
   onEdit?: (car: Car) => void;
   onDelete?: (car: Car) => void;
+  onRemove?: (car: Car) => void;
   onToggleFavorite?: () => void;
 }
 
@@ -45,7 +46,7 @@ const serverColors = {
   tverskoy: "bg-yellow-500 text-yellow-900",
 };
 
-export function CarCard({ car, onViewDetails, onEdit, onDelete, onToggleFavorite }: CarCardProps) {
+export function CarCard({ car, onViewDetails, onEdit, onDelete, onRemove, onToggleFavorite }: CarCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -217,6 +218,22 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onToggleFavorite
                 </Button>
               )}
             </>
+          )}
+
+          {/* Owner controls - Remove from sale */}
+          {user && car.createdBy === user.id && onRemove && (
+            <Button 
+              variant="secondary"
+              size="sm"
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(car);
+              }}
+              title="Снять с продажи"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>
