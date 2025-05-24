@@ -1126,6 +1126,62 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Удаление автомобиля через POST (обход блокировки)
+  app.post("/api/cars/delete", requireAuth, async (req, res) => {
+    console.log("🚗 POST /api/cars/delete - Удаление автомобиля");
+    console.log("📥 Тело запроса:", req.body);
+    console.log("👤 Пользователь:", req.user?.id, req.user?.username);
+    
+    try {
+      const { carId } = req.body;
+      const userId = req.user!.id;
+      
+      if (!carId) {
+        console.log("❌ Отсутствует carId");
+        return res.status(400).json({ error: "Отсутствует ID автомобиля" });
+      }
+      
+      // Проверяем, что автомобиль принадлежит пользователю
+      const car = await storage.getCar(carId);
+      if (!car) {
+        console.log("❌ Автомобиль не найден");
+        return res.status(404).json({ error: "Автомобиль не найден" });
+      }
+      
+      if (car.createdBy !== userId) {
+        console.log("❌ Пользователь не владелец автомобиля");
+        return res.status(403).json({ error: "Вы можете удалять только свои автомобили" });
+      }
+      
+      // Удаляем все сообщения связанные с этим автомобилем
+      const allMessages = await storage.getAllMessages();
+      const messagesToDelete = allMessages.filter((msg: any) => msg.carId === carId);
+      
+      for (const msgToDelete of messagesToDelete) {
+        await storage.deleteMessage(msgToDelete.id);
+        console.log(`📨 Удалено сообщение ID: ${msgToDelete.id}`);
+      }
+      
+      // Удаляем автомобиль
+      const deleted = await storage.deleteCar(carId);
+      if (!deleted) {
+        console.log("❌ Ошибка при удалении автомобиля");
+        return res.status(500).json({ error: "Ошибка при удалении автомобиля" });
+      }
+      
+      console.log(`✅ Автомобиль "${car.name}" успешно удален пользователем ${userId}`);
+      
+      res.json({
+        success: true,
+        message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.`
+      });
+      
+    } catch (error) {
+      console.error("❌ Ошибка при удалении автомобиля:", error);
+      res.status(500).json({ error: "Ошибка сервера" });
+    }
+  });
+
   // Отметка сообщений как прочитанных
   app.post("/api/messages/mark-read", requireAuth, async (req, res) => {
     console.log("🚀 POST /api/messages/mark-read - Начало обработки");
