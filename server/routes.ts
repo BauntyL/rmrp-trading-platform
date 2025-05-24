@@ -36,8 +36,8 @@ export function registerRoutes(app: Express): Server {
       const { search, category, server } = req.query;
       const cars = await storage.searchCars(
         search as string || "",
-        category as string,
-        server as string
+        category === "all" ? undefined : category as string,
+        server === "all" ? undefined : server as string
       );
       res.json(cars);
     } catch (error) {

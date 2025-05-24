@@ -20,8 +20,8 @@ export default function HomePage() {
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [showAddCarModal, setShowAddCarModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedServer, setSelectedServer] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedServer, setSelectedServer] = useState<string>("all");
 
   const { data: cars = [], isLoading: carsLoading } = useQuery<Car[]>({
     queryKey: ["/api/cars", { search: searchQuery, category: selectedCategory, server: selectedServer }],
@@ -78,7 +78,7 @@ export default function HomePage() {
                     <SelectValue placeholder="Все категории" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Все категории</SelectItem>
+                    <SelectItem value="all">Все категории</SelectItem>
                     <SelectItem value="standard">Стандарт</SelectItem>
                     <SelectItem value="sport">Спорт</SelectItem>
                     <SelectItem value="coupe">Купе</SelectItem>
@@ -95,7 +95,7 @@ export default function HomePage() {
                     <SelectValue placeholder="Все серверы" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Все серверы</SelectItem>
+                    <SelectItem value="all">Все серверы</SelectItem>
                     <SelectItem value="arbat">Арбат</SelectItem>
                     <SelectItem value="patriki">Патрики</SelectItem>
                     <SelectItem value="rublevka">Рублевка</SelectItem>
