@@ -145,6 +145,30 @@ export function registerRoutes(app: Express): Server {
   // Настройка аутентификации
   setupAuth(app);
 
+  // РОУТ МОДЕРАЦИИ СООБЩЕНИЙ - ДОБАВЛЕН В НАЧАЛО
+  app.get("/api/messages/all", requireAuth, async (req, res) => {
+    console.log("🚀 РОУТ /api/messages/all ВЫПОЛНЯЕТСЯ!");
+    
+    try {
+      console.log(`🔍 GET /api/messages/all - Пользователь: ${req.user!.id} ${req.user!.username} (${req.user!.role})`);
+      
+      // Проверяем роль
+      if (req.user!.role !== "moderator" && req.user!.role !== "admin") {
+        console.log("❌ Недостаточно прав для модерации сообщений");
+        return res.status(403).json({ error: "Недостаточно прав" });
+      }
+      
+      console.log("🔍 Вызываем storage.getAllMessages()...");
+      const messages = await storage.getAllMessages();
+      console.log(`📊 Получено сообщений для модерации: ${messages.length}`);
+      console.log(`📋 Содержимое сообщений:`, JSON.stringify(messages, null, 2));
+      res.json(messages);
+    } catch (error) {
+      console.error("❌ Ошибка получения всех сообщений:", error);
+      res.status(500).json({ error: "Ошибка получения сообщений" });
+    }
+  });
+
   // Добавляем middleware для отладки API запросов
   app.use('/api/*', (req, res, next) => {
     console.log(`API Request: ${req.method} ${req.path}`);
@@ -607,29 +631,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Получение всех сообщений для модерации (только для модераторов и админов)
-  app.get("/api/messages/all", requireAuth, async (req, res) => {
-    console.log("🚀 РОУТ /api/messages/all ВЫПОЛНЯЕТСЯ!");
-    
-    try {
-      console.log(`🔍 GET /api/messages/all - Пользователь: ${req.user!.id} ${req.user!.username} (${req.user!.role})`);
-      
-      // Проверяем роль
-      if (req.user!.role !== "moderator" && req.user!.role !== "admin") {
-        console.log("❌ Недостаточно прав для модерации сообщений");
-        return res.status(403).json({ error: "Недостаточно прав" });
-      }
-      
-      console.log("🔍 Вызываем storage.getAllMessages()...");
-      const messages = await storage.getAllMessages();
-      console.log(`📊 Получено сообщений для модерации: ${messages.length}`);
-      console.log(`📋 Содержимое сообщений:`, JSON.stringify(messages, null, 2));
-      res.json(messages);
-    } catch (error) {
-      console.error("❌ Ошибка получения всех сообщений:", error);
-      res.status(500).json({ error: "Ошибка получения сообщений" });
-    }
-  });
+
 
   app.get("/api/messages", requireAuth, async (req, res) => {
     console.log("🎯 Обработка запроса /api/messages для пользователя:", req.user!.id);
