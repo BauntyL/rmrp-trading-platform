@@ -316,6 +316,11 @@ export function registerRoutes(app: Express): Server {
       console.log(`🎯 НАЙДЕН REMOVE ЗАПРОС! URL: ${req.url}, Method: ${req.method}`);
     }
     
+    // Специальная проверка для нашего уникального endpoint
+    if (req.url.includes('/delete-my-car-completely')) {
+      console.log(`🟢🟢🟢 НАЙДЕН УНИКАЛЬНЫЙ DELETE ЗАПРОС! URL: ${req.url}, Method: ${req.method}, Body:`, req.body);
+    }
+    
     next();
   });
 
