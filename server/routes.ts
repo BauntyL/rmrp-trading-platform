@@ -659,8 +659,19 @@ export function registerRoutes(app: Express): Server {
     res.setHeader('Expires', '0');
     
     try {
-      const messages = await storage.getMessagesByUser(req.user!.id);
-      console.log("📨 Получено сообщений из базы:", messages.length);
+      let messages;
+      
+      // Если это модератор или админ, возвращаем ВСЕ сообщения
+      if (req.user!.role === "moderator" || req.user!.role === "admin") {
+        console.log("👮 Модератор/Админ запрашивает все сообщения");
+        messages = await storage.getAllMessages();
+        console.log("📨 Получено всех сообщений для модерации:", messages.length);
+      } else {
+        // Для обычных пользователей - только их сообщения
+        console.log("👤 Обычный пользователь запрашивает свои сообщения");
+        messages = await storage.getMessagesByUser(req.user!.id);
+        console.log("📨 Получено сообщений пользователя:", messages.length);
+      }
       
       // Обогащаем сообщения информацией о пользователях и автомобилях
       const enrichedMessages = [];
@@ -677,7 +688,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
       
-      console.log("📤 Отправляем обогащенные сообщения:", JSON.stringify(enrichedMessages, null, 2));
+      console.log("📤 Отправляем обогащенные сообщения:", enrichedMessages.length);
       res.json(enrichedMessages);
     } catch (error) {
       console.error("Ошибка при получении сообщений:", error);
