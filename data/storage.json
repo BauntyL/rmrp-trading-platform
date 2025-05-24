@@ -11,57 +11,8 @@
       }
     ]
   ],
-  "cars": [
-    [
-      4,
-      {
-        "name": "BMW M5",
-        "imageUrl": "https://bmw.scene7.com/is/image/BMW/g90_driving-dynamics_fb?qlt=80&wid=1024&fmt=webp",
-        "price": 12000000,
-        "maxSpeed": 240,
-        "acceleration": "5.2",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "serverId": "477-554",
-        "phone": "+7 (999) 123-45-67",
-        "telegram": "@tg",
-        "discord": "aaaa#2222",
-        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
-        "isPremium": true,
-        "createdBy": 2,
-        "createdAt": "2025-05-24T09:56:49.591Z",
-        "id": 4,
-        "status": "active"
-      }
-    ]
-  ],
+  "cars": [],
   "carApplications": [
-    [
-      1,
-      {
-        "name": "BMW M5",
-        "imageUrl": "https://avatars.mds.yandex.net/get-autoru-vos/5541977/a6250e30ddc876dd833714fde3e4667f/456x342",
-        "price": 15000000,
-        "maxSpeed": 230,
-        "acceleration": "5",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "serverId": "477-554",
-        "phone": "+7 (999) 123-45-67",
-        "telegram": "@tg",
-        "discord": "aaaa#2222",
-        "description": "BMW M5 — культовая спортивная версия седана BMW 5-й серии, оснащенная мощнейшим двигателем V8 с двойным турбонаддувом.",
-        "isPremium": true,
-        "createdBy": 2,
-        "id": 1,
-        "status": "approved",
-        "reviewedBy": 1,
-        "reviewedAt": "2025-05-24T01:18:29.093Z",
-        "createdAt": "2025-05-24T01:16:01.424Z"
-      }
-    ],
     [
       2,
       {
@@ -99,76 +50,13 @@
         "reviewedAt": "2025-05-24T02:58:00.058Z",
         "createdAt": "2025-05-24T02:57:49.250Z"
       }
-    ],
-    [
-      4,
-      {
-        "name": "МБ Гелик 63",
-        "price": 100,
-        "maxSpeed": 100,
-        "acceleration": "5",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "isPremium": false,
-        "createdBy": 2,
-        "id": 4,
-        "status": "rejected",
-        "reviewedBy": 1,
-        "reviewedAt": "2025-05-24T04:03:12.325Z",
-        "createdAt": "2025-05-24T03:35:39.903Z"
-      }
-    ],
-    [
-      5,
-      {
-        "name": "BMW M5",
-        "imageUrl": "https://bmw.scene7.com/is/image/BMW/g90_driving-dynamics_fb?qlt=80&wid=1024&fmt=webp",
-        "price": 12000000,
-        "maxSpeed": 240,
-        "acceleration": "5.2",
-        "drive": "RWD",
-        "category": "sport",
-        "server": "patriki",
-        "serverId": "477-554",
-        "phone": "+7 (999) 123-45-67",
-        "telegram": "@tg",
-        "discord": "aaaa#2222",
-        "description": "BMW M5 — это симфония инженерного совершенства, мощи и элегантности, воплощённая в автомобиле, способном подарить водителю неповторимые ощущения скорости и свободы на дороге.",
-        "isPremium": true,
-        "createdBy": 2,
-        "id": 5,
-        "status": "approved",
-        "reviewedBy": 1,
-        "reviewedAt": "2025-05-24T09:56:49.591Z",
-        "createdAt": "2025-05-24T09:56:24.647Z"
-      }
     ]
   ],
-  "favorites": [
-    [
-      1,
-      {
-        "userId": 1,
-        "carId": 1,
-        "id": 1,
-        "createdAt": "2025-05-24T01:22:04.981Z"
-      }
-    ],
-    [
-      4,
-      {
-        "userId": 1,
-        "carId": 3,
-        "id": 4,
-        "createdAt": "2025-05-24T09:52:10.027Z"
-      }
-    ]
-  ],
+  "favorites": [],
   "counters": {
-    "userIdCounter": 5,
-    "carIdCounter": 5,
-    "carApplicationIdCounter": 6,
-    "favoriteIdCounter": 5
+    "userIdCounter": 2,
+    "carIdCounter": 1,
+    "carApplicationIdCounter": 4,
+    "favoriteIdCounter": 1
   }
 }
