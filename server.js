@@ -1,5 +1,9 @@
-// Перенаправление для совместимости с Render.com
-import('./dist/index.js').catch(() => {
-  // Fallback если dist не найден
-  import('./server/index.js');
-});
+// Запуск сервера для Render.com
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+// Загружаем tsx для выполнения TypeScript
+require('tsx/cjs');
+
+// Запускаем основной сервер
+import('./server/index.ts');
