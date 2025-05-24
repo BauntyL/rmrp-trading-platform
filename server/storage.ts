@@ -429,7 +429,6 @@ export class MemStorage implements IStorage {
         
         return {
           ...message,
-          createdAt: message.createdAt.toISOString(),
           buyerName: buyer?.username || `Пользователь #${message.buyerId}`,
           sellerName: seller?.username || `Пользователь #${message.sellerId}`,
           carName: car?.name || `Автомобиль #${message.carId}`
