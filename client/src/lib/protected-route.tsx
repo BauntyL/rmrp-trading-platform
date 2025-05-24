@@ -16,10 +16,11 @@ export function ProtectedRoute({
 
   // Принудительное перенаправление при ошибке или отсутствии пользователя
   useEffect(() => {
-    if (!isLoading && (!user || error)) {
+    if (!isLoading && !user) {
+      console.log("🔐 Пользователь не авторизован, перенаправление на /auth");
       setLocation("/auth");
     }
-  }, [user, isLoading, error, setLocation]);
+  }, [user, isLoading, setLocation]);
 
   if (isLoading) {
     return (
