@@ -31,7 +31,7 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
       console.log("🔥 Используем PATCH удаление для автомобиля ID:", carId);
       
       try {
-        const response = await apiRequest("PATCH", `/api/cars-remove/${carId}`, { action: "delete" });
+        const response = await apiRequest("GET", `/api/cars-remove/${carId}`);
         console.log("🔥 Получен ответ от сервера:", response.status, response.statusText);
         
         const data = await response.json();
