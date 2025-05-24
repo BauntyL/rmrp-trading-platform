@@ -297,31 +297,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.patch("/api/users/:id/role", requireAuth, requireRole(["admin"]), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { role } = req.body;
-      
-      const roleSchema = z.enum(["user", "moderator", "admin"]);
-      const validation = roleSchema.safeParse(role);
-      
-      if (!validation.success) {
-        return res.status(400).json({ message: "Некорректная роль" });
-      }
-
-      const user = await storage.updateUserRole(id, validation.data);
-      if (!user) {
-        return res.status(404).json({ message: "Пользователь не найден" });
-      }
-      
-      const { password, ...safeUser } = user;
-      res.json(safeUser);
-    } catch (error) {
-      res.status(500).json({ message: "Ошибка при обновлении роли пользователя" });
-    }
-  });
-
-  // Update user (admin only)
+  // Update user (admin only) - ВАЖНО: этот маршрут должен быть ПЕРЕД /role маршрутом
   app.patch("/api/users/:id", requireAuth, requireRole(["admin"]), async (req, res) => {
     console.log('🔧 PATCH /api/users/:id - Запрос получен', req.params.id, req.body);
     try {
@@ -384,6 +360,31 @@ export function registerRoutes(app: Express): Server {
       res.json({ message: "Пользователь успешно удален" });
     } catch (error) {
       res.status(500).json({ message: "Ошибка при удалении пользователя" });
+    }
+  });
+
+  // Update user role only (admin only) - ПОСЛЕ основного маршрута редактирования
+  app.patch("/api/users/:id/role", requireAuth, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { role } = req.body;
+      
+      const roleSchema = z.enum(["user", "moderator", "admin"]);
+      const validation = roleSchema.safeParse(role);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Некорректная роль" });
+      }
+
+      const user = await storage.updateUserRole(id, validation.data);
+      if (!user) {
+        return res.status(404).json({ message: "Пользователь не найден" });
+      }
+      
+      const { password, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при обновлении роли пользователя" });
     }
   });
 
