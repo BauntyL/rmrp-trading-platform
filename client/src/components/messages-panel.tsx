@@ -36,10 +36,11 @@ export function MessagesPanel() {
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
     enabled: !!user,
-    staleTime: 30000, // Данные свежие 30 секунд
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false, // Отключаем обновление при фокусе
-    refetchInterval: false, // Отключаем частые обновления
+    staleTime: 5000,
+    refetchOnMount: "always", 
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000, // Возвращаем автообновление для новых сообщений
+    refetchIntervalInBackground: true,
   });
 
   // Мутация для отметки сообщений как прочитанных

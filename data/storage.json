@@ -196,6 +196,20 @@
         "isRead": true,
         "createdAt": "2025-05-24T13:51:01.570Z"
       }
+    ],
+    [
+      7,
+      {
+        "id": 7,
+        "carId": 1,
+        "buyerId": 1,
+        "sellerId": 3,
+        "senderId": 1,
+        "recipientId": 3,
+        "content": "Привет",
+        "isRead": false,
+        "createdAt": "2025-05-24T14:03:08.519Z"
+      }
     ]
   ],
   "counters": {
@@ -203,6 +217,6 @@
     "carIdCounter": 2,
     "carApplicationIdCounter": 5,
     "favoriteIdCounter": 3,
-    "messageIdCounter": 7
+    "messageIdCounter": 8
   }
 }

@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Устранение белых полос при обновлении данных */
+* {
+  transition: opacity 0.15s ease-in-out;
+}
+
+/* Плавные переходы для контейнеров */
+.container, .main-content, [data-query-loading] {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Предотвращение мерцания при загрузке */
+.loading-overlay {
+  transition: opacity 0.1s ease-in-out;
+}
+
+/* Плавное появление контента */
+.fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 :root {
   --background: 240 10% 98%; /* #f8fafc */
   --foreground: 222 84% 5%; /* #020817 */
