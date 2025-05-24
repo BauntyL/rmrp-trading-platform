@@ -42,7 +42,9 @@ export function MessagesPanel() {
       return response.json();
     },
     onSuccess: () => {
+      // Принудительно обновляем данные сообщений
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.refetchQueries({ queryKey: ["/api/messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
       setNewMessage("");
       toast({
@@ -141,16 +143,22 @@ export function MessagesPanel() {
             {sortedMessages.map((message: Message) => {
               const isMyMessage = message.senderId === user?.id;
               
-              // Определяем имя отправителя из данных сообщения или используем fallback
+              // Определяем имя отправителя
               let senderName = "Неизвестный пользователь";
               if (message.senderId === user?.id) {
                 senderName = "Вы";
-              } else if (message.senderId === message.buyerId) {
-                senderName = message.buyerName || (message.buyerId === 3 ? "Баунти Миллер" : 
-                           message.buyerId === 1 ? "477-554" : `Покупатель #${message.buyerId}`);
-              } else if (message.senderId === message.sellerId) {
-                senderName = message.sellerName || (message.sellerId === 3 ? "Баунти Миллер" : 
-                           message.sellerId === 1 ? "477-554" : `Продавец #${message.sellerId}`);
+              } else {
+                // Сначала проверяем, есть ли buyerName или sellerName в данных
+                if (message.buyerName && message.senderId === message.buyerId) {
+                  senderName = message.buyerName;
+                } else if (message.sellerName && message.senderId === message.sellerId) {
+                  senderName = message.sellerName;
+                } else {
+                  // Fallback для известных пользователей
+                  senderName = message.senderId === 3 ? "Баунти Миллер" : 
+                             message.senderId === 1 ? "477-554" : 
+                             `Пользователь #${message.senderId}`;
+                }
               }
               
               return (
