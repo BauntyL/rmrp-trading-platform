@@ -36,6 +36,17 @@ export default function HomePage() {
 
   const { data: cars = [], isLoading: carsLoading } = useQuery<Car[]>({
     queryKey: ["/api/cars", { search: searchQuery, category: selectedCategory, server: selectedServer }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (selectedCategory !== 'all') params.append('category', selectedCategory);
+      if (selectedServer !== 'all') params.append('server', selectedServer);
+      
+      const url = `/api/cars${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch cars');
+      return response.json();
+    },
     enabled: activeSection === "catalog",
   });
 
@@ -73,6 +84,46 @@ export default function HomePage() {
       toast({
         title: "Ошибка",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addToFavoritesMutation = useMutation({
+    mutationFn: async (carId: number) => {
+      await apiRequest("POST", "/api/favorites", { carId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      toast({
+        title: "Добавлено в избранное",
+        description: "Автомобиль успешно добавлен в избранное",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось добавить в избранное",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeFromFavoritesMutation = useMutation({
+    mutationFn: async (carId: number) => {
+      await apiRequest("DELETE", `/api/favorites/${carId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      toast({
+        title: "Удалено из избранного",
+        description: "Автомобиль успешно удален из избранного",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить из избранного",
         variant: "destructive",
       });
     },
@@ -197,6 +248,8 @@ export default function HomePage() {
                     onViewDetails={setSelectedCar}
                     onEdit={handleEditCar}
                     onDelete={handleDeleteCar}
+                    onAddToFavorites={() => addToFavoritesMutation.mutate(car.id)}
+                    onRemoveFromFavorites={() => removeFromFavoritesMutation.mutate(car.id)}
                   />
                 ))}
               </div>

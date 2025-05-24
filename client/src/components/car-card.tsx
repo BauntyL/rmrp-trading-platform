@@ -12,6 +12,8 @@ interface CarCardProps {
   onViewDetails: (car: Car) => void;
   onEdit?: (car: Car) => void;
   onDelete?: (car: Car) => void;
+  onAddToFavorites?: () => void;
+  onRemoveFromFavorites?: () => void;
 }
 
 const categoryNames = {
@@ -44,41 +46,20 @@ const serverColors = {
   tverskoy: "bg-yellow-500 text-yellow-900",
 };
 
-export function CarCard({ car, onViewDetails, onEdit, onDelete }: CarCardProps) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+export function CarCard({ car, onViewDetails, onEdit, onDelete, onAddToFavorites, onRemoveFromFavorites }: CarCardProps) {
   const { user } = useAuth();
 
   const { data: favoriteCheck } = useQuery({
     queryKey: ["/api/favorites/check", car.id],
   });
 
-  const toggleFavoriteMutation = useMutation({
-    mutationFn: async () => {
-      if (favoriteCheck?.isFavorite) {
-        await apiRequest("DELETE", `/api/favorites/${car.id}`);
-      } else {
-        await apiRequest("POST", "/api/favorites", { carId: car.id });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", car.id] });
-      toast({
-        title: favoriteCheck?.isFavorite ? "Удалено из избранного" : "Добавлено в избранное",
-        description: favoriteCheck?.isFavorite 
-          ? `${car.name} удален из избранного` 
-          : `${car.name} добавлен в избранное`,
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось обновить избранное",
-        variant: "destructive",
-      });
-    },
-  });
+  const handleToggleFavorite = () => {
+    if (favoriteCheck?.isFavorite) {
+      onRemoveFromFavorites?.();
+    } else {
+      onAddToFavorites?.();
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("ru-RU", {
