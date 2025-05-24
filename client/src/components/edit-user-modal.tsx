@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -38,7 +38,7 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
   });
 
   // Обновляем значения формы при изменении пользователя
-  useState(() => {
+  useEffect(() => {
     if (user) {
       form.reset({
         username: user.username,

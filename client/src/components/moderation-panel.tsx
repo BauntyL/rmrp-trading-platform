@@ -11,7 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle, XCircle, Eye, Users, Shield, Crown, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Users, Shield, Crown, Clock, Edit, Trash2 } from "lucide-react";
+import { EditUserModal } from "./edit-user-modal";
+import { DeleteUserModal } from "./delete-user-modal";
 
 interface ModerationPanelProps {
   activeTab: "moderation" | "users";
@@ -61,6 +63,9 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedApplication, setSelectedApplication] = useState<CarApplication | null>(null);
+  const [editUserModalOpen, setEditUserModalOpen] = useState(false);
+  const [deleteUserModalOpen, setDeleteUserModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const { data: applications = [], isLoading: applicationsLoading } = useQuery<CarApplication[]>({
     queryKey: ["/api/applications"],
@@ -466,24 +471,34 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                         {formatDate(userItem.createdAt)}
                       </TableCell>
                       <TableCell>
-                        {userItem.id !== user.id && (
-                          <Select
-                            value={userItem.role}
-                            onValueChange={(newRole: "user" | "moderator" | "admin") => {
-                              updateUserRoleMutation.mutate({ id: userItem.id, role: newRole });
-                            }}
-                          >
-                            <SelectTrigger className="w-32 bg-slate-700 border-slate-600 text-white">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="user">Пользователь</SelectItem>
-                              <SelectItem value="moderator">Модератор</SelectItem>
-                              <SelectItem value="admin">Администратор</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                        {userItem.id === user.id && (
+                        {userItem.id !== user.id ? (
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedUser(userItem);
+                                setEditUserModalOpen(true);
+                              }}
+                              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Изменить
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setSelectedUser(userItem);
+                                setDeleteUserModalOpen(true);
+                              }}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Удалить
+                            </Button>
+                          </div>
+                        ) : (
                           <span className="text-slate-500 text-sm">Текущий пользователь</span>
                         )}
                       </TableCell>
@@ -495,6 +510,19 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Модальные окна управления пользователями */}
+      <EditUserModal
+        user={selectedUser}
+        open={editUserModalOpen}
+        onOpenChange={setEditUserModalOpen}
+      />
+      
+      <DeleteUserModal
+        user={selectedUser}
+        open={deleteUserModalOpen}
+        onOpenChange={setDeleteUserModalOpen}
+      />
     </div>
   );
 }
