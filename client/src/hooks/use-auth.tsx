@@ -52,6 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      // Очищаем сохраненные данные при неудачном входе
+      localStorage.removeItem("rememberedCredentials");
+      
       toast({
         title: "Ошибка авторизации",
         description: error.message,
