@@ -141,9 +141,9 @@ export function MessagesPanel() {
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ); // Сортируем диалоги по времени последнего сообщения
 
-  // Автоматически отмечаем сообщения как прочитанные при просмотре диалога
+  // Автоматически отмечаем сообщения как прочитанные при просмотре диалога (только один раз за просмотр)
   useEffect(() => {
-    if (!selectedConversation || !user || !messages) return;
+    if (!selectedConversation || !user || !messages || markReadMutation.isPending) return;
 
     const currentConversation = conversationsByCarId[selectedConversation];
     if (!currentConversation || currentConversation.length === 0) return;
@@ -166,14 +166,13 @@ export function MessagesPanel() {
         {
           onSuccess: (result) => {
             console.log("✅ Сообщения в активном диалоге отмечены как прочитанные:", result);
-            // Обновляем данные сообщений и счетчик
-            queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+            // Обновляем только счетчик, не сообщения (чтобы избежать циклов)
             queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
           }
         }
       );
     }
-  }, [selectedConversation, messages, user?.id, conversationsByCarId]);
+  }, [selectedConversation, user?.id]); // Убираем messages из зависимостей чтобы избежать циклов
 
   // Функция отправки сообщения
   const handleSendMessage = () => {
