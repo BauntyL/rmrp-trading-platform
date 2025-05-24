@@ -267,8 +267,8 @@ export function registerRoutes(app: Express): Server {
     console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
     
     // Специальная проверка для нашего delete endpoint
-    if (req.url.startsWith('/delete-car-action/')) {
-      console.log(`🎯 НАЙДЕН DELETE-CAR-ACTION ЗАПРОС! URL: ${req.url}, Method: ${req.method}`);
+    if (req.url.includes('/remove')) {
+      console.log(`🎯 НАЙДЕН REMOVE ЗАПРОС! URL: ${req.url}, Method: ${req.method}`);
     }
     
     next();
