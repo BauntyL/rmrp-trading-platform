@@ -30,6 +30,12 @@ export function registerRoutes(app: Express): Server {
   // Настройка аутентификации
   setupAuth(app);
 
+  // Добавляем middleware для отладки API запросов
+  app.use('/api/*', (req, res, next) => {
+    console.log(`API Request: ${req.method} ${req.path}`);
+    next();
+  });
+
   // Cars routes
   app.get("/api/cars", async (req, res) => {
     try {
