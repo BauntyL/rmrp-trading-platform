@@ -323,6 +323,18 @@ export function MessagesPanel() {
             
             const isUnread = !message.isRead && message.recipientId === user?.id;
             
+            // Логирование для диагностики
+            if (message.carId === 1) {
+              console.log("🔍 Проверка сообщения:", {
+                messageId: message.id,
+                isRead: message.isRead,
+                recipientId: message.recipientId,
+                userId: user?.id,
+                recipientMatch: message.recipientId === user?.id,
+                isUnread: isUnread
+              });
+            }
+            
             return (
               <div
                 key={message.id}
