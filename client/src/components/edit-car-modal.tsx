@@ -1,3 +1,4 @@
+import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -51,24 +52,47 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
 
   const form = useForm<EditCarFormData>({
     resolver: zodResolver(editCarSchema),
-    defaultValues: car ? {
-      name: car.name,
-      category: car.category,
-      server: car.server,
-      price: car.price,
-      maxSpeed: car.maxSpeed,
-      acceleration: car.acceleration,
-      drive: car.drive as "FWD" | "RWD" | "AWD",
-      serverId: car.serverId || "",
-      phone: car.phone || "",
-      telegram: car.telegram || "",
-      discord: car.discord || "",
-      imageUrl: car.imageUrl || "",
-      description: car.description || "",
-      isPremium: car.isPremium,
-      createdBy: car.createdBy,
-    } : undefined,
+    defaultValues: {
+      name: "",
+      category: "standard",
+      server: "arbat", 
+      price: 0,
+      maxSpeed: 0,
+      acceleration: "",
+      drive: "FWD",
+      serverId: "",
+      phone: "",
+      telegram: "",
+      discord: "",
+      imageUrl: "",
+      description: "",
+      isPremium: false,
+      createdBy: 1,
+    },
   });
+
+  // Reset form when car changes
+  React.useEffect(() => {
+    if (car) {
+      form.reset({
+        name: car.name,
+        category: car.category,
+        server: car.server,
+        price: car.price,
+        maxSpeed: car.maxSpeed,
+        acceleration: car.acceleration,
+        drive: car.drive as "FWD" | "RWD" | "AWD",
+        serverId: car.serverId || "",
+        phone: car.phone || "",
+        telegram: car.telegram || "",
+        discord: car.discord || "",
+        imageUrl: car.imageUrl || "",
+        description: car.description || "",
+        isPremium: car.isPremium || false,
+        createdBy: car.createdBy,
+      });
+    }
+  }, [car, form]);
 
   const updateCarMutation = useMutation({
     mutationFn: async (data: EditCarFormData) => {

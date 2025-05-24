@@ -6,6 +6,7 @@ import { CarCard } from "@/components/car-card";
 import { CarDetailsModal } from "@/components/car-details-modal";
 import { AddCarModal } from "@/components/add-car-modal";
 import { EditCarModal } from "@/components/edit-car-modal";
+import { DeleteCarModal } from "@/components/delete-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,8 @@ export default function HomePage() {
   const [showAddCarModal, setShowAddCarModal] = useState(false);
   const [showEditCarModal, setShowEditCarModal] = useState(false);
   const [carToEdit, setCarToEdit] = useState<Car | null>(null);
+  const [showDeleteCarModal, setShowDeleteCarModal] = useState(false);
+  const [carToDelete, setCarToDelete] = useState<Car | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedServer, setSelectedServer] = useState<string>("all");
@@ -77,8 +80,15 @@ export default function HomePage() {
   };
 
   const handleDeleteCar = (car: Car) => {
-    if (confirm(`Вы уверены, что хотите удалить автомобиль "${car.name}"?`)) {
-      deleteCarMutation.mutate(car.id);
+    setCarToDelete(car);
+    setShowDeleteCarModal(true);
+  };
+
+  const confirmDeleteCar = () => {
+    if (carToDelete) {
+      deleteCarMutation.mutate(carToDelete.id);
+      setShowDeleteCarModal(false);
+      setCarToDelete(null);
     }
   };
 
@@ -402,6 +412,14 @@ export default function HomePage() {
         car={carToEdit}
         open={showEditCarModal}
         onOpenChange={setShowEditCarModal}
+      />
+
+      <DeleteCarModal
+        car={carToDelete}
+        open={showDeleteCarModal}
+        onOpenChange={setShowDeleteCarModal}
+        onConfirm={confirmDeleteCar}
+        isLoading={deleteCarMutation.isPending}
       />
     </div>
   );
