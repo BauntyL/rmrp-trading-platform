@@ -609,6 +609,8 @@ export function registerRoutes(app: Express): Server {
 
   // Получение всех сообщений для модерации (только для модераторов и админов)
   app.get("/api/messages/all", requireAuth, async (req, res) => {
+    console.log("🚀 РОУТ /api/messages/all ВЫПОЛНЯЕТСЯ!");
+    
     try {
       console.log(`🔍 GET /api/messages/all - Пользователь: ${req.user!.id} ${req.user!.username} (${req.user!.role})`);
       
@@ -621,6 +623,7 @@ export function registerRoutes(app: Express): Server {
       console.log("🔍 Вызываем storage.getAllMessages()...");
       const messages = await storage.getAllMessages();
       console.log(`📊 Получено сообщений для модерации: ${messages.length}`);
+      console.log(`📋 Содержимое сообщений:`, JSON.stringify(messages, null, 2));
       res.json(messages);
     } catch (error) {
       console.error("❌ Ошибка получения всех сообщений:", error);
