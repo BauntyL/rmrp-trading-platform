@@ -24,9 +24,10 @@ export function MessagesPanel() {
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["/api/messages"],
     enabled: !!user,
-    staleTime: 60000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    cacheTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     refetchInterval: false,
   });
 
