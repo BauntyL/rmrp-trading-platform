@@ -116,6 +116,20 @@
         "isRead": true,
         "createdAt": "2025-05-24T14:18:48.867Z"
       }
+    ],
+    [
+      4,
+      {
+        "id": 4,
+        "carId": 1,
+        "buyerId": 1,
+        "sellerId": 2,
+        "senderId": 1,
+        "recipientId": 2,
+        "content": "Привет! Какая цена?",
+        "isRead": true,
+        "createdAt": "2025-05-24T14:20:14.297Z"
+      }
     ]
   ],
   "counters": {
@@ -123,6 +137,6 @@
     "carIdCounter": 2,
     "carApplicationIdCounter": 2,
     "favoriteIdCounter": 1,
-    "messageIdCounter": 4
+    "messageIdCounter": 5
   }
 }
