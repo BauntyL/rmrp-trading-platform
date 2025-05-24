@@ -169,6 +169,23 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ТЕСТОВЫЙ РОУТ для диагностики
+  app.get("/api/debug/messages", async (req, res) => {
+    console.log("🔧 ТЕСТОВЫЙ РОУТ ВЫПОЛНЯЕТСЯ!");
+    try {
+      const messages = await storage.getAllMessages();
+      console.log(`🔧 В базе найдено сообщений: ${messages.length}`);
+      res.json({ 
+        count: messages.length, 
+        messages: messages,
+        debug: "test route working"
+      });
+    } catch (error) {
+      console.error("🔧 Ошибка в тестовом роуте:", error);
+      res.status(500).json({ error: error });
+    }
+  });
+
   // Добавляем middleware для отладки API запросов
   app.use('/api/*', (req, res, next) => {
     console.log(`API Request: ${req.method} ${req.path}`);
