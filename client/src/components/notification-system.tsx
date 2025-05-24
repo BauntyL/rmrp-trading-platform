@@ -31,6 +31,9 @@ export function NotificationSystem() {
       ws.onopen = () => {
         console.log("📡 WebSocket соединение установлено");
         ws.send(JSON.stringify({ type: "authenticate", userId: user.id }));
+        
+        // Сохраняем WebSocket глобально для использования в других компонентах
+        (window as any).globalWebSocket = ws;
       };
 
       ws.onmessage = (event) => {
