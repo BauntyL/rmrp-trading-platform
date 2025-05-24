@@ -28,10 +28,10 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
 
   const removeCarMutation = useMutation({
     mutationFn: async (carId: number) => {
-      console.log("🔥 Используем PATCH удаление для автомобиля ID:", carId);
+      console.log("🔥 Используем POST удаление для автомобиля ID:", carId);
       
       try {
-        const response = await apiRequest("GET", `/api/delete-car-action/${carId}`);
+        const response = await apiRequest("POST", `/api/cars/${carId}/remove`);
         console.log("🔥 Получен ответ от сервера:", response.status, response.statusText);
         
         const data = await response.json();
