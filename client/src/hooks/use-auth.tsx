@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useState, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -15,6 +15,8 @@ type AuthContextType = {
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  showTermsModal: boolean;
+  acceptTerms: () => void;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -23,6 +25,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const {
     data: user,
     error,
@@ -41,6 +44,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 0, // Всегда считаем данные устаревшими
     gcTime: 0, // Не кэшируем данные пользователя
   });
+
+  // Проверяем, нужно ли показать модальное окно с условиями
+  useEffect(() => {
+    if (user) {
+      const termsAcceptedKey = `terms-accepted-${user.id}`;
+      const hasAcceptedTerms = localStorage.getItem(termsAcceptedKey);
+      
+      if (!hasAcceptedTerms) {
+        setShowTermsModal(true);
+      }
+    }
+  }, [user]);
+
+  const acceptTerms = () => {
+    if (user) {
+      const termsAcceptedKey = `terms-accepted-${user.id}`;
+      localStorage.setItem(termsAcceptedKey, 'true');
+      setShowTermsModal(false);
+    }
+  };
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
