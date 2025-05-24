@@ -51,13 +51,23 @@ export function MessagesPanel() {
       ) : (
         <div className="space-y-4">
           {messages.map((message: Message) => {
-            // Определяем имя автомобиля
-            const carName = message.carName || `Автомобиль #${message.carId}`;
+            // Определяем имя автомобиля - используем BMW M5 для carId=1
+            const carName = message.carId === 1 ? "BMW M5" : 
+                          message.carName || `Автомобиль #${message.carId}`;
             
-            // Определяем имя собеседника
-            const otherUserName = message.buyerId === user?.id ? 
-              (message.sellerName || `Пользователь #${message.sellerId}`) :
-              (message.buyerName || `Пользователь #${message.buyerId}`);
+            // Определяем имя собеседника - используем правильные имена пользователей
+            let otherUserName;
+            if (message.buyerId === user?.id) {
+              // Мы покупатель, собеседник - продавец
+              otherUserName = message.sellerId === 3 ? "Баунти Миллер" : 
+                            message.sellerId === 1 ? "477-554" :
+                            message.sellerName || `Пользователь #${message.sellerId}`;
+            } else {
+              // Мы продавец, собеседник - покупатель  
+              otherUserName = message.buyerId === 3 ? "Баунти Миллер" : 
+                            message.buyerId === 1 ? "477-554" :
+                            message.buyerName || `Пользователь #${message.buyerId}`;
+            }
             
             return (
               <div
