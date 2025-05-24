@@ -344,7 +344,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Пользователь не найден" });
       }
 
-      const { password, ...safeUser } = updatedUser;
+      const safeUser = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        role: updatedUser.role,
+        createdAt: updatedUser.createdAt
+      };
+      console.log('Отправляем обновленного пользователя:', safeUser);
       res.json(safeUser);
     } catch (error) {
       res.status(500).json({ message: "Ошибка при обновлении пользователя" });
