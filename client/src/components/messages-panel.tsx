@@ -148,13 +148,15 @@ export function MessagesPanel() {
               if (message.senderId === user?.id) {
                 senderName = "Вы";
               } else {
-                // Сначала проверяем, есть ли buyerName или sellerName в данных
-                if (message.buyerName && message.senderId === message.buyerId) {
-                  senderName = message.buyerName;
-                } else if (message.sellerName && message.senderId === message.sellerId) {
-                  senderName = message.sellerName;
+                // Используем имена из API или fallback
+                if (message.senderId === message.buyerId) {
+                  senderName = message.buyerName || (message.buyerId === 3 ? "Баунти Миллер" : 
+                             message.buyerId === 1 ? "477-554" : `Покупатель #${message.buyerId}`);
+                } else if (message.senderId === message.sellerId) {
+                  senderName = message.sellerName || (message.sellerId === 3 ? "Баунти Миллер" : 
+                             message.sellerId === 1 ? "477-554" : `Продавец #${message.sellerId}`);
                 } else {
-                  // Fallback для известных пользователей
+                  // Fallback
                   senderName = message.senderId === 3 ? "Баунти Миллер" : 
                              message.senderId === 1 ? "477-554" : 
                              `Пользователь #${message.senderId}`;
