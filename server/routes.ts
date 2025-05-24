@@ -708,14 +708,22 @@ export function registerRoutes(app: Express): Server {
 
   // Удаление сообщения (только для модераторов и админов)
   app.delete("/api/messages/:id", requireAuth, requireRole(["moderator", "admin"]), async (req, res) => {
+    console.log(`🚀 DELETE /api/messages/:id ЗАПРОС ПОЛУЧЕН!`);
+    console.log(`📝 Параметры:`, req.params);
+    console.log(`👤 Пользователь:`, req.user?.id, req.user?.username, req.user?.role);
+    
     try {
       const messageId = parseInt(req.params.id);
       console.log(`🗑️ DELETE /api/messages/${messageId} - Модератор: ${req.user!.id} ${req.user!.username}`);
       
       const success = await storage.deleteMessage(messageId);
+      console.log(`✅ Результат удаления:`, success);
+      
       if (success) {
+        console.log(`✅ Сообщение ${messageId} успешно удалено`);
         res.json({ success: true });
       } else {
+        console.log(`❌ Сообщение ${messageId} не найдено`);
         res.status(404).json({ error: "Сообщение не найдено" });
       }
     } catch (error) {
