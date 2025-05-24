@@ -387,6 +387,50 @@ export class MemStorage implements IStorage {
       fav => fav.userId === userId && fav.carId === carId
     );
   }
+
+  // Messages
+  async getMessagesByUser(userId: number): Promise<Message[]> {
+    return Array.from(this.messages.values()).filter(
+      message => message.buyerId === userId || message.sellerId === userId
+    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]> {
+    return Array.from(this.messages.values()).filter(
+      message => message.carId === carId && 
+                message.buyerId === buyerId && 
+                message.sellerId === sellerId
+    ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async sendMessage(insertMessage: InsertMessage): Promise<Message> {
+    const message: Message = {
+      id: this.messageIdCounter++,
+      ...insertMessage,
+      isRead: false,
+      createdAt: new Date(),
+    };
+    
+    this.messages.set(message.id, message);
+    this.saveData();
+    return message;
+  }
+
+  async markMessageAsRead(messageId: number): Promise<boolean> {
+    const message = this.messages.get(messageId);
+    if (message) {
+      message.isRead = true;
+      this.saveData();
+      return true;
+    }
+    return false;
+  }
+
+  async getUnreadMessagesCount(userId: number): Promise<number> {
+    return Array.from(this.messages.values()).filter(
+      message => message.sellerId === userId && !message.isRead
+    ).length;
+  }
 }
 
 export const storage = new MemStorage();

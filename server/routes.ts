@@ -397,6 +397,40 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Messages API routes
+  app.get("/api/messages", requireAuth, async (req, res) => {
+    try {
+      const messages = await storage.getMessagesByUser(req.user!.id);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при получении сообщений" });
+    }
+  });
+
+  app.post("/api/messages", requireAuth, async (req, res) => {
+    try {
+      const { carId, sellerId, message } = req.body;
+      const newMessage = await storage.sendMessage({
+        carId: parseInt(carId),
+        buyerId: req.user!.id,
+        sellerId: parseInt(sellerId),
+        message: message,
+      });
+      res.status(201).json(newMessage);
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при отправке сообщения" });
+    }
+  });
+
+  app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
+    try {
+      const count = await storage.getUnreadMessagesCount(req.user!.id);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при получении счетчика" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

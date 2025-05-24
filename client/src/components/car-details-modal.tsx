@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Car } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -5,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Heart, Phone, MessageCircle, Crown } from "lucide-react";
 import { SiTelegram, SiDiscord } from "react-icons/si";
+import { ContactSellerModal } from "./contact-seller-modal";
 
 interface CarDetailsModalProps {
   car: Car;
