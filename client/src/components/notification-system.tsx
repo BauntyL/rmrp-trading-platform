@@ -59,13 +59,9 @@ export function NotificationSystem() {
 
             // Воспроизводим звук уведомления
             try {
-              playNotificationSound(); return;
-              audio.volume = 0.4;
-              audio.play().catch(() => {
-                // Игнорируем ошибки воспроизведения
-              });
+              playNotificationSound();
             } catch (error) {
-              // Игнорируем ошибки создания аудио
+              // Игнорируем ошибки воспроизведения звука
             }
 
             // Показываем браузерное уведомление (если разрешено)

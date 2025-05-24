@@ -49,9 +49,9 @@ export function MessagesPanel() {
     staleTime: 30000, // Увеличиваем время кеша
     refetchOnMount: "always",
     refetchOnWindowFocus: false, // Отключаем обновление при фокусе
-    refetchInterval: 30000, // Редкие обновления для предотвращения мерцания
-    retry: 1, // Только одна попытка повтора
-    retryDelay: 5000,
+    refetchInterval: 3000, // Быстрое обновление для реального времени
+    retry: 1, 
+    retryDelay: 1000,
   });
 
   // Мутация для отметки сообщений как прочитанных

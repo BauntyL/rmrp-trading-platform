@@ -1144,9 +1144,18 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
     try {
-      const count = await storage.getUnreadMessagesCount(req.user!.id);
+      const userId = req.user!.id;
+      const count = await storage.getUnreadMessagesCount(userId);
+      console.log(`📊 Счетчик непрочитанных сообщений для пользователя ${userId}: ${count}`);
+      
+      // Отключаем кеширование для точного счетчика
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Expires', '0');
+      res.set('Pragma', 'no-cache');
+      
       res.json({ count });
     } catch (error) {
+      console.error("❌ Ошибка при получении счетчика:", error);
       res.status(500).json({ message: "Ошибка при получении счетчика" });
     }
   });
