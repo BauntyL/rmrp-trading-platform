@@ -32,8 +32,8 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
     mutationFn: async (carId: number) => {
       console.log("🚀 Удаляем автомобиль ID:", carId);
       
-      // Отправляем запрос на сервер (огнестрелом)
-      fetch(window.location.origin + '/api/delete-my-car-completely', {
+      // Отправляем запрос на существующий эндпоинт
+      fetch(window.location.origin + '/api/delete-car-direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
