@@ -182,6 +182,20 @@
         "isRead": true,
         "createdAt": "2025-05-24T13:49:25.913Z"
       }
+    ],
+    [
+      6,
+      {
+        "id": 6,
+        "carId": 1,
+        "buyerId": 1,
+        "sellerId": 3,
+        "senderId": 1,
+        "recipientId": 3,
+        "content": "але казел",
+        "isRead": true,
+        "createdAt": "2025-05-24T13:51:01.570Z"
+      }
     ]
   ],
   "counters": {
@@ -189,6 +203,6 @@
     "carIdCounter": 2,
     "carApplicationIdCounter": 5,
     "favoriteIdCounter": 3,
-    "messageIdCounter": 6
+    "messageIdCounter": 7
   }
 }
