@@ -77,6 +77,8 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
     enabled: activeTab === "users" && user?.role === "admin",
+    refetchInterval: 30000, // Автообновление пользователей каждые 30 секунд
+    refetchOnWindowFocus: true,
   });
 
   const updateApplicationMutation = useMutation({
