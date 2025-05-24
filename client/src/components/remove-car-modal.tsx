@@ -33,63 +33,58 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
       console.log("🚀 Используем WebSocket для удаления автомобиля ID:", carId);
       
       return new Promise((resolve, reject) => {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
-        const socket = new WebSocket(wsUrl);
+        // Получаем глобальное WebSocket соединение
+        const existingSocket = (window as any).globalWebSocket;
         
-        socket.onopen = () => {
-          console.log("🔌 WebSocket соединение для удаления установлено");
+        if (existingSocket && existingSocket.readyState === WebSocket.OPEN) {
+          console.log("🔌 Используем существующее WebSocket соединение");
           
-          // Сначала аутентифицируемся
-          socket.send(JSON.stringify({
-            type: "authenticate",
-            userId: user?.id
+          // Создаем временный обработчик для ответа
+          const originalOnMessage = existingSocket.onmessage;
+          
+          existingSocket.onmessage = (event: MessageEvent) => {
+            try {
+              const response = JSON.parse(event.data);
+              console.log("📨 Получен ответ через WebSocket:", response);
+              
+              if (response.type === "DELETE_CAR_SUCCESS") {
+                console.log("✅ Автомобиль успешно удален через WebSocket");
+                existingSocket.onmessage = originalOnMessage; // Восстанавливаем обработчик
+                resolve(response);
+              } else if (response.type === "DELETE_CAR_ERROR") {
+                console.log("❌ Ошибка удаления через WebSocket:", response.message);
+                existingSocket.onmessage = originalOnMessage; // Восстанавливаем обработчик
+                reject(new Error(response.message));
+              } else {
+                // Передаем другие сообщения оригинальному обработчику
+                if (originalOnMessage) {
+                  originalOnMessage.call(existingSocket, event);
+                }
+              }
+            } catch (error) {
+              console.log("❌ Ошибка парсинга WebSocket ответа:", error);
+              existingSocket.onmessage = originalOnMessage; // Восстанавливаем обработчик
+              reject(error);
+            }
+          };
+          
+          // Отправляем команду удаления
+          console.log("📤 Отправляем команду DELETE_CAR через существующее соединение");
+          existingSocket.send(JSON.stringify({
+            type: "DELETE_CAR",
+            carId: carId
           }));
           
-          // Затем отправляем команду удаления через небольшую задержку
+          // Таймаут для предотвращения зависания
           setTimeout(() => {
-            console.log("📤 Отправляем команду DELETE_CAR");
-            socket.send(JSON.stringify({
-              type: "DELETE_CAR",
-              carId: carId
-            }));
-          }, 100);
-        };
-        
-        socket.onmessage = (event) => {
-          try {
-            const response = JSON.parse(event.data);
-            console.log("📨 Получен ответ через WebSocket:", response);
-            
-            if (response.type === "DELETE_CAR_SUCCESS") {
-              console.log("✅ Автомобиль успешно удален через WebSocket");
-              socket.close();
-              resolve(response);
-            } else if (response.type === "DELETE_CAR_ERROR") {
-              console.log("❌ Ошибка удаления через WebSocket:", response.message);
-              socket.close();
-              reject(new Error(response.message));
-            }
-          } catch (error) {
-            console.log("❌ Ошибка парсинга WebSocket ответа:", error);
-            socket.close();
-            reject(error);
-          }
-        };
-        
-        socket.onerror = (error) => {
-          console.log("❌ Ошибка WebSocket соединения:", error);
-          socket.close();
-          reject(new Error("Ошибка WebSocket соединения"));
-        };
-        
-        // Таймаут для предотвращения зависания
-        setTimeout(() => {
-          if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) {
-            socket.close();
+            existingSocket.onmessage = originalOnMessage; // Восстанавливаем обработчик
             reject(new Error("Таймаут операции удаления"));
-          }
-        }, 10000);
+          }, 10000);
+          
+        } else {
+          console.log("❌ Глобальное WebSocket соединение недоступно");
+          reject(new Error("WebSocket соединение недоступно"));
+        }
       });
     },
     onSuccess: (data) => {
