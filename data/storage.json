@@ -9,26 +9,6 @@
         "role": "admin",
         "createdAt": "2025-05-24T01:11:03.227Z"
       }
-    ],
-    [
-      2,
-      {
-        "username": "Баунти Миллер",
-        "password": "$2b$10$B1iv8KUdvLJD/BZYsFRZNuxml0UVWsvMZPPLCv6EnnHnfwwXQIJ32",
-        "role": "user",
-        "id": 2,
-        "createdAt": "2025-05-24T01:14:12.776Z"
-      }
-    ],
-    [
-      3,
-      {
-        "username": "001-001",
-        "password": "$2b$10$LgxGr3LkrRBEEPcaZwLqwe818gqcqpIr8.si0EaUvyIC9poKtS.Ba",
-        "role": "user",
-        "id": 3,
-        "createdAt": "2025-05-24T10:00:51.779Z"
-      }
     ]
   ],
   "cars": [
@@ -173,15 +153,6 @@
         "carId": 1,
         "id": 1,
         "createdAt": "2025-05-24T01:22:04.981Z"
-      }
-    ],
-    [
-      3,
-      {
-        "userId": 2,
-        "carId": 3,
-        "id": 3,
-        "createdAt": "2025-05-24T03:00:09.481Z"
       }
     ],
     [

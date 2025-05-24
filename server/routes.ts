@@ -331,7 +331,7 @@ export function registerRoutes(app: Express): Server {
         id: updatedUser.id,
         username: updatedUser.username,
         role: updatedUser.role,
-        createdAt: updatedUser.createdAt.toISOString()
+        createdAt: typeof updatedUser.createdAt === 'string' ? updatedUser.createdAt : updatedUser.createdAt.toISOString()
       };
       console.log('Отправляем обновленного пользователя:', safeUser);
       res.setHeader('Content-Type', 'application/json');
@@ -355,6 +355,13 @@ export function registerRoutes(app: Express): Server {
       const deleted = await storage.deleteUser(userId);
       if (!deleted) {
         return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      // Если удаляемый пользователь сейчас авторизован, завершаем его сессию
+      if (req.user && req.user.id === userId) {
+        req.logout((err) => {
+          if (err) console.error('Ошибка при завершении сессии удаленного пользователя:', err);
+        });
       }
 
       res.json({ message: "Пользователь успешно удален" });
