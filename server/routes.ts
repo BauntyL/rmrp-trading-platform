@@ -543,7 +543,13 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/my-cars", requireAuth, async (req, res) => {
     try {
+      // Отключаем кеширование
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       const cars = await storage.getCarsByUser(req.user!.id);
+      console.log(`🔍 GET /api/my-cars - Пользователь: ${req.user!.id} ${req.user!.username}`);
       res.json(cars);
     } catch (error) {
       res.status(500).json({ message: "Ошибка при получении ваших автомобилей" });

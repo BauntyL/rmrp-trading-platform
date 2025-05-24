@@ -304,7 +304,14 @@ export class MemStorage implements IStorage {
   }
 
   async getCarsByUser(userId: number): Promise<Car[]> {
-    return Array.from(this.cars.values()).filter(car => car.createdBy === userId);
+    const allCars = Array.from(this.cars.values());
+    const userCars = allCars.filter(car => car.createdBy === userId);
+    
+    console.log(`🚗 getCarsByUser(${userId}): Всего автомобилей в системе: ${allCars.length}`);
+    console.log(`🚗 Автомобили пользователя ${userId}: ${userCars.length}`);
+    console.log(`🚗 Список автомобилей пользователя:`, userCars.map(car => `ID:${car.id} "${car.name}" createdBy:${car.createdBy}`));
+    
+    return userCars;
   }
 
   async searchCars(query: string, category?: string, server?: string): Promise<Car[]> {
