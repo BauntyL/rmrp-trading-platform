@@ -166,6 +166,66 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
+  // PATCH роут для удаления автомобилей (ВЫСШИЙ ПРИОРИТЕТ)
+  app.patch("/api/my-cars/:id", requireAuth, async (req, res) => {
+    console.log(`🔥 PATCH DELETE ENDPOINT! ID: ${req.params.id}, Body:`, req.body);
+    
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Проверяем, что это запрос на удаление
+      if (req.body.action === 'delete') {
+        console.log(`🗑️ Пользователь ${req.user!.id} удаляет автомобиль ID: ${id}`);
+        
+        // Проверяем, что автомобиль принадлежит пользователю
+        const car = await storage.getCar(id);
+        if (!car) {
+          return res.status(404).json({ message: "Автомобиль не найден" });
+        }
+        
+        if (car.createdBy !== req.user!.id) {
+          return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
+        }
+        
+        // Удаляем все сообщения связанные с этим автомобилем
+        const allMessages = await storage.getAllMessages();
+        const messagesToDelete = allMessages.filter((msg: any) => msg.carId === id);
+        
+        for (const message of messagesToDelete) {
+          await storage.deleteMessage(message.id);
+        }
+        
+        // Удаляем автомобиль
+        const deleted = await storage.deleteCar(id);
+        if (!deleted) {
+          return res.status(500).json({ message: "Ошибка при удалении автомобиля" });
+        }
+        
+        console.log(`✅ Автомобиль ${car.name} успешно удален`);
+        return res.json({ 
+          message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.`,
+          success: true 
+        });
+      }
+      
+      // Обычное обновление автомобиля
+      const validation = insertCarSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Некорректные данные автомобиля" });
+      }
+
+      const car = await storage.updateCar(id, validation.data);
+      if (!car) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      res.json(car);
+    } catch (error) {
+      console.error("❌ Ошибка в PATCH обработчике:", error);
+      res.status(500).json({ message: "Ошибка при обработке запроса" });
+    }
+  });
+
   // РОУТ МОДЕРАЦИИ СООБЩЕНИЙ - ДОБАВЛЕН В НАЧАЛО
   app.get("/api/messages/all", requireAuth, async (req, res) => {
     console.log("🚀 РОУТ /api/messages/all ВЫПОЛНЯЕТСЯ!");
@@ -270,65 +330,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // PATCH роут для удаления автомобилей пользователем (работает через PATCH метод)
-  app.patch("/api/my-cars/:id", requireAuth, async (req, res) => {
-    console.log(`🔥 PATCH DELETE ENDPOINT! ID: ${req.params.id}, Body:`, req.body);
-    
-    try {
-      const id = parseInt(req.params.id);
-      
-      // Проверяем, что это запрос на удаление
-      if (req.body.action === 'delete') {
-        console.log(`🗑️ Пользователь ${req.user!.id} удаляет автомобиль ID: ${id}`);
-        
-        // Проверяем, что автомобиль принадлежит пользователю
-        const car = await storage.getCar(id);
-        if (!car) {
-          return res.status(404).json({ message: "Автомобиль не найден" });
-        }
-        
-        if (car.createdBy !== req.user!.id) {
-          return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
-        }
-        
-        // Удаляем все сообщения связанные с этим автомобилем
-        const allMessages = await storage.getAllMessages();
-        const messagesToDelete = allMessages.filter((msg: any) => msg.carId === id);
-        
-        for (const message of messagesToDelete) {
-          await storage.deleteMessage(message.id);
-        }
-        
-        // Удаляем автомобиль
-        const deleted = await storage.deleteCar(id);
-        if (!deleted) {
-          return res.status(500).json({ message: "Ошибка при удалении автомобиля" });
-        }
-        
-        console.log(`✅ Автомобиль ${car.name} успешно удален`);
-        return res.json({ 
-          message: `Автомобиль "${car.name}" снят с продажи. Все связанные диалоги удалены.`,
-          success: true 
-        });
-      }
-      
-      // Обычное обновление автомобиля
-      const validation = insertCarSchema.partial().safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ message: "Некорректные данные автомобиля" });
-      }
 
-      const car = await storage.updateCar(id, validation.data);
-      if (!car) {
-        return res.status(404).json({ message: "Автомобиль не найден" });
-      }
-      
-      res.json(car);
-    } catch (error) {
-      console.error("❌ Ошибка в PATCH обработчике:", error);
-      res.status(500).json({ message: "Ошибка при обработке запроса" });
-    }
-  });
 
   // СПЕЦИАЛЬНЫЙ роут для снятия автомобиля с продажи (обход конфликтов маршрутизации)
   app.post("/api/remove-car", requireAuth, async (req, res) => {
