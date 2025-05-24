@@ -20,7 +20,7 @@ export function MessagesPanel() {
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const { user } = useAuth();
 
-  const { data: messages = [], isLoading } = useQuery({
+  const { data: messages = [], isLoading } = useQuery<EnrichedMessage[]>({
     queryKey: ["/api/messages"],
   });
 
