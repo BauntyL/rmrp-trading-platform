@@ -55,20 +55,20 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async () => {
-      if (favoriteCheck?.isFavorite) {
-        await apiRequest("DELETE", `/api/favorites/${car.id}`);
-      } else {
-        await apiRequest("POST", "/api/favorites", { carId: car.id });
-      }
+      const response = await apiRequest("POST", `/api/favorites/toggle/${car.id}`, {});
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      queryClient.setQueryData(["/api/favorites/check", car.id], { isFavorite: result.isFavorite });
+      queryClient.removeQueries({ queryKey: ["/api/favorites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", car.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
+      
       toast({
-        title: favoriteCheck?.isFavorite ? "Удалено из избранного" : "Добавлено в избранное",
-        description: favoriteCheck?.isFavorite 
-          ? `${car.name} удален из избранного` 
-          : `${car.name} добавлен в избранное`,
+        title: result.action === "added" ? "Добавлено в избранное" : "Удалено из избранного",
+        description: result.action === "added" 
+          ? `${car.name} добавлен в избранное`
+          : `${car.name} удален из избранного`,
       });
     },
     onError: () => {
