@@ -48,6 +48,8 @@ const serverColors = {
 };
 
 export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProps) {
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -261,6 +263,19 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
                   Скопировать телефон
                 </Button>
               )}
+              
+              {/* Contact Seller Button - только если это не собственный автомобиль */}
+              {user && user.id !== car.createdBy && (
+                <Button 
+                  variant="outline"
+                  className="flex-1 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                  onClick={() => setContactModalOpen(true)}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Написать продавцу
+                </Button>
+              )}
+              
               <Button 
                 variant="secondary"
                 className="bg-slate-700 hover:bg-slate-600"
@@ -278,6 +293,13 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
           </div>
         </div>
       </DialogContent>
+      
+      {/* Contact Seller Modal */}
+      <ContactSellerModal 
+        car={car}
+        open={contactModalOpen}
+        onOpenChange={setContactModalOpen}
+      />
     </Dialog>
   );
 }
