@@ -320,6 +320,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/cars/:id", requireRole(["moderator", "admin"]), async (req, res) => {
+    console.log(`🔴🔴🔴 ADMIN DELETE ENDPOINT ПОЛУЧЕН! ID: ${req.params.id}, User: ${req.user?.id}`);
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteCar(id);
