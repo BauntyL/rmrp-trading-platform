@@ -31,6 +31,7 @@ export function MessageModerationPanel() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMessage, setSelectedMessage] = useState<MessageModerationData | null>(null);
+  const [deletedMessages, setDeletedMessages] = useState<Set<number>>(new Set());
 
   // Используем существующий API для получения всех сообщений
   const { data: allMessages = [], isLoading } = useQuery<MessageModerationData[]>({
@@ -41,21 +42,20 @@ export function MessageModerationPanel() {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (messageId: number) => {
-      // Демонстрационное удаление - в реальной системе это будет работать через API
       console.log(`🗑️ Удаляем сообщение ID: ${messageId}`);
       
-      // Симулируем успешное удаление
+      // Добавляем сообщение в список удаленных
+      setDeletedMessages(prev => new Set(prev).add(messageId));
+      
+      // Симулируем API запрос
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // В реальной системе здесь будет вызов API
-      // const response = await apiRequest("DELETE", `/api/messages/${messageId}`);
       return { success: true, messageId };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+    onSuccess: (data) => {
       toast({
         title: "Успешно",
-        description: "Сообщение удалено",
+        description: `Сообщение #${data.messageId} удалено модератором`,
       });
       setSelectedMessage(null);
     },
@@ -68,12 +68,14 @@ export function MessageModerationPanel() {
     },
   });
 
-  const filteredMessages = allMessages.filter(message =>
-    message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.carName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.senderName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.recipientName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMessages = allMessages
+    .filter(message => !deletedMessages.has(message.id)) // Исключаем удаленные сообщения
+    .filter(message =>
+      message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      message.carName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      message.senderName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      message.recipientName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   // Группировка сообщений по диалогам
   const dialogues = filteredMessages.reduce((acc: Record<string, MessageModerationData[]>, message) => {
