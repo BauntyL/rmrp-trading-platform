@@ -57,17 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.removeQueries({ queryKey: ["/api/user"] });
       queryClient.clear(); // Очищаем весь кэш
       localStorage.removeItem("rememberedCredentials");
-      
-      // Принудительно перенаправляем на страницу авторизации
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth';
-      }
+      localStorage.clear(); // Очищаем весь localStorage
       
       toast({
         title: "Ошибка авторизации",
         description: error.message,
         variant: "destructive",
       });
+      
+      // Принудительное перенаправление с задержкой
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+          window.location.replace('/auth');
+        }
+      }, 100);
     },
   });
 
