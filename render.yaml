@@ -3,7 +3,7 @@ services:
     name: autocatalog
     env: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: chmod +x build.sh && ./build.sh
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
