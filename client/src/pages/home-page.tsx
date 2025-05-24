@@ -51,28 +51,28 @@ export default function HomePage() {
       return response.json();
     },
     enabled: activeSection === "catalog",
-    refetchInterval: 10000, // Автообновление каждые 10 секунд
+    refetchInterval: 5000, // Автообновление каждые 5 секунд
     refetchOnWindowFocus: true, // Обновление при возврате на вкладку
   });
 
   const { data: favorites = [], isLoading: favoritesLoading } = useQuery<Car[]>({
     queryKey: ["/api/favorites"],
     enabled: activeSection === "favorites",
-    refetchInterval: 15000, // Автообновление каждые 15 секунд
+    refetchInterval: 5000, // Автообновление каждые 5 секунд
     refetchOnWindowFocus: true,
   });
 
   const { data: myCars = [], isLoading: myCarsLoading } = useQuery<Car[]>({
     queryKey: ["/api/my-cars"],
     enabled: activeSection === "my-cars",
-    refetchInterval: 20000, // Автообновление каждые 20 секунд
+    refetchInterval: 5000, // Автообновление каждые 5 секунд
     refetchOnWindowFocus: true,
   });
 
   const { data: myApplications = [], isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/my-applications"],
     enabled: activeSection === "applications",
-    refetchInterval: 20000, // Автообновление каждые 20 секунд
+    refetchInterval: 5000, // Автообновление каждые 5 секунд
     refetchOnWindowFocus: true,
   });
 

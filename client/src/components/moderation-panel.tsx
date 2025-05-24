@@ -70,7 +70,7 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
   const { data: applications = [], isLoading: applicationsLoading } = useQuery<CarApplication[]>({
     queryKey: ["/api/applications"],
     enabled: activeTab === "moderation" && (user?.role === "moderator" || user?.role === "admin"),
-    refetchInterval: 15000, // Автообновление заявок каждые 15 секунд
+    refetchInterval: 5000, // Автообновление заявок каждые 5 секунд
     refetchOnWindowFocus: true,
   });
 
