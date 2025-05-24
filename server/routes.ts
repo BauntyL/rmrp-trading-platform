@@ -136,6 +136,9 @@ function requireRole(roles: string[]) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // Настройка аутентификации СНАЧАЛА
+  setupAuth(app);
+  
   // УНИВЕРСАЛЬНОЕ ЛОГИРОВАНИЕ ВСЕХ ЗАПРОСОВ
   app.use((req, res, next) => {
     if (req.method === 'DELETE') {
@@ -152,9 +155,6 @@ export function registerRoutes(app: Express): Server {
     console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
     next();
   });
-
-  // Настройка аутентификации
-  setupAuth(app);
 
   // РОУТ МОДЕРАЦИИ СООБЩЕНИЙ - ДОБАВЛЕН В НАЧАЛО
   app.get("/api/messages/all", requireAuth, async (req, res) => {
