@@ -55,7 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Полностью очищаем данные пользователя при неудачном входе
       queryClient.setQueryData(["/api/user"], null);
       queryClient.removeQueries({ queryKey: ["/api/user"] });
+      queryClient.clear(); // Очищаем весь кэш
       localStorage.removeItem("rememberedCredentials");
+      
+      // Принудительно перенаправляем на страницу авторизации
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
       
       toast({
         title: "Ошибка авторизации",
