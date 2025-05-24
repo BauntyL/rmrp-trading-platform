@@ -112,10 +112,83 @@
     ]
   ],
   "favorites": [],
+  "messages": [
+    [
+      1,
+      {
+        "id": 1,
+        "carId": 1,
+        "buyerId": 1,
+        "sellerId": 3,
+        "senderId": 1,
+        "recipientId": 3,
+        "content": "Привет лох",
+        "isRead": true,
+        "createdAt": "2025-05-24T13:47:13.785Z"
+      }
+    ],
+    [
+      2,
+      {
+        "id": 2,
+        "carId": 1,
+        "buyerId": 3,
+        "sellerId": 1,
+        "senderId": 3,
+        "recipientId": 1,
+        "content": "Сам лох",
+        "isRead": true,
+        "createdAt": "2025-05-24T13:47:26.708Z"
+      }
+    ],
+    [
+      3,
+      {
+        "id": 3,
+        "carId": 1,
+        "buyerId": 3,
+        "sellerId": 1,
+        "senderId": 3,
+        "recipientId": 1,
+        "content": "3123",
+        "isRead": true,
+        "createdAt": "2025-05-24T13:48:00.968Z"
+      }
+    ],
+    [
+      4,
+      {
+        "id": 4,
+        "carId": 1,
+        "buyerId": 3,
+        "sellerId": 1,
+        "senderId": 3,
+        "recipientId": 1,
+        "content": "фффффффффффффффффффффффффффффффффф",
+        "isRead": true,
+        "createdAt": "2025-05-24T13:48:14.567Z"
+      }
+    ],
+    [
+      5,
+      {
+        "id": 5,
+        "carId": 1,
+        "buyerId": 3,
+        "sellerId": 1,
+        "senderId": 3,
+        "recipientId": 1,
+        "content": "Спас на Крови, полное название Храм Воскресения Христова («Спас на крови»), построен в память об императоре Александре II. Этот храм возвели на месте покушения на царя-реформатора 1 марта 1881 года, когда террорист бросил бомбу, смертельно ранив Александра II. Строительство храма было начато вскоре после трагического события и продолжалось вплоть до начала XX века. Архитектором проекта стал Альфред Парланд совместно с группой художников, среди которых были известные мастера русской живописи Михаил Нестеров и Виктор Васнецов.",
+        "isRead": true,
+        "createdAt": "2025-05-24T13:49:25.913Z"
+      }
+    ]
+  ],
   "counters": {
     "userIdCounter": 4,
     "carIdCounter": 2,
     "carApplicationIdCounter": 5,
-    "favoriteIdCounter": 3
+    "favoriteIdCounter": 3,
+    "messageIdCounter": 6
   }
 }

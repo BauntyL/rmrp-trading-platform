@@ -24,7 +24,11 @@ interface Message {
 
 export function MessagesPanel() {
   const { user } = useAuth();
-  const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<number | null>(() => {
+    // Восстанавливаем выбранный диалог из localStorage
+    const saved = localStorage.getItem('selectedConversation');
+    return saved ? parseInt(saved, 10) : null;
+  });
   const [newMessage, setNewMessage] = useState("");
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -165,7 +169,10 @@ export function MessagesPanel() {
         <div className="flex items-center mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-lg">
           <Button 
             variant="outline" 
-            onClick={() => setSelectedConversation(null)}
+            onClick={() => {
+              setSelectedConversation(null);
+              localStorage.removeItem('selectedConversation');
+            }}
             className="mr-4 hover:bg-white dark:hover:bg-gray-600"
           >
             ← Назад к списку
@@ -323,17 +330,7 @@ export function MessagesPanel() {
             
             const isUnread = !message.isRead && message.recipientId === user?.id;
             
-            // Логирование для диагностики
-            if (message.carId === 1) {
-              console.log("🔍 Проверка сообщения:", {
-                messageId: message.id,
-                isRead: message.isRead,
-                recipientId: message.recipientId,
-                userId: user?.id,
-                recipientMatch: message.recipientId === user?.id,
-                isUnread: isUnread
-              });
-            }
+
             
             return (
               <div
@@ -401,22 +398,16 @@ export function MessagesPanel() {
                     <div className="flex flex-col space-y-2">
                       <Button
                         onClick={() => {
-                          console.log("🔄 Кнопка нажата!", { carId: message.carId, isUnread });
                           setSelectedConversation(message.carId);
+                          // Сохраняем выбранный диалог в localStorage
+                          localStorage.setItem('selectedConversation', message.carId.toString());
                           // Отмечаем сообщения как прочитанные при открытии диалога
                           if (isUnread) {
-                            console.log("📨 Отправляем запрос на отметку...", {
-                              carId: message.carId,
-                              buyerId: message.buyerId,
-                              sellerId: message.sellerId
-                            });
                             markReadMutation.mutate({
                               carId: message.carId,
                               buyerId: message.buyerId,
                               sellerId: message.sellerId
                             });
-                          } else {
-                            console.log("ℹ️ Сообщение уже прочитано, запрос не отправляется");
                           }
                         }}
                         className={`${
