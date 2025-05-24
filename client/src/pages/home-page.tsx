@@ -104,7 +104,12 @@ export default function HomePage() {
       }
       
       const contentType = response.headers.get("content-type");
+      console.log("Response content-type:", contentType);
+      console.log("Response status:", response.status);
+      
       if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text();
+        console.log("Response text (first 200 chars):", responseText.substring(0, 200));
         throw new Error("Получен неверный формат данных");
       }
       
