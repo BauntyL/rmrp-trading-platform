@@ -508,9 +508,16 @@ export function registerRoutes(app: Express): Server {
 
   // Messages API routes
   app.get("/api/messages", requireAuth, async (req, res) => {
-    console.log("🔍 GET /api/messages - Пользователь:", req.user!.id, req.user!.username);
+    console.log("🔍 GET /api/messages - Пользователь:", req.user?.id, req.user?.username);
+    console.log("🔍 Проверка авторизации:", !!req.user);
+    
+    if (!req.user) {
+      console.log("❌ Пользователь не авторизован");
+      return res.status(401).json({ message: "Требуется авторизация" });
+    }
+    
     try {
-      const messages = await storage.getMessagesByUser(req.user!.id);
+      const messages = await storage.getMessagesByUser(req.user.id);
       console.log("✅ Получено сообщений:", messages.length);
       res.json(messages);
     } catch (error: any) {

@@ -408,28 +408,39 @@ export class MemStorage implements IStorage {
   // Messages
   async getMessagesByUser(userId: number): Promise<any[]> {
     try {
+      console.log("🔍 Получение сообщений для пользователя:", userId);
       const messages = Array.from(this.messages.values()).filter(
         message => message.buyerId === userId || message.sellerId === userId
-      ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      );
+      
+      console.log("📨 Найдено сообщений:", messages.length);
+      
+      if (messages.length === 0) {
+        return [];
+      }
+
+      const sortedMessages = messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       // Добавляем имена пользователей и автомобилей к сообщениям
-      const enrichedMessages = messages.map(message => {
+      const enrichedMessages = sortedMessages.map(message => {
         const buyer = this.users.get(message.buyerId);
         const seller = this.users.get(message.sellerId);
         const car = this.cars.get(message.carId);
         
         return {
           ...message,
+          createdAt: message.createdAt.toISOString(),
           buyerName: buyer?.username || `Пользователь #${message.buyerId}`,
           sellerName: seller?.username || `Пользователь #${message.sellerId}`,
           carName: car?.name || `Автомобиль #${message.carId}`
         };
       });
 
+      console.log("✅ Сообщения обогащены данными:", enrichedMessages.length);
       return enrichedMessages;
     } catch (error) {
       console.error("❌ Ошибка в getMessagesByUser:", error);
-      throw error;
+      return [];
     }
   }
 
