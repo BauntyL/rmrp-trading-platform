@@ -94,14 +94,17 @@ export default function HomePage() {
       await apiRequest("POST", "/api/favorites", { carId });
     },
     onSuccess: (_, carId) => {
+      // Обновляем кеш оптимистично
+      queryClient.setQueryData(["/api/favorites/check", carId], { isFavorite: true });
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
       toast({
         title: "Добавлено в избранное",
         description: "Автомобиль успешно добавлен в избранное",
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, carId) => {
+      // Возвращаем старое состояние при ошибке
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось добавить в избранное",
@@ -115,14 +118,17 @@ export default function HomePage() {
       await apiRequest("DELETE", `/api/favorites/${carId}`);
     },
     onSuccess: (_, carId) => {
+      // Обновляем кеш оптимистично
+      queryClient.setQueryData(["/api/favorites/check", carId], { isFavorite: false });
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
       toast({
         title: "Удалено из избранного",
         description: "Автомобиль успешно удален из избранного",
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, carId) => {
+      // Возвращаем старое состояние при ошибке
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check", carId] });
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось удалить из избранного",
