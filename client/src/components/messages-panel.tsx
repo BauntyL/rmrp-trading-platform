@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Message } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { MessageCircle, Clock, User } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
+import { queryClient } from "@/lib/queryClient";
 
 // Расширенный тип сообщения с дополнительной информацией
 interface EnrichedMessage extends Message {
@@ -20,8 +21,14 @@ export function MessagesPanel() {
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const { user } = useAuth();
 
+  // Принудительно очищаем кэш при монтировании компонента
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+  }, []);
+
   const { data: messages = [], isLoading } = useQuery<EnrichedMessage[]>({
     queryKey: ["/api/messages"],
+    staleTime: 0, // Принудительно обновляем данные
   });
 
   // Группируем сообщения по автомобилям и собеседникам
