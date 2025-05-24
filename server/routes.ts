@@ -2,8 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
+import { insertCarSchema, insertCarApplicationSchema } from "@shared/schema";
 import { z } from "zod";
-import { insertCarApplicationSchema } from "@shared/schema";
 
 // Middleware для проверки аутентификации
 function requireAuth(req: any, res: any, next: any) {
@@ -64,6 +64,41 @@ export function registerRoutes(app: Express): Server {
       res.json(cars);
     } catch (error) {
       res.status(500).json({ message: "Ошибка при получении ваших автомобилей" });
+    }
+  });
+
+  app.put("/api/cars/:id", requireRole(["moderator", "admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validation = insertCarSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Некорректные данные автомобиля" });
+      }
+
+      const car = await storage.updateCar(id, validation.data);
+      if (!car) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      res.json(car);
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при обновлении автомобиля" });
+    }
+  });
+
+  app.delete("/api/cars/:id", requireRole(["moderator", "admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteCar(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Автомобиль не найден" });
+      }
+      
+      res.sendStatus(204);
+    } catch (error) {
+      res.status(500).json({ message: "Ошибка при удалении автомобиля" });
     }
   });
 

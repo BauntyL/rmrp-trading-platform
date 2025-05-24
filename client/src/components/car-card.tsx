@@ -4,11 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, Phone, Crown } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Heart, Phone, Crown, Edit, Trash2 } from "lucide-react";
 
 interface CarCardProps {
   car: Car;
   onViewDetails: (car: Car) => void;
+  onEdit?: (car: Car) => void;
+  onDelete?: (car: Car) => void;
 }
 
 const categoryNames = {
@@ -41,9 +44,10 @@ const serverColors = {
   tverskoy: "bg-yellow-500 text-yellow-900",
 };
 
-export function CarCard({ car, onViewDetails }: CarCardProps) {
+export function CarCard({ car, onViewDetails, onEdit, onDelete }: CarCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: favoriteCheck } = useQuery({
     queryKey: ["/api/favorites/check", car.id],
