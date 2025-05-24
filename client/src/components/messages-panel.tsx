@@ -25,7 +25,6 @@ export function MessagesPanel() {
     queryKey: ["/api/messages"],
     enabled: !!user,
     staleTime: 0,
-    cacheTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchInterval: false,
