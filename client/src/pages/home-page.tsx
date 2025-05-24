@@ -172,6 +172,11 @@ export default function HomePage() {
     }
   };
 
+  const handleRemoveCar = (car: Car) => {
+    setCarToRemove(car);
+    setShowRemoveCarModal(true);
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case "catalog":
@@ -355,10 +360,7 @@ export default function HomePage() {
                     key={car.id}
                     car={car}
                     onViewDetails={setSelectedCar}
-                    onRemove={(car) => {
-                      setCarToRemove(car);
-                      setShowRemoveCarModal(true);
-                    }}
+                    onRemove={handleRemoveCar}
                   />
                 ))}
               </div>
