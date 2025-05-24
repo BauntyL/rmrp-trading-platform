@@ -348,11 +348,12 @@ export function registerRoutes(app: Express): Server {
         id: updatedUser.id,
         username: updatedUser.username,
         role: updatedUser.role,
-        createdAt: updatedUser.createdAt
+        createdAt: updatedUser.createdAt.toISOString()
       };
       console.log('Отправляем обновленного пользователя:', safeUser);
       res.json(safeUser);
     } catch (error) {
+      console.error('Ошибка при обновлении пользователя:', error);
       res.status(500).json({ message: "Ошибка при обновлении пользователя" });
     }
   });

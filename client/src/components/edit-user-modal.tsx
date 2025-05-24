@@ -51,6 +51,13 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
     mutationFn: async (data: EditUserFormData) => {
       if (!user) throw new Error("Пользователь не выбран");
       const res = await apiRequest("PATCH", `/api/users/${user.id}`, data);
+      
+      // Проверяем, что ответ действительно JSON
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Сервер вернул некорректный ответ");
+      }
+      
       return await res.json();
     },
     onSuccess: () => {
