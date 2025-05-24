@@ -528,19 +528,38 @@ export function registerRoutes(app: Express): Server {
 
   // Отметка сообщений как прочитанных
   app.post("/api/messages/mark-read", requireAuth, async (req, res) => {
+    console.log("🚀 POST /api/messages/mark-read - Начало обработки");
+    console.log("📥 Тело запроса:", req.body);
+    console.log("👤 Пользователь:", req.user?.id, req.user?.username);
+    
     try {
       const { carId, buyerId, sellerId } = req.body;
       const userId = req.user!.id;
       
       console.log("🔍 Отметка сообщений как прочитанных:", { carId, buyerId, sellerId, userId });
       
+      if (!carId || !buyerId || !sellerId) {
+        console.log("❌ Отсутствуют обязательные параметры");
+        return res.status(400).json({ error: "Отсутствуют обязательные параметры" });
+      }
+      
       // Получаем все сообщения для данной беседы
+      console.log("📨 Получаем сообщения для беседы...");
       const messages = await storage.getMessagesByCarAndUsers(carId, buyerId, sellerId);
+      console.log("📋 Найдено сообщений:", messages.length);
       
       // Отмечаем как прочитанные все сообщения, которые пришли к текущему пользователю
       let markedCount = 0;
       for (const message of messages) {
+        console.log("📨 Проверяем сообщение:", { 
+          id: message.id, 
+          recipientId: message.recipientId, 
+          userId, 
+          isRead: message.isRead 
+        });
+        
         if (message.recipientId === userId && !message.isRead) {
+          console.log("✅ Отмечаем сообщение как прочитанное:", message.id);
           await storage.markMessageAsRead(message.id);
           markedCount++;
         }
@@ -549,8 +568,8 @@ export function registerRoutes(app: Express): Server {
       console.log("✅ Отмечено как прочитанных:", markedCount, "сообщений");
       res.json({ success: true, markedCount });
     } catch (error) {
-      console.error("Ошибка отметки сообщений как прочитанных:", error);
-      res.status(500).json({ error: "Ошибка сервера" });
+      console.error("❌ Ошибка отметки сообщений как прочитанных:", error);
+      res.status(500).json({ error: "Ошибка сервера", details: error.message });
     }
   });
 
