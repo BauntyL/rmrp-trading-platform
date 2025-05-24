@@ -460,6 +460,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/messages", requireAuth, async (req, res) => {
+    try {
+      const messages = await storage.getMessagesByUser(req.user!.id);
+      res.json(messages);
+    } catch (error) {
+      console.error("❌ Ошибка при получении сообщений:", error);
+      res.status(500).json({ message: "Ошибка при получении сообщений" });
+    }
+  });
+
   app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
     try {
       const count = await storage.getUnreadMessagesCount(req.user!.id);
