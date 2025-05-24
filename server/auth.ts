@@ -293,12 +293,29 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json({
-      id: req.user!.id,
-      username: req.user!.username,
-      role: req.user!.role,
-      createdAt: req.user!.createdAt,
+    if (!req.isAuthenticated() || !req.user) {
+      return res.sendStatus(401);
+    }
+    
+    // Дополнительная проверка - существует ли пользователь в базе
+    storage.getUser(req.user.id).then(user => {
+      if (!user) {
+        // Пользователь был удален, завершаем сессию
+        req.logout((err) => {
+          if (err) console.error('Ошибка при завершении сессии удаленного пользователя:', err);
+        });
+        return res.sendStatus(401);
+      }
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        createdAt: user.createdAt,
+      });
+    }).catch(error => {
+      console.error('Ошибка при проверке пользователя:', error);
+      res.sendStatus(401);
     });
   });
 }
