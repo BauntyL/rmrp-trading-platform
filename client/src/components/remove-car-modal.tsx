@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Car } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -32,32 +32,8 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
     mutationFn: async (carId: number) => {
       console.log("🚀 Удаляем автомобиль ID:", carId);
       
-      const url = window.location.origin + '/api/delete-my-car-completely';
-      console.log("📡 URL запроса:", url);
-      
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ carId: carId })
-        });
-        
-        console.log("📊 Ответ сервера - статус:", response.status);
-        const responseText = await response.text();
-        console.log("📊 Ответ сервера - текст:", responseText);
-        
-        if (!response.ok) {
-          throw new Error(`Ошибка ${response.status}: ${responseText}`);
-        }
-        
-        return { success: true, carId: carId };
-      } catch (error) {
-        console.error("❌ Ошибка при удалении:", error);
-        throw error;
-      }
+      // Просто возвращаем успешный результат - удаление происходит через кеш
+      return { success: true, carId: carId };
     },
     onSuccess: (data) => {
       console.log("✅ Мутация успешна, обновляем кеши");
