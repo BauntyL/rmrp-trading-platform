@@ -43,13 +43,47 @@ export function MessagesPanel() {
     return unsubscribe;
   }, []);
 
+  // Автоматически отмечаем сообщения как прочитанные при просмотре диалога
+  useEffect(() => {
+    if (!selectedConversation || !user || !messages) return;
+
+    const currentConversation = conversationsByCarId[selectedConversation];
+    if (!currentConversation || currentConversation.length === 0) return;
+
+    // Находим непрочитанные сообщения в текущем диалоге
+    const unreadInThisConversation = currentConversation.filter(
+      (msg: Message) => !msg.isRead && msg.recipientId === user.id
+    );
+
+    if (unreadInThisConversation.length > 0) {
+      // Отмечаем сообщения в этом диалоге как прочитанные
+      const firstMessage = currentConversation[0];
+      const buyerId = firstMessage.buyerId;
+      const sellerId = firstMessage.sellerId;
+
+      console.log(`📖 Автоматически отмечаем ${unreadInThisConversation.length} сообщений как прочитанные в диалоге ${selectedConversation}`);
+
+      markReadMutation.mutate(
+        { carId: selectedConversation, buyerId, sellerId },
+        {
+          onSuccess: (result) => {
+            console.log("✅ Сообщения в активном диалоге отмечены как прочитанные:", result);
+            // Обновляем данные сообщений и счетчик
+            queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+          }
+        }
+      );
+    }
+  }, [selectedConversation, messages, user?.id, conversationsByCarId]);
+
   const { data: messages = [], isLoading, error } = useQuery({
     queryKey: ["/api/messages"],
     enabled: !!user, // Включаем обратно для функциональности
     staleTime: 30000, // Увеличиваем время кеша
     refetchOnMount: "always",
     refetchOnWindowFocus: false, // Отключаем обновление при фокусе
-    refetchInterval: 3000, // Быстрое обновление для реального времени
+    refetchInterval: 2000, // Очень быстрое обновление для реального времени
     retry: 1, 
     retryDelay: 1000,
   });

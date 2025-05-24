@@ -214,7 +214,7 @@
         "senderId": 1,
         "recipientId": 2,
         "content": "а йоу",
-        "isRead": false,
+        "isRead": true,
         "createdAt": "2025-05-24T18:52:41.395Z"
       }
     ],
@@ -242,7 +242,7 @@
         "senderId": 1,
         "recipientId": 2,
         "content": "ку",
-        "isRead": false,
+        "isRead": true,
         "createdAt": "2025-05-24T18:53:07.368Z"
       }
     ],
@@ -270,7 +270,7 @@
         "senderId": 1,
         "recipientId": 2,
         "content": "ку",
-        "isRead": false,
+        "isRead": true,
         "createdAt": "2025-05-24T18:53:45.679Z"
       }
     ],
@@ -301,6 +301,90 @@
         "isRead": true,
         "createdAt": "2025-05-24T18:54:35.726Z"
       }
+    ],
+    [
+      14,
+      {
+        "id": 14,
+        "carId": 3,
+        "buyerId": 1,
+        "sellerId": 2,
+        "senderId": 1,
+        "recipientId": 2,
+        "content": "ку",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:00:40.331Z"
+      }
+    ],
+    [
+      15,
+      {
+        "id": 15,
+        "carId": 3,
+        "buyerId": 2,
+        "sellerId": 1,
+        "senderId": 2,
+        "recipientId": 1,
+        "content": "ку",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:00:52.785Z"
+      }
+    ],
+    [
+      16,
+      {
+        "id": 16,
+        "carId": 3,
+        "buyerId": 1,
+        "sellerId": 2,
+        "senderId": 1,
+        "recipientId": 2,
+        "content": "ку",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:02:00.707Z"
+      }
+    ],
+    [
+      17,
+      {
+        "id": 17,
+        "carId": 3,
+        "buyerId": 2,
+        "sellerId": 1,
+        "senderId": 2,
+        "recipientId": 1,
+        "content": "ку",
+        "isRead": false,
+        "createdAt": "2025-05-24T19:02:06.323Z"
+      }
+    ],
+    [
+      18,
+      {
+        "id": 18,
+        "carId": 3,
+        "buyerId": 2,
+        "sellerId": 1,
+        "senderId": 2,
+        "recipientId": 1,
+        "content": "ку",
+        "isRead": false,
+        "createdAt": "2025-05-24T19:02:13.303Z"
+      }
+    ],
+    [
+      19,
+      {
+        "id": 19,
+        "carId": 3,
+        "buyerId": 1,
+        "sellerId": 2,
+        "senderId": 1,
+        "recipientId": 2,
+        "content": "йоу",
+        "isRead": true,
+        "createdAt": "2025-05-24T19:02:23.945Z"
+      }
     ]
   ],
   "counters": {
@@ -308,6 +392,6 @@
     "carIdCounter": 4,
     "carApplicationIdCounter": 7,
     "favoriteIdCounter": 1,
-    "messageIdCounter": 14
+    "messageIdCounter": 20
   }
 }
