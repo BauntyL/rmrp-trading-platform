@@ -43,12 +43,23 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
         console.log("🔥 Получен ответ от сервера:", response.status, response.statusText);
         
         if (!response.ok) {
-          throw new Error(`Ошибка сервера: ${response.status}`);
+          const errorText = await response.text();
+          console.log("❌ Текст ошибки от сервера:", errorText);
+          throw new Error(`Ошибка сервера: ${response.status} - ${errorText}`);
         }
         
-        const data = await response.json();
-        console.log("✅ Автомобиль успешно удален:", data);
-        return data;
+        const responseText = await response.text();
+        console.log("📄 Сырой ответ сервера:", responseText);
+        
+        try {
+          const data = JSON.parse(responseText);
+          console.log("✅ Автомобиль успешно удален:", data);
+          return data;
+        } catch (parseError) {
+          console.log("❌ Ошибка парсинга JSON:", parseError);
+          console.log("📄 Ответ не является JSON:", responseText);
+          throw new Error("Сервер вернул некорректный ответ");
+        }
       } catch (error) {
         console.error("❌ Ошибка при удалении автомобиля:", error);
         throw error;
