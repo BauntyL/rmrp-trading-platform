@@ -389,14 +389,22 @@ export function MessagesPanel() {
                     <div className="flex flex-col space-y-2">
                       <Button
                         onClick={() => {
+                          console.log("🔄 Кнопка нажата!", { carId: message.carId, isUnread });
                           setSelectedConversation(message.carId);
                           // Отмечаем сообщения как прочитанные при открытии диалога
                           if (isUnread) {
+                            console.log("📨 Отправляем запрос на отметку...", {
+                              carId: message.carId,
+                              buyerId: message.buyerId,
+                              sellerId: message.sellerId
+                            });
                             markReadMutation.mutate({
                               carId: message.carId,
                               buyerId: message.buyerId,
                               sellerId: message.sellerId
                             });
+                          } else {
+                            console.log("ℹ️ Сообщение уже прочитано, запрос не отправляется");
                           }
                         }}
                         className={`${
