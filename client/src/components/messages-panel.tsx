@@ -33,7 +33,7 @@ export function MessagesPanel() {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: messages = [], isLoading } = useQuery({
+  const { data: messages = [], isLoading, error } = useQuery({
     queryKey: ["/api/messages"],
     enabled: !!user,
     staleTime: 5000,
@@ -41,6 +41,8 @@ export function MessagesPanel() {
     refetchOnWindowFocus: true,
     refetchInterval: 5000, // Возвращаем автообновление для новых сообщений
     refetchIntervalInBackground: true,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Мутация для отметки сообщений как прочитанных

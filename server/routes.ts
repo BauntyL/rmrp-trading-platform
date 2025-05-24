@@ -508,11 +508,15 @@ export function registerRoutes(app: Express): Server {
 
   // Messages API routes
   app.get("/api/messages", requireAuth, async (req, res) => {
+    console.log("🔍 GET /api/messages - Пользователь:", req.user!.id, req.user!.username);
     try {
       const messages = await storage.getMessagesByUser(req.user!.id);
+      console.log("✅ Получено сообщений:", messages.length);
       res.json(messages);
-    } catch (error) {
-      res.status(500).json({ message: "Ошибка при получении сообщений" });
+    } catch (error: any) {
+      console.error("❌ Ошибка при получении сообщений:", error);
+      console.error("❌ Детали ошибки:", error.message, error.stack);
+      res.status(500).json({ message: "Ошибка при получении сообщений", details: error.message });
     }
   });
 
