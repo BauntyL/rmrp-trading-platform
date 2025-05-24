@@ -214,6 +214,12 @@ export function registerRoutes(app: Express): Server {
   // Добавляем debug middleware для всех API запросов
   app.use('/api', (req, res, next) => {
     console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
+    
+    // Специальная проверка для нашего delete endpoint
+    if (req.url.startsWith('/delete-car-action/')) {
+      console.log(`🎯 НАЙДЕН DELETE-CAR-ACTION ЗАПРОС! URL: ${req.url}, Method: ${req.method}`);
+    }
+    
     next();
   });
 
