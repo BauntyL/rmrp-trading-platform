@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertCarSchema, insertCarApplicationSchema } from "@shared/schema";
@@ -480,5 +481,58 @@ export function registerRoutes(app: Express): Server {
   });
 
   const httpServer = createServer(app);
+
+  // Настраиваем WebSocket сервер для push-уведомлений
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Храним активные WebSocket соединения пользователей
+  const userConnections = new Map<number, WebSocket>();
+
+  wss.on('connection', (ws) => {
+    console.log('📡 Новое WebSocket соединение');
+    
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        if (message.type === 'authenticate' && message.userId) {
+          // Регистрируем пользователя
+          userConnections.set(message.userId, ws);
+          console.log(`👤 Пользователь ${message.userId} подключен к WebSocket`);
+        }
+      } catch (error) {
+        console.error('Ошибка обработки WebSocket сообщения:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      // Удаляем соединение при отключении
+      for (const [userId, connection] of userConnections.entries()) {
+        if (connection === ws) {
+          userConnections.delete(userId);
+          console.log(`👤 Пользователь ${userId} отключен от WebSocket`);
+          break;
+        }
+      }
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket ошибка:', error);
+    });
+  });
+
+  // Экспортируем функцию для отправки уведомлений
+  global.sendNotification = (userId: number, notification: any) => {
+    const connection = userConnections.get(userId);
+    if (connection && connection.readyState === WebSocket.OPEN) {
+      try {
+        connection.send(JSON.stringify(notification));
+        console.log(`📨 Уведомление отправлено пользователю ${userId}`);
+      } catch (error) {
+        console.error('Ошибка отправки уведомления:', error);
+      }
+    }
+  };
+
   return httpServer;
 }

@@ -3,6 +3,7 @@ import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
+import { UnreadMessagesCounter } from "@/components/unread-messages-counter";
 import { CarApplication } from "@shared/schema";
 import {
   Car,
@@ -149,6 +150,8 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
         >
           <MessageCircle className="h-5 w-5 mr-3" />
           Сообщения
+          {/* Показываем счетчик непрочитанных сообщений */}
+          <UnreadMessagesCounter />
         </Button>
 
         <Button

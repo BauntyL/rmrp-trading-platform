@@ -10,6 +10,7 @@ import { DeleteCarModal } from "@/components/delete-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
 import { SecurityAlerts } from "@/components/security-alerts";
 import { MessagesPanel } from "@/components/messages-panel";
+import { NotificationSystem } from "@/components/notification-system";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -479,6 +480,9 @@ export default function HomePage() {
           {renderContent()}
         </div>
       </main>
+
+      {/* Система уведомлений работает в фоне */}
+      <NotificationSystem />
 
       {selectedCar && (
         <CarDetailsModal
