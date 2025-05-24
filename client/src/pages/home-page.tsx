@@ -397,6 +397,12 @@ export default function HomePage() {
         open={showAddCarModal}
         onOpenChange={setShowAddCarModal}
       />
+
+      <EditCarModal
+        car={carToEdit}
+        open={showEditCarModal}
+        onOpenChange={setShowEditCarModal}
+      />
     </div>
   );
 }
