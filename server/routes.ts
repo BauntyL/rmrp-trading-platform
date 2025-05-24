@@ -136,6 +136,17 @@ function requireRole(roles: string[]) {
 }
 
 export function registerRoutes(app: Express): Server {
+  // УНИВЕРСАЛЬНОЕ ЛОГИРОВАНИЕ ВСЕХ ЗАПРОСОВ
+  app.use((req, res, next) => {
+    if (req.method === 'DELETE') {
+      console.log(`🚨🚨🚨 ЛЮБОЙ DELETE ЗАПРОС: ${req.method} ${req.url} от пользователя: ${req.user?.id || 'неавторизован'}`);
+    }
+    if (req.url.includes('/api/my-cars/')) {
+      console.log(`🎯🎯🎯 ЗАПРОС К MY-CARS: ${req.method} ${req.url}`);
+    }
+    next();
+  });
+  
   // Добавляем debug middleware для всех API запросов
   app.use('/api', (req, res, next) => {
     console.log(`🔍 API запрос: ${req.method} ${req.originalUrl} ${req.url}`);
