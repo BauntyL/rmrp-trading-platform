@@ -95,7 +95,14 @@ export function MessageModerationPanel() {
     deleteMessageMutation.mutate(messageId);
   };
 
-  console.log("📊 Данные модерации:", { allMessages, filteredMessages, sortedDialogues });
+  console.log("📊 Данные модерации:", { 
+    debugData,
+    allMessages, 
+    allMessagesLength: allMessages?.length,
+    filteredMessages, 
+    sortedDialogues,
+    isLoading 
+  });
 
   if (isLoading) {
     return (
