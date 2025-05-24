@@ -1,0 +1,338 @@
+import { 
+  users, 
+  cars, 
+  carApplications, 
+  favorites,
+  type User, 
+  type InsertUser, 
+  type Car, 
+  type InsertCar, 
+  type CarApplication, 
+  type InsertCarApplication, 
+  type Favorite, 
+  type InsertFavorite 
+} from "@shared/schema";
+import session from "express-session";
+import createMemoryStore from "memorystore";
+import fs from "fs";
+import path from "path";
+
+const MemoryStore = createMemoryStore(session);
+
+export interface IStorage {
+  // Users
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUserRole(id: number, role: "user" | "moderator" | "admin"): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+
+  // Cars
+  getCar(id: number): Promise<Car | undefined>;
+  getAllCars(): Promise<Car[]>;
+  createCar(car: InsertCar): Promise<Car>;
+  updateCar(id: number, car: Partial<InsertCar>): Promise<Car | undefined>;
+  deleteCar(id: number): Promise<boolean>;
+  getCarsByUser(userId: number): Promise<Car[]>;
+  searchCars(query: string, category?: string, server?: string): Promise<Car[]>;
+
+  // Car Applications
+  getCarApplication(id: number): Promise<CarApplication | undefined>;
+  getAllCarApplications(): Promise<CarApplication[]>;
+  createCarApplication(application: InsertCarApplication): Promise<CarApplication>;
+  updateCarApplicationStatus(id: number, status: "approved" | "rejected", reviewedBy: number): Promise<CarApplication | undefined>;
+  getCarApplicationsByUser(userId: number): Promise<CarApplication[]>;
+  getPendingCarApplications(): Promise<CarApplication[]>;
+
+  // Favorites
+  getFavoritesByUser(userId: number): Promise<Favorite[]>;
+  addToFavorites(favorite: InsertFavorite): Promise<Favorite>;
+  removeFromFavorites(userId: number, carId: number): Promise<boolean>;
+  isFavorite(userId: number, carId: number): Promise<boolean>;
+
+  sessionStore: session.SessionStore;
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<number, User> = new Map();
+  private cars: Map<number, Car> = new Map();
+  private carApplications: Map<number, CarApplication> = new Map();
+  private favorites: Map<number, Favorite> = new Map();
+  
+  private userIdCounter = 1;
+  private carIdCounter = 1;
+  private carApplicationIdCounter = 1;
+  private favoriteIdCounter = 1;
+  
+  public sessionStore: session.SessionStore;
+  private dataDir = path.join(process.cwd(), 'data');
+
+  constructor() {
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000,
+    });
+    
+    this.ensureDataDir();
+    this.loadData();
+    this.initializeDefaultData();
+  }
+
+  private ensureDataDir() {
+    if (!fs.existsSync(this.dataDir)) {
+      fs.mkdirSync(this.dataDir, { recursive: true });
+    }
+  }
+
+  private saveData() {
+    try {
+      const data = {
+        users: Array.from(this.users.entries()),
+        cars: Array.from(this.cars.entries()),
+        carApplications: Array.from(this.carApplications.entries()),
+        favorites: Array.from(this.favorites.entries()),
+        counters: {
+          userIdCounter: this.userIdCounter,
+          carIdCounter: this.carIdCounter,
+          carApplicationIdCounter: this.carApplicationIdCounter,
+          favoriteIdCounter: this.favoriteIdCounter,
+        }
+      };
+      
+      fs.writeFileSync(path.join(this.dataDir, 'storage.json'), JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error('Error saving data:', error);
+    }
+  }
+
+  private loadData() {
+    try {
+      const dataPath = path.join(this.dataDir, 'storage.json');
+      if (fs.existsSync(dataPath)) {
+        const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+        
+        this.users = new Map(data.users || []);
+        this.cars = new Map(data.cars || []);
+        this.carApplications = new Map(data.carApplications || []);
+        this.favorites = new Map(data.favorites || []);
+        
+        if (data.counters) {
+          this.userIdCounter = data.counters.userIdCounter || 1;
+          this.carIdCounter = data.counters.carIdCounter || 1;
+          this.carApplicationIdCounter = data.counters.carApplicationIdCounter || 1;
+          this.favoriteIdCounter = data.counters.favoriteIdCounter || 1;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  }
+
+  private async initializeDefaultData() {
+    // Создаем админа по умолчанию если его нет
+    const adminExists = Array.from(this.users.values()).some(u => u.role === 'admin');
+    if (!adminExists) {
+      const bcrypt = await import('bcrypt');
+      const hashedPassword = await bcrypt.hash('lql477kqkvb55vp', 10);
+      
+      const admin: User = {
+        id: this.userIdCounter++,
+        username: '477-554',
+        password: hashedPassword,
+        role: 'admin',
+        createdAt: new Date(),
+      };
+      this.users.set(admin.id, admin);
+      this.saveData();
+    }
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.username === username);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const user: User = {
+      ...insertUser,
+      id: this.userIdCounter++,
+      role: insertUser.role || 'user',
+      createdAt: new Date(),
+    };
+    this.users.set(user.id, user);
+    this.saveData();
+    return user;
+  }
+
+  async updateUserRole(id: number, role: "user" | "moderator" | "admin"): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (user) {
+      user.role = role;
+      this.users.set(id, user);
+      this.saveData();
+      return user;
+    }
+    return undefined;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  // Car methods
+  async getCar(id: number): Promise<Car | undefined> {
+    return this.cars.get(id);
+  }
+
+  async getAllCars(): Promise<Car[]> {
+    return Array.from(this.cars.values()).filter(car => car.status === 'active');
+  }
+
+  async createCar(insertCar: InsertCar): Promise<Car> {
+    const car: Car = {
+      ...insertCar,
+      id: this.carIdCounter++,
+      status: 'active',
+      createdAt: new Date(),
+    };
+    this.cars.set(car.id, car);
+    this.saveData();
+    return car;
+  }
+
+  async updateCar(id: number, updateData: Partial<InsertCar>): Promise<Car | undefined> {
+    const car = this.cars.get(id);
+    if (car) {
+      Object.assign(car, updateData);
+      this.cars.set(id, car);
+      this.saveData();
+      return car;
+    }
+    return undefined;
+  }
+
+  async deleteCar(id: number): Promise<boolean> {
+    const deleted = this.cars.delete(id);
+    if (deleted) {
+      this.saveData();
+    }
+    return deleted;
+  }
+
+  async getCarsByUser(userId: number): Promise<Car[]> {
+    return Array.from(this.cars.values()).filter(car => car.createdBy === userId);
+  }
+
+  async searchCars(query: string, category?: string, server?: string): Promise<Car[]> {
+    let cars = Array.from(this.cars.values()).filter(car => car.status === 'active');
+    
+    if (query) {
+      cars = cars.filter(car => 
+        car.name.toLowerCase().includes(query.toLowerCase()) ||
+        car.description?.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+    
+    if (category) {
+      cars = cars.filter(car => car.category === category);
+    }
+    
+    if (server) {
+      cars = cars.filter(car => car.server === server);
+    }
+    
+    return cars;
+  }
+
+  // Car Application methods
+  async getCarApplication(id: number): Promise<CarApplication | undefined> {
+    return this.carApplications.get(id);
+  }
+
+  async getAllCarApplications(): Promise<CarApplication[]> {
+    return Array.from(this.carApplications.values());
+  }
+
+  async createCarApplication(insertApplication: InsertCarApplication): Promise<CarApplication> {
+    const application: CarApplication = {
+      ...insertApplication,
+      id: this.carApplicationIdCounter++,
+      status: 'pending',
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: new Date(),
+    };
+    this.carApplications.set(application.id, application);
+    this.saveData();
+    return application;
+  }
+
+  async updateCarApplicationStatus(id: number, status: "approved" | "rejected", reviewedBy: number): Promise<CarApplication | undefined> {
+    const application = this.carApplications.get(id);
+    if (application) {
+      application.status = status;
+      application.reviewedBy = reviewedBy;
+      application.reviewedAt = new Date();
+      
+      this.carApplications.set(id, application);
+      
+      // If approved, create the car
+      if (status === 'approved') {
+        const { id: appId, status: appStatus, reviewedBy: rb, reviewedAt: ra, ...carData } = application;
+        await this.createCar(carData);
+      }
+      
+      this.saveData();
+      return application;
+    }
+    return undefined;
+  }
+
+  async getCarApplicationsByUser(userId: number): Promise<CarApplication[]> {
+    return Array.from(this.carApplications.values()).filter(app => app.createdBy === userId);
+  }
+
+  async getPendingCarApplications(): Promise<CarApplication[]> {
+    return Array.from(this.carApplications.values()).filter(app => app.status === 'pending');
+  }
+
+  // Favorite methods
+  async getFavoritesByUser(userId: number): Promise<Favorite[]> {
+    return Array.from(this.favorites.values()).filter(fav => fav.userId === userId);
+  }
+
+  async addToFavorites(insertFavorite: InsertFavorite): Promise<Favorite> {
+    const favorite: Favorite = {
+      ...insertFavorite,
+      id: this.favoriteIdCounter++,
+      createdAt: new Date(),
+    };
+    this.favorites.set(favorite.id, favorite);
+    this.saveData();
+    return favorite;
+  }
+
+  async removeFromFavorites(userId: number, carId: number): Promise<boolean> {
+    const favoriteEntry = Array.from(this.favorites.entries()).find(
+      ([_, fav]) => fav.userId === userId && fav.carId === carId
+    );
+    
+    if (favoriteEntry) {
+      this.favorites.delete(favoriteEntry[0]);
+      this.saveData();
+      return true;
+    }
+    return false;
+  }
+
+  async isFavorite(userId: number, carId: number): Promise<boolean> {
+    return Array.from(this.favorites.values()).some(
+      fav => fav.userId === userId && fav.carId === carId
+    );
+  }
+}
+
+export const storage = new MemStorage();

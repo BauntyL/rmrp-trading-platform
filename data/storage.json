@@ -1,0 +1,23 @@
+{
+  "users": [
+    [
+      1,
+      {
+        "id": 1,
+        "username": "477-554",
+        "password": "$2b$10$WRBbRbUoeSnCpHaJ/JAPqu4Imvx6ef9u2nv.vLeF0bHdTXtiJBbYK",
+        "role": "admin",
+        "createdAt": "2025-05-24T01:11:03.227Z"
+      }
+    ]
+  ],
+  "cars": [],
+  "carApplications": [],
+  "favorites": [],
+  "counters": {
+    "userIdCounter": 2,
+    "carIdCounter": 1,
+    "carApplicationIdCounter": 1,
+    "favoriteIdCounter": 1
+  }
+}
