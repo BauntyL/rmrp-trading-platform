@@ -65,7 +65,16 @@ export function RemoveCarModal({ car, open, onOpenChange }: RemoveCarModalProps)
   });
 
   const handleRemove = () => {
-    if (!car || confirmText.toLowerCase() !== "удалить") return;
+    console.log("🔴 handleRemove вызвана");
+    console.log("🔴 car:", car);
+    console.log("🔴 confirmText:", confirmText);
+    
+    if (!car || confirmText.toLowerCase() !== "удалить") {
+      console.log("🔴 Условие не выполнено, выходим");
+      return;
+    }
+    
+    console.log("🔴 Запускаем мутацию для автомобиля ID:", car.id);
     removeCarMutation.mutate(car.id);
   };
 
