@@ -1190,6 +1190,7 @@ export function registerRoutes(app: Express): Server {
     ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString());
+        console.log(`🔍 WebSocket получил сообщение:`, message);
         
         if (message.type === 'authenticate' && message.userId) {
           // Регистрируем пользователя
