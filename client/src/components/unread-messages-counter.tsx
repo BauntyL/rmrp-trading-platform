@@ -8,8 +8,9 @@ export function UnreadMessagesCounter() {
 
   const { data: unreadData } = useQuery({
     queryKey: ["/api/messages/unread-count"],
-    refetchInterval: 10000, // Обновляем каждые 10 секунд
-    refetchOnWindowFocus: true,
+    refetchInterval: false, // Отключаем автообновление
+    refetchOnWindowFocus: false, // Отключаем обновление при фокусе
+    staleTime: 60000, // Данные свежие 1 минуту
   });
 
   const unreadCount = unreadData?.count || 0;
