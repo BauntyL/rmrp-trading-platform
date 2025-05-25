@@ -88,6 +88,83 @@ passport.deserializeUser(async (id, done) => {
 
 console.log("🔧 Setting up API routes...");
 
+// Login route (фронтенд использует /api/login)
+app.post('/api/login', (req, res, next) => {
+  console.log(`📝 Login attempt via /api/login for: ${req.body.username}`);
+  
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      console.error('❌ Login error:', err);
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+    
+    if (!user) {
+      console.log(`❌ Login failed: ${info?.message || 'Authentication failed'}`);
+      return res.status(401).json({ error: info?.message || 'Неверные данные для входа' });
+    }
+
+    req.logIn(user, (err) => {
+      if (err) {
+        console.error('❌ Session creation error:', err);
+        return res.status(500).json({ error: 'Ошибка создания сессии' });
+      }
+      
+      console.log(`✅ Login successful via /api/login: ${user.username}`);
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    });
+  })(req, res, next);
+});
+
+// Register route (фронтенд использует /api/register)
+app.post('/api/register', async (req, res) => {
+  console.log(`📝 Registration attempt for: ${req.body.username}`);
+  
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      console.log(`❌ Registration failed: missing username or password`);
+      return res.status(400).json({ error: 'Имя пользователя и пароль обязательны' });
+    }
+
+    // Проверяем, существует ли уже пользователь
+    const existingUser = await storage.getUserByUsername(username);
+    if (existingUser) {
+      console.log(`❌ Registration failed: user already exists: ${username}`);
+      return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
+    }
+
+    // Хешируем пароль
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Создаем пользователя
+    const user = await storage.createUser({
+      username,
+      password: hashedPassword,
+      role: 'user'
+    });
+
+    console.log(`✅ User registered successfully: ${user.username} with ID: ${user.id}`);
+    
+    // Автоматически авторизуем пользователя после регистрации
+    req.logIn(user, (err) => {
+      if (err) {
+        console.error('❌ Auto-login error after registration:', err);
+        return res.status(500).json({ error: 'Пользователь создан, но ошибка автоматического входа' });
+      }
+      
+      console.log(`✅ Auto-login successful after registration: ${user.username}`);
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json({ user: userWithoutPassword });
+    });
+    
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(500).json({ error: 'Ошибка регистрации пользователя' });
+  }
+});
+
 // Дополнительный роут для /auth (если фронтенд использует этот URL)
 app.post('/auth', (req, res, next) => {
   console.log(`📝 POST /auth - redirecting to login logic`);
