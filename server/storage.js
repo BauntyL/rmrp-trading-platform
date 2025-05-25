@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import { EventEmitter } from "events";
 
 // In-memory storage
 let data = {
@@ -171,25 +172,51 @@ if (data.users.length === 0) {
   console.log("🎯 Default data initialization complete");
 }
 
-// Simple session store for passport
-const sessionStore = {
-  sessions: new Map(),
+// Session store that extends EventEmitter
+class MemorySessionStore extends EventEmitter {
+  constructor() {
+    super();
+    this.sessions = new Map();
+  }
   
   get(sessionId, callback) {
     const session = this.sessions.get(sessionId);
     callback(null, session);
-  },
+  }
   
   set(sessionId, session, callback) {
     this.sessions.set(sessionId, session);
     callback(null);
-  },
+  }
   
   destroy(sessionId, callback) {
     this.sessions.delete(sessionId);
     callback(null);
   }
-};
+  
+  // Required methods for express-session
+  touch(sessionId, session, callback) {
+    // Update last access time
+    callback(null);
+  }
+  
+  length(callback) {
+    callback(null, this.sessions.size);
+  }
+  
+  clear(callback) {
+    this.sessions.clear();
+    callback(null);
+  }
+  
+  all(callback) {
+    const sessions = Array.from(this.sessions.values());
+    callback(null, sessions);
+  }
+}
+
+// Create session store instance
+const sessionStore = new MemorySessionStore();
 
 // Storage methods
 export const storage = {
