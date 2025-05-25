@@ -58,6 +58,31 @@ export class DatabaseStorage {
     return result.rows[0] || null;
   }
 
+  // 🚨 НОВЫЙ МЕТОД ДЛЯ ОБНОВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ
+  async updateUser(id, updateData) {
+    await this.init();
+    
+    const fields = [];
+    const values = [];
+    let paramCount = 0;
+
+    for (const [key, value] of Object.entries(updateData)) {
+      paramCount++;
+      fields.push(`"${key}" = $${paramCount}`);
+      values.push(value);
+    }
+
+    if (fields.length === 0) return null;
+
+    paramCount++;
+    values.push(id);
+
+    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    
+    const result = await pool.query(sql, values);
+    return result.rows[0] || null;
+  }
+
   async deleteUser(userId) {
     await this.init();
     
