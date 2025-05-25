@@ -4,6 +4,8 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcrypt";
 import { storage } from "./storage.js";
+import { setupAuth } from "./auth.js";
+import { registerRoutes } from "./routes.js";
 import path from "path";
 
 const app = express();
@@ -891,8 +893,15 @@ app.get('*', (req, res) => {
 console.log("🔧 About to start listening on port:", process.env.PORT || 3000);
 console.log("🎯 Server setup complete, waiting for connections...");
 
+// Инициализируем аутентификацию
+setupAuth(app);
+
+// Регистрируем все API роуты
+const server = registerRoutes(app);
+
+// Запускаем сервер
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server successfully running on port ${PORT}`);
   console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
 });
