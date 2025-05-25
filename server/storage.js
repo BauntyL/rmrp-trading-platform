@@ -29,7 +29,7 @@ export class DatabaseStorage {
     return user;
   }
 
-  async getUser(id) {
+  async getUserById(id) {
     await this.init();
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
     return result.rows[0] || null;
@@ -58,7 +58,7 @@ export class DatabaseStorage {
     return result.rows[0] || null;
   }
 
-  // 🚨 НОВЫЙ МЕТОД ДЛЯ ОБНОВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ
+  // 🚨 ИСПРАВЛЕННЫЙ МЕТОД ДЛЯ ОБНОВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ
   async updateUser(id, updateData) {
     await this.init();
     
@@ -198,11 +198,11 @@ export class DatabaseStorage {
 
   // ============ APPLICATION METHODS ============
 
-  async createCarApplication(applicationData) {
+  async createApplication(applicationData) {
     await this.init();
     
     const result = await pool.query(
-      `INSERT INTO car_applications (name, description, price, category, server, "createdBy", "imageUrl", status) 
+      `INSERT INTO car_applications (name, description, price, category, server, "userId", "imageUrl", status) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         applicationData.name,
@@ -210,7 +210,7 @@ export class DatabaseStorage {
         applicationData.price,
         applicationData.category,
         applicationData.server,
-        applicationData.createdBy,
+        applicationData.userId,
         applicationData.imageUrl || 'https://via.placeholder.com/400x300?text=Car',
         'pending'
       ]
@@ -219,32 +219,26 @@ export class DatabaseStorage {
     return result.rows[0];
   }
 
-  async getAllCarApplications() {
-    await this.init();
-    const result = await pool.query('SELECT * FROM car_applications ORDER BY "createdAt" DESC');
-    return result.rows;
-  }
-
-  async getPendingCarApplications() {
+  async getPendingApplications() {
     await this.init();
     const result = await pool.query('SELECT * FROM car_applications WHERE status = $1 ORDER BY "createdAt" DESC', ['pending']);
     return result.rows;
   }
 
-  async getCarApplicationsByUser(userId) {
+  async getUserApplications(userId) {
     await this.init();
-    const result = await pool.query('SELECT * FROM car_applications WHERE "createdBy" = $1 ORDER BY "createdAt" DESC', [userId]);
+    const result = await pool.query('SELECT * FROM car_applications WHERE "userId" = $1 ORDER BY "createdAt" DESC', [userId]);
     return result.rows;
   }
 
-  async updateCarApplicationStatus(applicationId, status, reviewedBy) {
+  async approveApplication(applicationId) {
     await this.init();
     
-    console.log(`📝 Updating application ${applicationId} to status: ${status}`);
+    console.log(`📝 Approving application ${applicationId}`);
     
     const result = await pool.query(
-      'UPDATE car_applications SET status = $1, "reviewedBy" = $2, "reviewedAt" = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-      [status, reviewedBy, applicationId]
+      'UPDATE car_applications SET status = $1, "reviewedAt" = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      ['approved', applicationId]
     );
 
     const application = result.rows[0];
@@ -254,25 +248,34 @@ export class DatabaseStorage {
     }
 
     // 🚀 АВТОМАТИЧЕСКИ СОЗДАЕМ АВТОМОБИЛЬ ПРИ ОДОБРЕНИИ
-    if (status === 'approved') {
-      console.log(`✅ Application approved - creating car for: ${application.name}`);
-      
-      const carData = {
-        name: application.name,
-        description: application.description,
-        price: application.price,
-        category: application.category,
-        server: application.server,
-        imageUrl: application.imageUrl,
-        createdBy: application.createdBy
-      };
-      
-      const newCar = await this.createCar(carData);
-      console.log(`🚗 Car created from approved application: ${newCar.name} (ID: ${newCar.id})`);
-    }
+    console.log(`✅ Application approved - creating car for: ${application.name}`);
+    
+    const carData = {
+      name: application.name,
+      description: application.description,
+      price: application.price,
+      category: application.category,
+      server: application.server,
+      imageUrl: application.imageUrl,
+      createdBy: application.userId
+    };
+    
+    const newCar = await this.createCar(carData);
+    console.log(`🚗 Car created from approved application: ${newCar.name} (ID: ${newCar.id})`);
 
-    console.log(`✅ Application status updated: ${applicationId} -> ${status}`);
-    return application;
+    console.log(`✅ Application approved: ${applicationId}`);
+    return { application, car: newCar };
+  }
+
+  async rejectApplication(applicationId, reason) {
+    await this.init();
+    
+    const result = await pool.query(
+      'UPDATE car_applications SET status = $1, "rejectionReason" = $2, "reviewedAt" = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+      ['rejected', reason, applicationId]
+    );
+
+    return result.rows[0] || null;
   }
 
   // ============ FAVORITES METHODS ============
@@ -321,47 +324,32 @@ export class DatabaseStorage {
     return result.rows;
   }
 
-  async getFavoritesByUser(userId) {
-    await this.init();
-    const result = await pool.query('SELECT * FROM favorites WHERE "userId" = $1', [userId]);
-    return result.rows;
-  }
-
-  async checkFavorite(userId, carId) {
-    await this.init();
-    const result = await pool.query(
-      'SELECT * FROM favorites WHERE "userId" = $1 AND "carId" = $2',
-      [userId, carId]
-    );
-    return result.rows.length > 0;
-  }
-
   // ============ MESSAGES METHODS ============
 
   async createMessage(messageData) {
     await this.init();
     
     const result = await pool.query(
-      'INSERT INTO messages ("senderId", "receiverId", "carId", content, "isRead") VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [messageData.senderId, messageData.receiverId, messageData.carId, messageData.content, false]
+      'INSERT INTO messages ("senderId", "recipientId", "carId", content, "isRead") VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [messageData.senderId, messageData.recipientId, messageData.carId, messageData.content, false]
     );
 
     return result.rows[0];
   }
 
-  async getMessagesByUser(userId) {
+  async getUserMessages(userId) {
     await this.init();
     const result = await pool.query(
-      'SELECT * FROM messages WHERE "senderId" = $1 OR "receiverId" = $1 ORDER BY "createdAt" DESC',
+      'SELECT * FROM messages WHERE "senderId" = $1 OR "recipientId" = $1 ORDER BY "createdAt" DESC',
       [userId]
     );
     return result.rows;
   }
 
-  async getUnreadCount(userId) {
+  async getUnreadMessagesCount(userId) {
     await this.init();
     const result = await pool.query(
-      'SELECT COUNT(*) as count FROM messages WHERE "receiverId" = $1 AND "isRead" = false',
+      'SELECT COUNT(*) as count FROM messages WHERE "recipientId" = $1 AND "isRead" = false',
       [userId]
     );
     
@@ -378,19 +366,11 @@ export class DatabaseStorage {
 
     return result.rows[0] || null;
   }
-
-  async deleteMessage(messageId) {
-    await this.init();
-    
-    const result = await pool.query('DELETE FROM messages WHERE id = $1', [messageId]);
-    return result.rowCount > 0;
-  }
-
-  async getAllMessages() {
-    await this.init();
-    const result = await pool.query('SELECT * FROM messages ORDER BY "createdAt" DESC');
-    return result.rows;
-  }
 }
 
 export const storage = new DatabaseStorage();
+
+// ✅ ДОБАВЛЯЕМ ФУНКЦИЮ initializeStorage
+export async function initializeStorage() {
+  return await storage.init();
+}
