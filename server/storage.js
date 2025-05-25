@@ -41,13 +41,24 @@ export class MemStorage {
   }
 
   ensureDataDir() {
+    console.log(`📁 Ensuring data directory exists: ${this.dataDir}`);
     if (!fs.existsSync(this.dataDir)) {
-      fs.mkdirSync(this.dataDir, { recursive: true });
+      try {
+        fs.mkdirSync(this.dataDir, { recursive: true });
+        console.log(`✅ Data directory created: ${this.dataDir}`);
+      } catch (error) {
+        console.error(`❌ Failed to create data directory:`, error);
+      }
+    } else {
+      console.log(`✅ Data directory already exists: ${this.dataDir}`);
     }
   }
 
   saveData() {
     try {
+      console.log(`💾 Saving data to: ${path.join(this.dataDir, 'storage.json')}`);
+      console.log(`📊 Saving: Users=${this.users.size}, Cars=${this.cars.size}, Messages=${this.messages.size}`);
+      
       const data = {
         users: Array.from(this.users.entries()),
         cars: Array.from(this.cars.entries()),
@@ -64,16 +75,22 @@ export class MemStorage {
       };
       
       fs.writeFileSync(path.join(this.dataDir, 'storage.json'), JSON.stringify(data, null, 2));
+      console.log(`✅ Data saved successfully`);
     } catch (error) {
-      console.error('Error saving data:', error);
+      console.error('❌ Error saving data:', error);
     }
   }
 
   loadData() {
     try {
       const dataPath = path.join(this.dataDir, 'storage.json');
+      console.log(`🔍 Trying to load data from: ${dataPath}`);
+      console.log(`📂 Data directory exists: ${fs.existsSync(this.dataDir)}`);
+      console.log(`📄 Storage file exists: ${fs.existsSync(dataPath)}`);
+      
       if (fs.existsSync(dataPath)) {
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+        console.log(`✅ Data loaded successfully. Found ${data.users?.length || 0} users`);
         
         this.users = new Map(data.users || []);
         this.cars = new Map(data.cars || []);
@@ -100,16 +117,24 @@ export class MemStorage {
           this.favoriteIdCounter = data.counters.favoriteIdCounter || 1;
           this.messageIdCounter = data.counters.messageIdCounter || 1;
         }
+        
+        console.log(`📊 Final counts: Users=${this.users.size}, Cars=${this.cars.size}, Messages=${this.messages.size}`);
+      } else {
+        console.log(`⚠️ Storage file not found, starting with empty data`);
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading data:', error);
     }
   }
 
   async initializeDefaultData() {
+    console.log(`🔧 Initializing default data...`);
+    console.log(`📊 Current state: Users=${this.users.size}, Cars=${this.cars.size}`);
+    
     // Создаем админа по умолчанию если его нет
     const adminExists = Array.from(this.users.values()).some(u => u.role === 'admin');
     if (!adminExists) {
+      console.log(`👤 Creating default admin user...`);
       const bcrypt = await import('bcrypt');
       const hashedPassword = await bcrypt.hash('lql477kqkvb55vp', 10);
       
@@ -121,8 +146,45 @@ export class MemStorage {
         createdAt: new Date(),
       };
       this.users.set(admin.id, admin);
-      this.saveData();
+      console.log(`✅ Admin created with ID: ${admin.id}`);
     }
+    
+    // Добавим тестовые автомобили если их нет
+    if (this.cars.size === 0) {
+      console.log(`🚗 Creating test cars...`);
+      const testCars = [
+        {
+          id: this.carIdCounter++,
+          name: 'BMW M3',
+          category: 'sport',
+          server: 'arbat',
+          price: 1500000,
+          description: 'Спортивный автомобиль в отличном состоянии',
+          status: 'active',
+          createdBy: 1,
+          createdAt: new Date(),
+        },
+        {
+          id: this.carIdCounter++,
+          name: 'Mercedes G-Class',
+          category: 'suv',
+          server: 'rublevka',
+          price: 2500000,
+          description: 'Премиальный внедорожник',
+          status: 'active',
+          createdBy: 1,
+          createdAt: new Date(),
+        }
+      ];
+      
+      testCars.forEach(car => {
+        this.cars.set(car.id, car);
+        console.log(`🚗 Added car: ${car.name} (ID: ${car.id})`);
+      });
+    }
+    
+    this.saveData();
+    console.log(`🎯 Default data initialization complete`);
   }
 
   // User methods
