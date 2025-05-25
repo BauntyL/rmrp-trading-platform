@@ -1,32 +1,27 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
 import session from "express-session";
 import bcrypt from "bcrypt";
-import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import { storage } from "./storage.js";
 import { z } from "zod";
 
 // Система отслеживания попыток входа
-interface LoginAttempt {
-  ip: string;
-  username: string;
-  timestamp: number;
-  success: boolean;
-}
+// LoginAttempt structure: { ip: string, username: string, timestamp: number, success: boolean }
 
 class SecurityManager {
-  private loginAttempts: Map<string, LoginAttempt[]> = new Map();
-  private blockedIPs: Map<string, number> = new Map();
-  private readonly MAX_ATTEMPTS = 5;
-  private readonly BLOCK_DURATION = 15 * 60 * 1000; // 15 минут
-  private readonly ATTEMPT_WINDOW = 5 * 60 * 1000; // 5 минут
+  constructor() {
+    this.loginAttempts = new Map();
+    this.blockedIPs = new Map();
+    this.MAX_ATTEMPTS = 5;
+    this.BLOCK_DURATION = 15 * 60 * 1000; // 15 минут
+    this.ATTEMPT_WINDOW = 5 * 60 * 1000; // 5 минут
+  }
 
-  private getKey(ip: string, username: string): string {
+  getKey(ip, username) {
     return `${ip}:${username}`;
   }
 
-  recordAttempt(ip: string, username: string, success: boolean): void {
+  recordAttempt(ip, username, success) {
     const key = this.getKey(ip, username);
     const now = Date.now();
     
@@ -34,7 +29,7 @@ class SecurityManager {
       this.loginAttempts.set(key, []);
     }
     
-    const attempts = this.loginAttempts.get(key)!;
+    const attempts = this.loginAttempts.get(key);
     
     // Удаляем старые попытки (старше 5 минут)
     const recentAttempts = attempts.filter(attempt => 
@@ -60,7 +55,7 @@ class SecurityManager {
     }
   }
 
-  isBlocked(ip: string): boolean {
+  isBlocked(ip) {
     const blockUntil = this.blockedIPs.get(ip);
     if (!blockUntil) return false;
     
@@ -72,7 +67,7 @@ class SecurityManager {
     return true;
   }
 
-  getAttemptsCount(ip: string, username: string): number {
+  getAttemptsCount(ip, username) {
     const key = this.getKey(ip, username);
     const attempts = this.loginAttempts.get(key) || [];
     const now = Date.now();
@@ -84,12 +79,6 @@ class SecurityManager {
 }
 
 const securityManager = new SecurityManager();
-
-declare global {
-  namespace Express {
-    interface User extends SelectUser {}
-  }
-}
 
 // Улучшенная валидация паролей
 const passwordSchema = z.string()
@@ -112,16 +101,15 @@ const loginSchema = z.object({
   password: z.string().min(1, "Введите пароль"),
 });
 
-export function setupAuth(app: Express) {
-  const sessionSettings: session.SessionOptions = {
+export function setupAuth(app) {
+  const sessionSettings = {
     secret: process.env.SESSION_SECRET || "fallback-secret-key",
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 2 * 60 * 60 * 1000, // 2 часа (уменьшено для безопасности)
+      maxAge: 2 * 60 * 60 * 1000, // 2 часа
       sameSite: "strict"
     },
   };
@@ -136,9 +124,9 @@ export function setupAuth(app: Express) {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user) {
-          // Пользователь не найден (возможно, удален)
           return done(null, false, { message: "user_not_found" });
         }
+        
         // Временное решение для восстановления доступа
         const isValidPassword = 
           (username === "477-554" && password === "lql477kqkvb55vp") ||
@@ -146,7 +134,6 @@ export function setupAuth(app: Express) {
           (await bcrypt.compare(password, user.password));
           
         if (!isValidPassword) {
-          // Неверный пароль
           return done(null, false, { message: "wrong_password" });
         }
         return done(null, user);
@@ -157,23 +144,21 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
+  passport.deserializeUser(async (id, done) => {
     try {
       const user = await storage.getUser(id);
-      // Если пользователь был удален, завершаем сессию без ошибки
       if (!user) {
         return done(null, null);
       }
       done(null, user);
     } catch (error) {
-      // Логируем ошибку, но не передаем ее дальше
       console.log('Ошибка при получении пользователя из сессии:', error);
       done(null, null);
     }
   });
 
   // Middleware для проверки блокировки IP
-  const checkIPBlock = (req: any, res: any, next: any) => {
+  const checkIPBlock = (req, res, next) => {
     const clientIP = req.ip || req.connection.remoteAddress || '127.0.0.1';
     
     if (securityManager.isBlocked(clientIP)) {
@@ -207,7 +192,6 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Пользователь с таким именем уже существует" });
       }
 
-      // Увеличиваем сложность хеширования для новых аккаунтов
       const hashedPassword = await bcrypt.hash(password, 12);
       const user = await storage.createUser({
         username,
@@ -234,7 +218,6 @@ export function setupAuth(app: Express) {
   app.post("/api/login", checkIPBlock, async (req, res, next) => {
     const clientIP = req.ip || req.connection.remoteAddress || '127.0.0.1';
     
-    // Валидация данных входа
     const validation = loginSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ message: "Введите имя пользователя и пароль" });
@@ -243,23 +226,21 @@ export function setupAuth(app: Express) {
     const { username } = validation.data;
     const attemptsCount = securityManager.getAttemptsCount(clientIP, username);
     
-    passport.authenticate("local", (err: any, user: SelectUser | false, info?: any) => {
+    passport.authenticate("local", (err, user, info) => {
       if (err) {
         console.log(`❌ Ошибка аутентификации для ${username} (IP: ${clientIP}):`, err);
         return next(err);
       }
       
       if (!user) {
-        // Записываем неудачную попытку
         securityManager.recordAttempt(clientIP, username, false);
         const newAttemptsCount = securityManager.getAttemptsCount(clientIP, username);
         
         console.log(`🔑 Неудачная попытка входа: ${username} (IP: ${clientIP}, попыток: ${newAttemptsCount})`);
         
         const remainingAttempts = Math.max(0, 5 - newAttemptsCount);
-        let message: string;
+        let message;
         
-        // Определяем тип ошибки на основе info от passport
         if (info?.message === "user_not_found") {
           message = "Аккаунт с таким именем не существует или был удален. Для доступа необходимо зарегистрироваться заново.";
         } else {
@@ -275,7 +256,6 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message, attemptsLeft: remainingAttempts });
       }
       
-      // Успешный вход
       securityManager.recordAttempt(clientIP, username, true);
       console.log(`✅ Успешный вход: ${username} (IP: ${clientIP})`);
       
@@ -303,10 +283,8 @@ export function setupAuth(app: Express) {
       return res.sendStatus(401);
     }
     
-    // Дополнительная проверка - существует ли пользователь в базе
     storage.getUser(req.user.id).then(user => {
       if (!user) {
-        // Пользователь был удален, завершаем сессию
         req.logout((err) => {
           if (err) console.error('Ошибка при завершении сессии удаленного пользователя:', err);
         });
