@@ -3,7 +3,7 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcrypt";
-import { storage } from "./database-storage.js";
+import { storage } from "./storage.js";
 import path from "path";
 
 const app = express();
