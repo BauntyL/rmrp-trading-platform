@@ -3,7 +3,7 @@ console.log('PORT:', process.env.PORT || 10000);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 console.log('📦 Trying to import express...');
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
 
 console.log('📦 Trying to import other modules...');
 import session from "express-session";
