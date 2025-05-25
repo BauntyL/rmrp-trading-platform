@@ -5,7 +5,7 @@ import {
   favorites,
   messages
 } from "../shared/schema.js";
-import { db, pool, initDatabase } from "./db.js";
+import { db, pool } from "./db.js"; import { initDatabase } from "./init-database.js";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 
 export class DatabaseStorage {
