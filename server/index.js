@@ -1,77 +1,64 @@
-console.log('🚀 Starting server...');
-console.log('PORT:', process.env.PORT || 10000);
-console.log('NODE_ENV:', process.env.NODE_ENV);
-
-console.log('📦 Trying to import express...');
 import express from "express";
-
-console.log('📦 Trying to import other modules...');
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcrypt";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-
-console.log('📦 Trying to import storage...');
-try {
-  const { storage } = await import("./storage.js");
-  console.log('✅ Storage imported successfully');
-} catch (error) {
-  console.error('❌ Error importing storage:', error);
-}
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { storage } from "./storage.js";
+import path from "path";
 
 const app = express();
-const PORT = process.env.PORT || 10000;
 
-console.log('🔧 Setting up middleware...');
+console.log("🚀 Starting server...");
+console.log("PORT:", process.env.PORT || 3000);
+console.log("NODE_ENV:", process.env.NODE_ENV);
+
+console.log("📦 Trying to import express...");
+console.log("📦 Trying to import other modules...");
+console.log("📦 Trying to import storage...");
+console.log("✅ Storage imported successfully");
+
+console.log("🔧 Setting up middleware...");
 
 // Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false }));
 
 // Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key-change-this-in-production',
+  secret: 'trading-platform-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+  store: storage.sessionStore,
 }));
 
-// Passport configuration
 app.use(passport.initialize());
 app.use(passport.session());
 
-console.log('🔧 Setting up passport strategy...');
+console.log("🔧 Setting up passport strategy...");
 
-// Passport Local Strategy
+// Passport strategy
 passport.use(new LocalStrategy(
-  { usernameField: 'username' },
   async (username, password, done) => {
     try {
-      console.log('🔑 Trying to authenticate user:', username);
-      const { storage } = await import("./storage.js");
+      console.log(`🔑 Trying to authenticate user: ${username}`);
       const user = await storage.getUserByUsername(username);
       
       if (!user) {
-        console.log('❌ User not found:', username);
-        return done(null, false, { message: 'Incorrect username.' });
+        console.log(`❌ User not found: ${username}`);
+        return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
 
-      const validPassword = await bcrypt.compare(password, user.password);
-      
-      if (!validPassword) {
-        console.log('❌ Invalid password for user:', username);
-        return done(null, false, { message: 'Incorrect password.' });
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        console.log(`❌ Invalid password for user: ${username}`);
+        return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
 
-      console.log('✅ User authenticated successfully:', username);
+      console.log(`✅ User authenticated successfully: ${username}`);
       return done(null, user);
     } catch (error) {
       console.error('❌ Authentication error:', error);
@@ -86,120 +73,242 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const { storage } = await import("./storage.js");
     const user = await storage.getUser(id);
-    done(null, user || null);
+    done(null, user);
   } catch (error) {
     done(error);
   }
 });
 
-// Auth middleware
-const requireAuth = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ error: 'Authentication required' });
-};
+console.log("🔧 Setting up API routes...");
 
-console.log('🔧 Setting up API routes...');
-
-// API Routes
-app.post('/api/register', async (req, res) => {
-  try {
-    console.log('📝 Registration attempt:', req.body.username);
-    const { username, password } = req.body;
+// Auth routes
+app.post('/api/auth/login', (req, res, next) => {
+  console.log(`📝 Login attempt for: ${req.body.username}`);
+  
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      console.error('❌ Login error:', err);
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
     
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+    if (!user) {
+      console.log(`❌ Login failed: ${info?.message || 'Authentication failed'}`);
+      return res.status(401).json({ error: info?.message || 'Неверные данные для входа' });
     }
 
-    const { storage } = await import("./storage.js");
-    
-    // Check if user already exists
-    const existingUser = await storage.getUserByUsername(username);
-    
-    if (existingUser) {
-      console.log('❌ User already exists:', username);
-      return res.status(400).json({ error: 'User already exists' });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create user
-    const newUser = await storage.createUser({
-      username,
-      password: hashedPassword,
-      role: 'user'
+    req.logIn(user, (err) => {
+      if (err) {
+        console.error('❌ Session creation error:', err);
+        return res.status(500).json({ error: 'Ошибка создания сессии' });
+      }
+      
+      console.log(`✅ Login successful: ${user.username}`);
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
     });
-
-    console.log('✅ User created successfully:', username);
-    res.status(201).json({ 
-      message: 'User created successfully', 
-      user: { id: newUser.id, username: newUser.username, role: newUser.role }
-    });
-  } catch (error) {
-    console.error('❌ Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
-  }
+  })(req, res, next);
 });
 
-app.post('/api/login', passport.authenticate('local'), (req, res) => {
-  console.log('✅ Login successful:', req.user.username);
-  res.json({ 
-    message: 'Login successful', 
-    user: { 
-      id: req.user.id, 
-      username: req.user.username, 
-      role: req.user.role 
-    }
-  });
-});
-
-app.post('/api/logout', (req, res) => {
+app.post('/api/auth/logout', (req, res) => {
+  console.log(`📝 Logout attempt for user: ${req.user?.username || 'unknown'}`);
+  
   req.logout((err) => {
     if (err) {
       console.error('❌ Logout error:', err);
-      return res.status(500).json({ error: 'Logout failed' });
+      return res.status(500).json({ error: 'Ошибка выхода' });
     }
-    console.log('✅ Logout successful');
-    res.json({ message: 'Logout successful' });
+    console.log(`✅ Logout successful`);
+    res.json({ message: 'Выход выполнен успешно' });
   });
 });
 
-app.get('/api/user', requireAuth, (req, res) => {
-  res.json({ 
-    user: { 
-      id: req.user.id, 
-      username: req.user.username, 
-      role: req.user.role 
-    }
-  });
+app.get('/api/auth/me', (req, res) => {
+  console.log(`📝 Auth check for user: ${req.user?.username || 'not authenticated'}`);
+  console.log(`📝 Session ID: ${req.sessionID}`);
+  console.log(`📝 User object:`, req.user ? 'exists' : 'null');
+  
+  if (req.user) {
+    const { password, ...userWithoutPassword } = req.user;
+    console.log(`✅ User authenticated: ${userWithoutPassword.username}`);
+    res.json({ user: userWithoutPassword });
+  } else {
+    console.log(`❌ User not authenticated`);
+    res.status(401).json({ error: 'Не авторизован' });
+  }
 });
 
-console.log('🔧 Setting up static files...');
+// Cars routes
+app.get('/api/cars', async (req, res) => {
+  try {
+    console.log(`📝 GET /api/cars - Fetching all cars`);
+    const cars = await storage.getAllCars();
+    console.log(`📋 Found ${cars.length} cars`);
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error fetching cars:', error);
+    res.status(500).json({ error: 'Ошибка получения автомобилей' });
+  }
+});
+
+app.get('/api/cars/search', async (req, res) => {
+  try {
+    const { query, category, server } = req.query;
+    console.log(`📝 GET /api/cars/search - Query: ${query}, Category: ${category}, Server: ${server}`);
+    
+    const cars = await storage.searchCars(query, category, server);
+    console.log(`📋 Search found ${cars.length} cars`);
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error searching cars:', error);
+    res.status(500).json({ error: 'Ошибка поиска автомобилей' });
+  }
+});
+
+app.get('/api/cars/my', async (req, res) => {
+  console.log(`📝 GET /api/cars/my - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for /api/cars/my`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const cars = await storage.getCarsByUser(req.user.id);
+    console.log(`📋 User ${req.user.username} has ${cars.length} cars`);
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error fetching user cars:', error);
+    res.status(500).json({ error: 'Ошибка получения автомобилей пользователя' });
+  }
+});
+
+app.get('/api/cars/:id', async (req, res) => {
+  try {
+    const carId = parseInt(req.params.id);
+    console.log(`📝 GET /api/cars/${carId} - Fetching car details`);
+    
+    const car = await storage.getCar(carId);
+    if (!car) {
+      console.log(`❌ Car not found: ${carId}`);
+      return res.status(404).json({ error: 'Автомобиль не найден' });
+    }
+    
+    console.log(`✅ Found car: ${car.name}`);
+    res.json(car);
+  } catch (error) {
+    console.error('❌ Error fetching car:', error);
+    res.status(500).json({ error: 'Ошибка получения автомобиля' });
+  }
+});
+
+app.post('/api/cars', async (req, res) => {
+  console.log(`📝 POST /api/cars - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for car creation`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const carData = {
+      ...req.body,
+      createdBy: req.user.id,
+    };
+    
+    console.log(`📝 Creating car: ${carData.name}`);
+    const car = await storage.createCar(carData);
+    console.log(`✅ Car created with ID: ${car.id}`);
+    res.status(201).json(car);
+  } catch (error) {
+    console.error('❌ Error creating car:', error);
+    res.status(500).json({ error: 'Ошибка создания автомобиля' });
+  }
+});
+
+app.put('/api/cars/:id', async (req, res) => {
+  console.log(`📝 PUT /api/cars/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for car update`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const carId = parseInt(req.params.id);
+    const car = await storage.getCar(carId);
+    
+    if (!car) {
+      console.log(`❌ Car not found for update: ${carId}`);
+      return res.status(404).json({ error: 'Автомобиль не найден' });
+    }
+
+    if (car.createdBy !== req.user.id && req.user.role !== 'admin') {
+      console.log(`❌ Access denied for car update: ${carId}`);
+      return res.status(403).json({ error: 'Нет прав для редактирования этого автомобиля' });
+    }
+
+    const updatedCar = await storage.updateCar(carId, req.body);
+    console.log(`✅ Car updated: ${carId}`);
+    res.json(updatedCar);
+  } catch (error) {
+    console.error('❌ Error updating car:', error);
+    res.status(500).json({ error: 'Ошибка обновления автомобиля' });
+  }
+});
+
+app.delete('/api/cars/:id', async (req, res) => {
+  console.log(`📝 DELETE /api/cars/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for car deletion`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const carId = parseInt(req.params.id);
+    const car = await storage.getCar(carId);
+    
+    if (!car) {
+      console.log(`❌ Car not found for deletion: ${carId}`);
+      return res.status(404).json({ error: 'Автомобиль не найден' });
+    }
+
+    if (car.createdBy !== req.user.id && req.user.role !== 'admin') {
+      console.log(`❌ Access denied for car deletion: ${carId}`);
+      return res.status(403).json({ error: 'Нет прав для удаления этого автомобиля' });
+    }
+
+    const deleted = await storage.deleteCar(carId);
+    if (deleted) {
+      console.log(`✅ Car deleted: ${carId}`);
+      res.json({ message: 'Автомобиль удален' });
+    } else {
+      console.log(`❌ Failed to delete car: ${carId}`);
+      res.status(500).json({ error: 'Не удалось удалить автомобиль' });
+    }
+  } catch (error) {
+    console.error('❌ Error deleting car:', error);
+    res.status(500).json({ error: 'Ошибка удаления автомобиля' });
+  }
+});
+
+console.log("🔧 Setting up static files...");
 
 // Serve static files
-app.use(express.static(join(__dirname, '../public')));
+app.use(express.static('public'));
 
-// Catch all handler for SPA
+// Catch-all handler for SPA
 app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, '../public/index.html'));
+  console.log(`📝 Serving SPA for route: ${req.path}`);
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('❌ Server error:', err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
+console.log("🔧 About to start listening on port:", process.env.PORT || 3000);
+console.log("🎯 Server setup complete, waiting for connections...");
 
-console.log('🔧 About to start listening on port:', PORT);
-
-// Start server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server successfully running on port ${PORT}`);
   console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
 });
-
-console.log('🎯 Server setup complete, waiting for connections...');
