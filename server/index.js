@@ -4,7 +4,23 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcrypt');
 const path = require('path');
-const { initializeStorage, storage } = require('./storage');
+
+// ✅ ИСПРАВЛЕННЫЙ ИМПОРТ STORAGE
+let initializeStorage, storage;
+
+try {
+  const storageModule = require('./storage');
+  initializeStorage = storageModule.initializeStorage;
+  storage = storageModule.storage;
+  
+  if (!initializeStorage || !storage) {
+    throw new Error('Failed to import storage functions');
+  }
+  console.log('✅ Storage imported successfully');
+} catch (error) {
+  console.error('❌ Failed to import storage:', error);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,7 +37,6 @@ console.log('📦 Trying to import other modules...');
 
 // Попытка импорта storage
 console.log('📦 Trying to import storage...');
-console.log('✅ Storage imported successfully');
 
 console.log('🔧 Setting up middleware...');
 
@@ -62,7 +77,7 @@ passport.use(new LocalStrategy(
         return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
 
-      const isValid = await bcrypt.compare(password, user.passwordHash);
+      const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) {
         console.log(`❌ Invalid password for user: ${username}`);
         return done(null, false, { message: 'Неверное имя пользователя или пароль' });
@@ -131,7 +146,10 @@ app.post('/api/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Create user
-    const newUser = await storage.createUser(username, passwordHash);
+    const newUser = await storage.createUser({
+      username,
+      password: passwordHash
+    });
     console.log(`✅ User registered via /api/register: ${username}`);
 
     // Log in the user
@@ -365,7 +383,7 @@ app.post('/api/cars', requireAuth, async (req, res) => {
     await initializeStorage();
     const newCar = await storage.createCar({
       ...carData,
-      ownerId: req.user.id
+      createdBy: req.user.id
     });
     
     console.log(`✅ Car created by ${req.user.username}:`, newCar);
@@ -388,7 +406,7 @@ app.get('/api/applications/pending', requireAuth, async (req, res) => {
 
     await initializeStorage();
     const applications = await storage.getPendingApplications();
-    console.log(`📋 Admin ${req.user.username} requested ${applications.length} pending applications`);
+    console.log(`📋 ${req.user.role} ${req.user.username} requested ${applications.length} pending applications`);
     res.json(applications);
   } catch (error) {
     console.error('❌ Error fetching pending applications:', error);
