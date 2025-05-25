@@ -5,9 +5,7 @@ import { createServer } from "http";
 
 import { storage } from "./storage.js";
 import { pool } from "./db.js";
-import { insertCarSchema } from "../shared/schema.js";
-// insertCarApplicationSchema removed - not exported from schema
-import { z } from "zod";
+// Schema imports removed - not used in current implementation
 
 // Система модерации сообщений
 // ModerationResult structure: { allowed: boolean, reason?: string, cleanContent: string }
