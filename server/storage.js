@@ -4,7 +4,7 @@ import {
   carApplications, 
   favorites,
   messages
-} from "@shared/schema";
+} from "../shared/schema.js";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import fs from "fs";
@@ -397,15 +397,15 @@ export class MemStorage {
     return Array.from(conversations.values());
   }
 
-  async getMessagesByCarAndUsers(carId, buyerId, sellerId) {
-    return Array.from(this.messages.values()).filter(msg => 
-      msg.carId === carId && 
-      ((msg.senderId === buyerId && msg.recipientId === sellerId) ||
-       (msg.senderId === sellerId && msg.recipientId === buyerId))
-    ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  async getConversationMessages(carId, userId1, userId2) {
+    return Array.from(this.messages.values()).filter(
+      msg => msg.carId === carId && 
+             ((msg.senderId === userId1 && msg.recipientId === userId2) ||
+              (msg.senderId === userId2 && msg.recipientId === userId1))
+    ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }
 
-  async sendMessage(insertMessage) {
+  async createMessage(insertMessage) {
     const message = {
       ...insertMessage,
       id: this.messageIdCounter++,
@@ -414,94 +414,49 @@ export class MemStorage {
     };
     this.messages.set(message.id, message);
     this.saveData();
-    
-    // Очищаем кэш для получателя
-    this.unreadCountCache.delete(message.recipientId);
-    
     return message;
   }
 
-  async markMessageAsRead(messageId) {
-    const message = this.messages.get(messageId);
-    if (message) {
-      message.isRead = true;
-      this.messages.set(messageId, message);
-      this.saveData();
-      
-      // Очищаем кэш для получателя
-      this.unreadCountCache.delete(message.recipientId);
-      
-      return true;
-    }
-    return false;
-  }
-
-  async markConversationAsRead(carId, buyerId, sellerId, userId) {
-    let markedCount = 0;
-    
-    Array.from(this.messages.values()).forEach(msg => {
-      if (msg.carId === carId && 
-          msg.recipientId === userId && 
-          !msg.isRead &&
-          ((msg.senderId === buyerId && msg.recipientId === sellerId) ||
-           (msg.senderId === sellerId && msg.recipientId === buyerId))) {
-        msg.isRead = true;
-        this.messages.set(msg.id, msg);
-        markedCount++;
+  async markMessagesAsRead(carId, userId) {
+    let updatedCount = 0;
+    this.messages.forEach((message, id) => {
+      if (message.carId === carId && message.recipientId === userId && !message.isRead) {
+        message.isRead = true;
+        this.messages.set(id, message);
+        updatedCount++;
       }
     });
     
-    if (markedCount > 0) {
+    if (updatedCount > 0) {
       this.saveData();
-      // Очищаем кэш для пользователя
-      this.unreadCountCache.delete(userId);
     }
     
-    return markedCount;
+    return updatedCount;
   }
 
-  async getUnreadMessagesCount(userId) {
-    // Проверяем кэш (действителен 5 секунд)
-    const cached = this.unreadCountCache.get(userId);
-    if (cached && Date.now() - cached.lastUpdate < 5000) {
-      return cached.count;
-    }
-    
-    const count = Array.from(this.messages.values()).filter(
-      msg => msg.recipientId === userId && !msg.isRead
-    ).length;
-    
-    // Обновляем кэш
-    this.unreadCountCache.set(userId, {
-      count,
-      lastUpdate: Date.now()
+  async getUnreadMessageCount(userId) {
+    let count = 0;
+    this.messages.forEach(message => {
+      if (message.recipientId === userId && !message.isRead) {
+        count++;
+      }
     });
-    
     return count;
   }
 
-  async getAllMessages() {
-    return Array.from(this.messages.values());
-  }
-
-  async deleteMessage(messageId) {
-    const existed = this.messages.has(messageId);
-    if (existed) {
-      const message = this.messages.get(messageId);
-      this.messages.delete(messageId);
-      this.saveData();
-      
-      // Очищаем кэш для получателя
-      if (message) {
-        this.unreadCountCache.delete(message.recipientId);
+  async getUnreadCountByConversation(userId) {
+    const conversations = new Map();
+    
+    this.messages.forEach(message => {
+      if (message.recipientId === userId && !message.isRead) {
+        const key = `${message.carId}-${message.senderId}`;
+        conversations.set(key, (conversations.get(key) || 0) + 1);
       }
-    }
-    return existed;
+    });
+    
+    return Object.fromEntries(conversations);
   }
 }
 
-// Создаем единственный экземпляр хранилища
+// Создаем и экспортируем экземпляр
 export const storage = new MemStorage();
-
-// Экспортируем также схемы для использования в других местах
-export { users, cars, carApplications, favorites, messages };
