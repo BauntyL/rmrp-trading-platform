@@ -5,7 +5,8 @@ import {
   favorites,
   messages
 } from "../shared/schema.js";
-import { db, pool } from "./db.js"; import { initDatabase } from "./init-database.js";
+import { db, pool } from "./db.js";
+import { initDatabase } from "./init-database.js";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 
 export class DatabaseStorage {
@@ -331,14 +332,14 @@ export class DatabaseStorage {
   async getMessagesByUser(userId) {
     await this.init();
     return await db.select().from(messages)
-      .where(or(eq(messages.senderId, userId), eq(messages.recipientId, userId)))
+      .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId)))
       .orderBy(desc(messages.createdAt));
   }
 
   async getUnreadCount(userId) {
     await this.init();
     const result = await db.select({ count: 'COUNT(*)' }).from(messages)
-      .where(and(eq(messages.recipientId, userId), eq(messages.isRead, false)));
+      .where(and(eq(messages.receiverId, userId), eq(messages.isRead, false)));
     
     return parseInt(result[0]?.count || 0);
   }
@@ -360,6 +361,11 @@ export class DatabaseStorage {
     
     const result = await db.delete(messages).where(eq(messages.id, messageId));
     return result.rowCount > 0;
+  }
+
+  async getAllMessages() {
+    await this.init();
+    return await db.select().from(messages);
   }
 }
 
