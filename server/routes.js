@@ -1,11 +1,13 @@
 // Express types removed for JavaScript compatibility
+import express from "express";
+import path from "path";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 
 import { setupAuth } from "./auth.js";
 import { storage } from "./storage.js";
 import { pool } from "./db.js";
-import { insertCarSchema, insertCarApplicationSchema } from "@shared/schema";
+import { insertCarSchema, insertCarApplicationSchema } from "../shared/schema.js";
 import { z } from "zod";
 
 // Система модерации сообщений
@@ -158,15 +160,6 @@ export function registerRoutes(app) {
       
       if (car.createdBy !== req.user.id) {
         return res.status(403).json({ message: "Вы можете удалять только свои автомобили" });
-      }
-      
-      // Удаляем все сообщения связанные с этим автомобилем
-      const allMessages = await storage.getAllMessages();
-      const messagesToDelete = allMessages.filter((msg) => msg.carId === carId);
-      
-      for (const message of messagesToDelete) {
-        await storage.deleteMessage(message.id);
-        console.log(`📨 Удалено сообщение ID: ${message.id}`);
       }
       
       // Удаляем автомобиль
@@ -528,16 +521,21 @@ export function registerRoutes(app) {
     }
   });
 
-  // Create HTTP server and WebSocket server
+  // Create HTTP server
   const server = createServer(app);
-  
+
   // Serve static files in production
   if (process.env.NODE_ENV === "production") {
-    const { serveStatic } = await import("./vite.js");
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite.js");
-    await setupVite(app, server);
+    console.log("🎯 Setting up static files...");
+    
+    // Serve static files
+    app.use(express.static('public'));
+    
+    // Catch-all handler for SPA (MUST BE LAST!)
+    app.get("*", (req, res) => {
+      console.log(`🎯 Serving SPA for route: ${req.path}`);
+      res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+    });
   }
 
   return server;
