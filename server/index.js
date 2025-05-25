@@ -357,12 +357,12 @@ app.put('/api/cars/:id', async (req, res) => {
     }
 
     if (car.createdBy !== req.user.id && req.user.role !== 'admin') {
-      console.log(`❌ Access denied for car update: ${carId}`);
-      return res.status(403).json({ error: 'Нет прав для редактирования этого автомобиля' });
+      console.log(`❌ Access denied for car update: ${req.user.username}`);
+      return res.status(403).json({ error: 'Нет прав для редактирования' });
     }
 
     const updatedCar = await storage.updateCar(carId, req.body);
-    console.log(`✅ Car updated: ${carId}`);
+    console.log(`✅ Car updated: ${updatedCar.name}`);
     res.json(updatedCar);
   } catch (error) {
     console.error('❌ Error updating car:', error);
@@ -388,8 +388,8 @@ app.delete('/api/cars/:id', async (req, res) => {
     }
 
     if (car.createdBy !== req.user.id && req.user.role !== 'admin') {
-      console.log(`❌ Access denied for car deletion: ${carId}`);
-      return res.status(403).json({ error: 'Нет прав для удаления этого автомобиля' });
+      console.log(`❌ Access denied for car deletion: ${req.user.username}`);
+      return res.status(403).json({ error: 'Нет прав для удаления' });
     }
 
     const deleted = await storage.deleteCar(carId);
@@ -398,7 +398,7 @@ app.delete('/api/cars/:id', async (req, res) => {
       res.json({ message: 'Автомобиль удален' });
     } else {
       console.log(`❌ Failed to delete car: ${carId}`);
-      res.status(500).json({ error: 'Не удалось удалить автомобиль' });
+      res.status(500).json({ error: 'Ошибка удаления автомобиля' });
     }
   } catch (error) {
     console.error('❌ Error deleting car:', error);
@@ -406,7 +406,7 @@ app.delete('/api/cars/:id', async (req, res) => {
   }
 });
 
-// ============ APPLICATIONS ROUTES ============
+// ============ APPLICATION ROUTES ============
 
 app.get('/api/applications/pending', async (req, res) => {
   console.log(`📝 GET /api/applications/pending - User: ${req.user?.username || 'not authenticated'}`);
@@ -431,53 +431,6 @@ app.get('/api/applications/pending', async (req, res) => {
   }
 });
 
-app.get('/api/applications', async (req, res) => {
-  console.log(`📝 GET /api/applications - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for all applications`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for all applications: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const applications = await storage.getAllCarApplications();
-    console.log(`📋 Admin ${req.user.username} requested ${applications.length} total applications`);
-    res.json(applications);
-  } catch (error) {
-    console.error('❌ Error fetching all applications:', error);
-    res.status(500).json({ error: 'Ошибка получения всех заявок' });
-  }
-});
-
-app.post('/api/car-applications', async (req, res) => {
-  console.log(`📝 POST /api/car-applications - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for car application`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const applicationData = {
-      ...req.body,
-      userId: req.user.id,
-    };
-    
-    console.log(`📝 Creating car application: ${JSON.stringify(applicationData)}`);
-    const application = await storage.createCarApplication(applicationData);
-    console.log(`✅ Car application created with ID: ${application.id}`);
-    res.status(201).json(application);
-  } catch (error) {
-    console.error('❌ Error creating car application:', error);
-    res.status(500).json({ error: 'Ошибка создания заявки на автомобиль' });
-  }
-});
-
 app.get('/api/my-applications', async (req, res) => {
   console.log(`📝 GET /api/my-applications - User: ${req.user?.username || 'not authenticated'}`);
   
@@ -491,137 +444,37 @@ app.get('/api/my-applications', async (req, res) => {
     console.log(`📋 User ${req.user.username} has ${applications.length} applications`);
     res.json(applications);
   } catch (error) {
-    console.error('❌ Error fetching applications:', error);
-    res.status(500).json({ error: 'Ошибка получения заявок' });
+    console.error('❌ Error fetching user applications:', error);
+    res.status(500).json({ error: 'Ошибка получения заявок пользователя' });
   }
 });
 
-// PUT методы для approve/reject
-app.put('/api/applications/:id/approve', async (req, res) => {
-  console.log(`📝 PUT /api/applications/${req.params.id}/approve - User: ${req.user?.username || 'not authenticated'}`);
+app.post('/api/applications', async (req, res) => {
+  console.log(`📝 POST /api/applications - User: ${req.user?.username || 'not authenticated'}`);
   
   if (!req.user) {
-    console.log(`❌ User not authenticated for application approval`);
+    console.log(`❌ User not authenticated for application creation`);
     return res.status(401).json({ error: 'Не авторизован' });
   }
 
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for application approval: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
   try {
-    const applicationId = parseInt(req.params.id);
-    const application = await storage.updateCarApplicationStatus(applicationId, 'approved', req.user.id);
+    const applicationData = {
+      ...req.body,
+      createdBy: req.user.id,
+    };
     
-    if (!application) {
-      console.log(`❌ Application not found for approval: ${applicationId}`);
-      return res.status(404).json({ error: 'Заявка не найдена' });
-    }
-
-    console.log(`✅ Application approved: ${applicationId} by ${req.user.username}`);
-    res.json(application);
+    console.log(`📝 Creating application: ${applicationData.name}`);
+    const application = await storage.createCarApplication(applicationData);
+    console.log(`✅ Application created with ID: ${application.id}`);
+    res.status(201).json(application);
   } catch (error) {
-    console.error('❌ Error approving application:', error);
-    res.status(500).json({ error: 'Ошибка одобрения заявки' });
+    console.error('❌ Error creating application:', error);
+    res.status(500).json({ error: 'Ошибка создания заявки' });
   }
 });
 
-app.put('/api/applications/:id/reject', async (req, res) => {
-  console.log(`📝 PUT /api/applications/${req.params.id}/reject - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for application rejection`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for application rejection: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const applicationId = parseInt(req.params.id);
-    const application = await storage.updateCarApplicationStatus(applicationId, 'rejected', req.user.id);
-    
-    if (!application) {
-      console.log(`❌ Application not found for rejection: ${applicationId}`);
-      return res.status(404).json({ error: 'Заявка не найдена' });
-    }
-
-    console.log(`✅ Application rejected: ${applicationId} by ${req.user.username}`);
-    res.json(application);
-  } catch (error) {
-    console.error('❌ Error rejecting application:', error);
-    res.status(500).json({ error: 'Ошибка отклонения заявки' });
-  }
-});
-
-// PATCH методы для approve/reject (дублируем для совместимости)
-app.patch('/api/applications/:id/approve', async (req, res) => {
-  console.log(`📝 PATCH /api/applications/${req.params.id}/approve - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for application approval`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for application approval: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const applicationId = parseInt(req.params.id);
-    const application = await storage.updateCarApplicationStatus(applicationId, 'approved', req.user.id);
-    
-    if (!application) {
-      console.log(`❌ Application not found for approval: ${applicationId}`);
-      return res.status(404).json({ error: 'Заявка не найдена' });
-    }
-
-    console.log(`✅ Application approved via PATCH: ${applicationId} by ${req.user.username}`);
-    res.json(application);
-  } catch (error) {
-    console.error('❌ Error approving application:', error);
-    res.status(500).json({ error: 'Ошибка одобрения заявки' });
-  }
-});
-
-app.patch('/api/applications/:id/reject', async (req, res) => {
-  console.log(`📝 PATCH /api/applications/${req.params.id}/reject - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for application rejection`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for application rejection: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const applicationId = parseInt(req.params.id);
-    const application = await storage.updateCarApplicationStatus(applicationId, 'rejected', req.user.id);
-    
-    if (!application) {
-      console.log(`❌ Application not found for rejection: ${applicationId}`);
-      return res.status(404).json({ error: 'Заявка не найдена' });
-    }
-
-    console.log(`✅ Application rejected via PATCH: ${applicationId} by ${req.user.username}`);
-    res.json(application);
-  } catch (error) {
-    console.error('❌ Error rejecting application:', error);
-    res.status(500).json({ error: 'Ошибка отклонения заявки' });
-  }
-});
-
-// Универсальный роут для обновления статуса заявки
 app.patch('/api/applications/:id', async (req, res) => {
   console.log(`📝 PATCH /api/applications/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
-  console.log(`📝 Request body:`, JSON.stringify(req.body));
   
   if (!req.user) {
     console.log(`❌ User not authenticated for application update`);
@@ -637,23 +490,27 @@ app.patch('/api/applications/:id', async (req, res) => {
     const applicationId = parseInt(req.params.id);
     const { status } = req.body;
     
-    if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
+    if (!status || !['approved', 'rejected'].includes(status)) {
       console.log(`❌ Invalid status provided: ${status}`);
       return res.status(400).json({ error: 'Недопустимый статус заявки' });
     }
 
-    const application = await storage.updateCarApplicationStatus(applicationId, status, req.user.id);
+    const updatedApplication = await storage.updateCarApplicationStatus(
+      applicationId, 
+      status, 
+      req.user.id
+    );
     
-    if (!application) {
-      console.log(`❌ Application not found for update: ${applicationId}`);
+    if (!updatedApplication) {
+      console.log(`❌ Application not found for status update: ${applicationId}`);
       return res.status(404).json({ error: 'Заявка не найдена' });
     }
 
-    console.log(`✅ Application status updated via PATCH: ${applicationId} -> ${status} by ${req.user.username}`);
-    res.json(application);
+    console.log(`✅ Application status updated: ${updatedApplication.id} -> ${status} by ${req.user.username}`);
+    res.json(updatedApplication);
   } catch (error) {
-    console.error('❌ Error updating application:', error);
-    res.status(500).json({ error: 'Ошибка обновления заявки' });
+    console.error('❌ Error updating application status:', error);
+    res.status(500).json({ error: 'Ошибка изменения статуса заявки' });
   }
 });
 
@@ -676,6 +533,7 @@ app.get('/api/users', async (req, res) => {
     const users = await storage.getAllUsers();
     console.log(`📋 Admin ${req.user.username} requested ${users.length} users`);
     
+    // Удаляем пароли из ответа
     const usersWithoutPasswords = users.map(user => {
       const { password, ...userWithoutPassword } = user;
       return userWithoutPassword;
@@ -704,6 +562,48 @@ app.put('/api/users/:id/role', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
     const { role } = req.body;
+    
+    if (!role || !['user', 'admin'].includes(role)) {
+      console.log(`❌ Invalid role provided: ${role}`);
+      return res.status(400).json({ error: 'Недопустимая роль пользователя' });
+    }
+
+    const updatedUser = await storage.updateUserRole(userId, role);
+    
+    if (!updatedUser) {
+      console.log(`❌ User not found for role change: ${userId}`);
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    console.log(`✅ User role updated: ${updatedUser.username} -> ${role} by ${req.user.username}`);
+    
+    const { password, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    console.error('❌ Error updating user role:', error);
+    res.status(500).json({ error: 'Ошибка изменения роли пользователя' });
+  }
+});
+
+// 🚨 НОВЫЙ PATCH ROUTE ДЛЯ ИСПРАВЛЕНИЯ ПРОБЛЕМЫ
+app.patch('/api/users/:id', async (req, res) => {
+  console.log(`📝 PATCH /api/users/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for role change`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  if (req.user.role !== 'admin') {
+    console.log(`❌ Access denied for role change: ${req.user.username} (role: ${req.user.role})`);
+    return res.status(403).json({ error: 'Нет прав доступа' });
+  }
+
+  try {
+    const userId = parseInt(req.params.id);
+    const { role } = req.body;
+    
+    console.log(`📝 Updating user ${userId} role to: ${role}`);
     
     if (!role || !['user', 'admin'].includes(role)) {
       console.log(`❌ Invalid role provided: ${role}`);
@@ -797,7 +697,7 @@ app.get('/api/favorites/check', async (req, res) => {
       return res.status(400).json({ error: 'Не указан ID автомобиля' });
     }
     
-    const isFavorite = await storage.isFavorite(req.user.id, parseInt(carId));
+    const isFavorite = await storage.checkFavorite(req.user.id, parseInt(carId));
     console.log(`📋 Car ${carId} is favorite for user ${req.user.username}: ${isFavorite}`);
     res.json({ isFavorite });
   } catch (error) {
@@ -821,10 +721,7 @@ app.post('/api/favorites', async (req, res) => {
       return res.status(400).json({ error: 'Не указан ID автомобиля' });
     }
 
-    const favorite = await storage.addToFavorites({
-      userId: req.user.id,
-      carId: parseInt(carId)
-    });
+    const favorite = await storage.addToFavorites(req.user.id, parseInt(carId));
 
     console.log(`✅ Added to favorites: car ${carId} by ${req.user.username}`);
     res.status(201).json(favorite);
