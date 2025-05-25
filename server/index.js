@@ -1,73 +1,74 @@
-import express from "express";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import bcrypt from "bcrypt";
-import { storage } from "./storage.js";
-import { setupAuth } from "./auth.js";
-import { registerRoutes } from "./routes.js";
-import path from "path";
+const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const bcrypt = require('bcrypt');
+const path = require('path');
+const { initializeStorage, storage } = require('./storage');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-console.log("🚀 Starting server...");
-console.log("PORT:", process.env.PORT || 3000);
-console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log('🚀 Starting server...');
+console.log('PORT:', PORT);
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
-console.log("📦 Trying to import express...");
-console.log("📦 Trying to import other modules...");
-console.log("📦 Trying to import storage...");
-console.log("✅ Storage imported successfully");
+// Попытка импорта express
+console.log('📦 Trying to import express...');
 
-console.log("🔧 Setting up middleware...");
+// Попытка импорта других модулей
+console.log('📦 Trying to import other modules...');
+
+// Попытка импорта storage
+console.log('📦 Trying to import storage...');
+console.log('✅ Storage imported successfully');
+
+console.log('🔧 Setting up middleware...');
 
 // Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 
-// Логирование всех запросов
-app.use((req, res, next) => {
-  console.log(`🌐 ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - Session: ${req.sessionID?.substring(0, 8)}...`);
-  next();
-});
-
-// Session configuration - используем стандартный MemoryStore
+// Session configuration
 app.use(session({
-  secret: 'trading-platform-secret-key-2024',
+  secret: process.env.SESSION_SECRET || 'your-secret-key-here',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    httpOnly: true,
-    sameSite: 'lax'
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-console.log("🔧 Setting up passport strategy...");
+console.log('🔧 Setting up passport strategy...');
 
-// Passport strategy
+// Passport configuration
 passport.use(new LocalStrategy(
+  {
+    usernameField: 'username',
+    passwordField: 'password'
+  },
   async (username, password, done) => {
     try {
-      console.log(`🔑 Trying to authenticate user: ${username}`);
-      const user = await storage.getUserByUsername(username);
+      console.log(`🔐 Authenticating user: ${username}`);
+      await initializeStorage();
       
+      const user = await storage.getUserByUsername(username);
       if (!user) {
         console.log(`❌ User not found: ${username}`);
         return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
 
-      const isValid = await bcrypt.compare(password, user.password);
+      const isValid = await bcrypt.compare(password, user.passwordHash);
       if (!isValid) {
         console.log(`❌ Invalid password for user: ${username}`);
         return done(null, false, { message: 'Неверное имя пользователя или пароль' });
       }
 
-      console.log(`✅ User authenticated successfully: ${username}`);
+      console.log(`✅ User authenticated: ${username}`);
       return done(null, user);
     } catch (error) {
       console.error('❌ Authentication error:', error);
@@ -84,12 +85,9 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
   try {
     console.log(`🔧 Deserializing user ID: ${id}`);
-    const user = await storage.getUser(id);
-    if (user) {
-      console.log(`✅ User deserialized: ${user.username}`);
-    } else {
-      console.log(`❌ User not found during deserialization: ${id}`);
-    }
+    await initializeStorage();
+    const user = await storage.getUserById(id);
+    console.log(`✅ User deserialized: ${user?.username || 'not found'}`);
     done(null, user);
   } catch (error) {
     console.error('❌ Deserialization error:', error);
@@ -97,736 +95,494 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-console.log("🔧 Setting up API routes...");
+// Logging middleware
+app.use((req, res, next) => {
+  const sessionInfo = req.session?.id ? req.session.id.substring(0, 12) + '...' : 'undefined';
+  console.log(`🌐 ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - Session: ${sessionInfo}...`);
+  next();
+});
 
-// ============ AUTHENTICATION ROUTES ============
+console.log('🔧 Setting up API routes...');
 
-app.post('/api/login', (req, res, next) => {
+// Authentication routes
+app.post('/api/register', async (req, res) => {
+  try {
+    console.log('📝 Registration attempt via /api/register');
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Имя пользователя и пароль обязательны' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
+    }
+
+    await initializeStorage();
+    
+    // Check if user already exists
+    const existingUser = await storage.getUserByUsername(username);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Create user
+    const newUser = await storage.createUser(username, passwordHash);
+    console.log(`✅ User registered via /api/register: ${username}`);
+
+    // Log in the user
+    req.login(newUser, (err) => {
+      if (err) {
+        console.error('❌ Login error after registration:', err);
+        return res.status(500).json({ error: 'Ошибка при автоматическом входе' });
+      }
+      
+      console.log(`🍪 Session created after registration: ${req.session.id}`);
+      console.log(`🍪 User in session: ${req.user.username}`);
+      
+      const userResponse = {
+        id: newUser.id,
+        username: newUser.username,
+        role: newUser.role,
+        createdAt: newUser.createdAt
+      };
+      
+      console.log('📤 Sending user data to frontend:', userResponse);
+      res.json(userResponse);
+    });
+
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(500).json({ error: 'Ошибка при регистрации' });
+  }
+});
+
+app.post('/api/login', async (req, res, next) => {
   console.log(`📝 Login attempt via /api/login for: ${req.body.username}`);
   
   passport.authenticate('local', (err, user, info) => {
     if (err) {
       console.error('❌ Login error:', err);
-      return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+      return res.status(500).json({ error: 'Ошибка сервера' });
     }
     
     if (!user) {
-      console.log(`❌ Login failed: ${info?.message || 'Authentication failed'}`);
-      return res.status(401).json({ error: info?.message || 'Неверные данные для входа' });
+      console.log(`❌ Login failed for: ${req.body.username} - ${info?.message}`);
+      return res.status(401).json({ error: info?.message || 'Неверные данные' });
     }
 
     req.logIn(user, (err) => {
       if (err) {
-        console.error('❌ Session creation error:', err);
-        return res.status(500).json({ error: 'Ошибка создания сессии' });
+        console.error('❌ Login session error:', err);
+        return res.status(500).json({ error: 'Ошибка при создании сессии' });
       }
       
       console.log(`✅ Login successful via /api/login: ${user.username}`);
-      console.log(`🍪 Session created: ${req.sessionID}`);
-      console.log(`🍪 User in session:`, req.user ? req.user.username : 'none');
+      console.log(`🍪 Session created: ${req.session.id}`);
+      console.log(`🍪 User in session: ${req.user.username}`);
       
-      const { password, ...userWithoutPassword } = user;
-      console.log(`📤 Sending user data to frontend:`, JSON.stringify(userWithoutPassword));
+      const userResponse = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        createdAt: user.createdAt
+      };
       
-      res.json(userWithoutPassword);
+      console.log('📤 Sending user data to frontend:', userResponse);
+      res.json(userResponse);
     });
   })(req, res, next);
 });
 
-app.post('/api/register', async (req, res) => {
-  console.log(`📝 Registration attempt for: ${req.body.username}`);
-  
-  try {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
-      console.log(`❌ Registration failed: missing username or password`);
-      return res.status(400).json({ error: 'Имя пользователя и пароль обязательны' });
-    }
-
-    const existingUser = await storage.getUserByUsername(username);
-    if (existingUser) {
-      console.log(`❌ Registration failed: user already exists: ${username}`);
-      return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    const user = await storage.createUser({
-      username,
-      password: hashedPassword,
-      role: 'user'
-    });
-
-    console.log(`✅ User registered successfully: ${user.username} with ID: ${user.id}`);
-    
-    req.logIn(user, (err) => {
-      if (err) {
-        console.error('❌ Auto-login error after registration:', err);
-        return res.status(500).json({ error: 'Пользователь создан, но ошибка автоматического входа' });
-      }
-      
-      console.log(`✅ Auto-login successful after registration: ${user.username}`);
-      console.log(`🍪 Session created after registration: ${req.sessionID}`);
-      console.log(`🍪 User in session:`, req.user ? req.user.username : 'none');
-      
-      const { password, ...userWithoutPassword } = user;
-      console.log(`📤 Sending registered user data to frontend:`, JSON.stringify(userWithoutPassword));
-      res.status(201).json(userWithoutPassword);
-    });
-    
-  } catch (error) {
-    console.error('❌ Registration error:', error);
-    res.status(500).json({ error: 'Ошибка регистрации пользователя' });
-  }
-});
-
-// User routes
-app.get('/api/user', (req, res) => {
-  console.log(`📝 GET /api/user - Session: ${req.sessionID?.substring(0, 8)}...`);
-  console.log(`📝 User in request: ${req.user?.username || 'not authenticated'}`);
-  console.log(`📝 Session user ID: ${req.session?.passport?.user || 'none'}`);
-  
-  if (req.user) {
-    const { password, ...userWithoutPassword } = req.user;
-    console.log(`✅ User data sent via /api/user: ${userWithoutPassword.username}`);
-    console.log(`📤 User object:`, JSON.stringify(userWithoutPassword));
-    res.json(userWithoutPassword);
-  } else {
-    console.log(`❌ User not authenticated`);
-    res.status(401).json({ error: 'Не авторизован' });
-  }
-});
-
-app.get('/api/auth/me', (req, res) => {
-  console.log(`📝 GET /api/auth/me - Session: ${req.sessionID?.substring(0, 8)}...`);
-  console.log(`📝 User in request: ${req.user?.username || 'not authenticated'}`);
-  
-  if (req.user) {
-    const { password, ...userWithoutPassword } = req.user;
-    console.log(`✅ User data sent via /api/auth/me: ${userWithoutPassword.username}`);
-    console.log(`📤 User object:`, JSON.stringify(userWithoutPassword));
-    res.json({ user: userWithoutPassword });
-  } else {
-    console.log(`❌ User not authenticated`);
-    res.status(401).json({ error: 'Не авторизован' });
-  }
-});
-
-app.get('/api/me', (req, res) => {
-  console.log(`📝 GET /api/me - Session: ${req.sessionID?.substring(0, 8)}...`);
-  console.log(`📝 User in request: ${req.user?.username || 'not authenticated'}`);
-  
-  if (req.user) {
-    const { password, ...userWithoutPassword } = req.user;
-    console.log(`✅ User data sent via /api/me: ${userWithoutPassword.username}`);
-    console.log(`📤 User object:`, JSON.stringify(userWithoutPassword));
-    res.json(userWithoutPassword);
-  } else {
-    console.log(`❌ User not authenticated`);
-    res.status(401).json({ error: 'Не авторизован' });
-  }
-});
-
 app.post('/api/logout', (req, res) => {
-  console.log(`📝 Logout attempt for user: ${req.user?.username || 'unknown'}`);
+  const username = req.user?.username || 'unknown';
+  console.log(`📝 Logout request for: ${username}`);
   
   req.logout((err) => {
     if (err) {
       console.error('❌ Logout error:', err);
-      return res.status(500).json({ error: 'Ошибка выхода' });
+      return res.status(500).json({ error: 'Ошибка при выходе' });
     }
     
     req.session.destroy((err) => {
       if (err) {
         console.error('❌ Session destroy error:', err);
-        return res.status(500).json({ error: 'Ошибка уничтожения сессии' });
+        return res.status(500).json({ error: 'Ошибка при завершении сессии' });
       }
       
-      console.log(`✅ Logout successful and session destroyed`);
+      console.log(`✅ Logout successful for: ${username}`);
       res.json({ message: 'Выход выполнен успешно' });
     });
   });
 });
 
-// ============ CAR ROUTES ============
-
-app.get('/api/cars', async (req, res) => {
-  try {
-    console.log(`📝 GET /api/cars - User: ${req.user?.username || 'anonymous'} - Fetching all cars`);
-    const cars = await storage.getAllCars();
-    console.log(`📋 Found ${cars.length} cars`);
-    console.log(`📤 Cars data:`, cars.map(car => `${car.id}: ${car.name}`));
-    res.json(cars);
-  } catch (error) {
-    console.error('❌ Error fetching cars:', error);
-    res.status(500).json({ error: 'Ошибка получения автомобилей' });
-  }
-});
-
-app.get('/api/cars/search', async (req, res) => {
-  try {
-    const { query, category, server } = req.query;
-    console.log(`📝 GET /api/cars/search - Query: ${query}, Category: ${category}, Server: ${server}`);
-    
-    const cars = await storage.searchCars(query, category, server);
-    console.log(`📋 Search found ${cars.length} cars`);
-    res.json(cars);
-  } catch (error) {
-    console.error('❌ Error searching cars:', error);
-    res.status(500).json({ error: 'Ошибка поиска автомобилей' });
-  }
-});
-
-app.get('/api/cars/my', async (req, res) => {
-  console.log(`📝 GET /api/cars/my - User: ${req.user?.username || 'not authenticated'}`);
+// Get current user
+app.get('/api/user', (req, res) => {
+  const sessionInfo = req.session?.id ? req.session.id.substring(0, 12) + '...' : 'undefined';
+  console.log(`📝 GET /api/user - Session: ${sessionInfo}`);
+  console.log(`📝 User in request: ${req.user ? req.user.username : 'not authenticated'}`);
+  console.log(`📝 Session user ID: ${req.session?.passport?.user || 'none'}`);
   
   if (!req.user) {
-    console.log(`❌ User not authenticated for /api/cars/my`);
+    console.log('❌ User not authenticated');
     return res.status(401).json({ error: 'Не авторизован' });
   }
-
-  try {
-    const cars = await storage.getCarsByUser(req.user.id);
-    console.log(`📋 User ${req.user.username} has ${cars.length} cars`);
-    res.json(cars);
-  } catch (error) {
-    console.error('❌ Error fetching user cars:', error);
-    res.status(500).json({ error: 'Ошибка получения автомобилей пользователя' });
-  }
-});
-
-app.get('/api/cars/:id', async (req, res) => {
-  try {
-    const carId = parseInt(req.params.id);
-    console.log(`📝 GET /api/cars/${carId} - Fetching car details`);
-    
-    const car = await storage.getCar(carId);
-    if (!car) {
-      console.log(`❌ Car not found: ${carId}`);
-      return res.status(404).json({ error: 'Автомобиль не найден' });
-    }
-    
-    console.log(`✅ Found car: ${car.name}`);
-    res.json(car);
-  } catch (error) {
-    console.error('❌ Error fetching car:', error);
-    res.status(500).json({ error: 'Ошибка получения автомобиля' });
-  }
-});
-
-app.post('/api/cars', async (req, res) => {
-  console.log(`📝 POST /api/cars - User: ${req.user?.username || 'not authenticated'}`);
   
-  if (!req.user) {
-    console.log(`❌ User not authenticated for car creation`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const carData = {
-      ...req.body,
-      createdBy: req.user.id,
-    };
-    
-    console.log(`📝 Creating car: ${carData.name}`);
-    const car = await storage.createCar(carData);
-    console.log(`✅ Car created with ID: ${car.id}`);
-    res.status(201).json(car);
-  } catch (error) {
-    console.error('❌ Error creating car:', error);
-    res.status(500).json({ error: 'Ошибка создания автомобиля' });
-  }
+  const userResponse = {
+    id: req.user.id,
+    username: req.user.username,
+    role: req.user.role,
+    createdAt: req.user.createdAt
+  };
+  
+  console.log('📤 Sending current user data:', userResponse);
+  res.json(userResponse);
 });
 
-app.put('/api/cars/:id', async (req, res) => {
-  console.log(`📝 PUT /api/cars/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
-  
+// Authentication middleware
+const requireAuth = (req, res, next) => {
   if (!req.user) {
-    console.log(`❌ User not authenticated for car update`);
-    return res.status(401).json({ error: 'Не авторизован' });
+    return res.status(401).json({ error: 'Необходимо войти в систему' });
   }
+  next();
+};
 
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Недостаточно прав доступа' });
+  }
+  next();
+};
+
+const requireModeratorOrAdmin = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'moderator')) {
+    return res.status(403).json({ error: 'Недостаточно прав доступа' });
+  }
+  next();
+};
+
+// User management routes
+app.get('/api/users', requireAuth, async (req, res) => {
   try {
-    const carId = parseInt(req.params.id);
-    const car = await storage.getCar(carId);
+    console.log(`📝 GET /api/users - User: ${req.user.username}`);
     
-    if (!car) {
-      console.log(`❌ Car not found for update: ${carId}`);
-      return res.status(404).json({ error: 'Автомобиль не найден' });
+    if (req.user.role !== 'admin') {
+      console.log(`❌ User ${req.user.username} not authorized for users list`);
+      return res.status(403).json({ error: 'Недостаточно прав доступа' });
     }
 
-    if (car.createdBy !== req.user.id && req.user.role !== 'admin') {
-      console.log(`❌ Access denied for car update: ${req.user.username}`);
-      return res.status(403).json({ error: 'Нет прав для редактирования' });
-    }
-
-    const updatedCar = await storage.updateCar(carId, req.body);
-    console.log(`✅ Car updated: ${updatedCar.name}`);
-    res.json(updatedCar);
-  } catch (error) {
-    console.error('❌ Error updating car:', error);
-    res.status(500).json({ error: 'Ошибка обновления автомобиля' });
-  }
-});
-
-app.delete('/api/cars/:id', async (req, res) => {
-  console.log(`📝 DELETE /api/cars/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for car deletion`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const carId = parseInt(req.params.id);
-    const car = await storage.getCar(carId);
-    
-    if (!car) {
-      console.log(`❌ Car not found for deletion: ${carId}`);
-      return res.status(404).json({ error: 'Автомобиль не найден' });
-    }
-
-    if (car.createdBy !== req.user.id && req.user.role !== 'admin') {
-      console.log(`❌ Access denied for car deletion: ${req.user.username}`);
-      return res.status(403).json({ error: 'Нет прав для удаления' });
-    }
-
-    const deleted = await storage.deleteCar(carId);
-    if (deleted) {
-      console.log(`✅ Car deleted: ${carId}`);
-      res.json({ message: 'Автомобиль удален' });
-    } else {
-      console.log(`❌ Failed to delete car: ${carId}`);
-      res.status(500).json({ error: 'Ошибка удаления автомобиля' });
-    }
-  } catch (error) {
-    console.error('❌ Error deleting car:', error);
-    res.status(500).json({ error: 'Ошибка удаления автомобиля' });
-  }
-});
-
-// ============ APPLICATION ROUTES ============
-
-app.get('/api/applications/pending', async (req, res) => {
-  console.log(`📝 GET /api/applications/pending - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for pending applications`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for pending applications: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const applications = await storage.getPendingCarApplications();
-    console.log(`📋 Admin ${req.user.username} requested ${applications.length} pending applications`);
-    res.json(applications);
-  } catch (error) {
-    console.error('❌ Error fetching pending applications:', error);
-    res.status(500).json({ error: 'Ошибка получения заявок' });
-  }
-});
-
-app.get('/api/my-applications', async (req, res) => {
-  console.log(`📝 GET /api/my-applications - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for applications`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const applications = await storage.getCarApplicationsByUser(req.user.id);
-    console.log(`📋 User ${req.user.username} has ${applications.length} applications`);
-    res.json(applications);
-  } catch (error) {
-    console.error('❌ Error fetching user applications:', error);
-    res.status(500).json({ error: 'Ошибка получения заявок пользователя' });
-  }
-});
-
-app.post('/api/applications', async (req, res) => {
-  console.log(`📝 POST /api/applications - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for application creation`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const applicationData = {
-      ...req.body,
-      createdBy: req.user.id,
-    };
-    
-    console.log(`📝 Creating application: ${applicationData.name}`);
-    const application = await storage.createCarApplication(applicationData);
-    console.log(`✅ Application created with ID: ${application.id}`);
-    res.status(201).json(application);
-  } catch (error) {
-    console.error('❌ Error creating application:', error);
-    res.status(500).json({ error: 'Ошибка создания заявки' });
-  }
-});
-
-app.patch('/api/applications/:id', async (req, res) => {
-  console.log(`📝 PATCH /api/applications/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for application update`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for application update: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const applicationId = parseInt(req.params.id);
-    const { status } = req.body;
-    
-    if (!status || !['approved', 'rejected'].includes(status)) {
-      console.log(`❌ Invalid status provided: ${status}`);
-      return res.status(400).json({ error: 'Недопустимый статус заявки' });
-    }
-
-    const updatedApplication = await storage.updateCarApplicationStatus(
-      applicationId, 
-      status, 
-      req.user.id
-    );
-    
-    if (!updatedApplication) {
-      console.log(`❌ Application not found for status update: ${applicationId}`);
-      return res.status(404).json({ error: 'Заявка не найдена' });
-    }
-
-    console.log(`✅ Application status updated: ${updatedApplication.id} -> ${status} by ${req.user.username}`);
-    res.json(updatedApplication);
-  } catch (error) {
-    console.error('❌ Error updating application status:', error);
-    res.status(500).json({ error: 'Ошибка изменения статуса заявки' });
-  }
-});
-
-// ============ USER MANAGEMENT ROUTES ============
-
-app.get('/api/users', async (req, res) => {
-  console.log(`📝 GET /api/users - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for users list`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for users list: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
+    await initializeStorage();
     const users = await storage.getAllUsers();
     console.log(`📋 Admin ${req.user.username} requested ${users.length} users`);
-    
-    // Удаляем пароли из ответа
-    const usersWithoutPasswords = users.map(user => {
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    });
-    
-    res.json(usersWithoutPasswords);
+    res.json(users);
   } catch (error) {
     console.error('❌ Error fetching users:', error);
-    res.status(500).json({ error: 'Ошибка получения списка пользователей' });
+    res.status(500).json({ error: 'Ошибка при получении списка пользователей' });
   }
 });
 
-app.put('/api/users/:id/role', async (req, res) => {
-  console.log(`📝 PUT /api/users/${req.params.id}/role - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for role change`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for role change: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
+// 🚨 ИСПРАВЛЕНО: Добавлена поддержка роли "moderator"
+app.patch('/api/users/:id', requireAdmin, async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const { role } = req.body;
+    const { username, role } = req.body;
     
+    console.log(`📝 PATCH /api/users/${userId} - User: ${req.user.username}`);
+    console.log(`📋 Update data:`, { username, role });
+
+    // Validate role - ✅ ДОБАВЛЕН "moderator"
     if (!role || !['user', 'moderator', 'admin'].includes(role)) {
       console.log(`❌ Invalid role provided: ${role}`);
       return res.status(400).json({ error: 'Недопустимая роль пользователя' });
     }
 
-    const updatedUser = await storage.updateUserRole(userId, role);
+    // Validate username if provided
+    if (username && username.length < 3) {
+      return res.status(400).json({ error: 'Имя пользователя должно содержать минимум 3 символа' });
+    }
+
+    await initializeStorage();
     
-    if (!updatedUser) {
-      console.log(`❌ User not found for role change: ${userId}`);
+    // Check if user exists
+    const existingUser = await storage.getUserById(userId);
+    if (!existingUser) {
+      console.log(`❌ User not found: ${userId}`);
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
-    console.log(`✅ User role updated: ${updatedUser.username} -> ${role} by ${req.user.username}`);
-    
-    const { password, ...userWithoutPassword } = updatedUser;
-    res.json(userWithoutPassword);
-  } catch (error) {
-    console.error('❌ Error updating user role:', error);
-    res.status(500).json({ error: 'Ошибка изменения роли пользователя' });
-  }
-});
-
-// 🚨 НОВЫЙ РАСШИРЕННЫЙ PATCH ROUTE ДЛЯ АДМИНОВ
-app.patch('/api/users/:id', async (req, res) => {
-  console.log(`📝 PATCH /api/users/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for user update`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for user update: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
-  try {
-    const userId = parseInt(req.params.id);
-    const updateData = {};
-    
-    // Проверяем какие поля нужно обновить
-    if (req.body.role) {
-      if (!['user', 'admin'].includes(req.body.role)) {
-        console.log(`❌ Invalid role provided: ${req.body.role}`);
-        return res.status(400).json({ error: 'Недопустимая роль пользователя' });
-      }
-      updateData.role = req.body.role;
-    }
-    
-    if (req.body.username) {
-      // Проверяем что новое имя не занято другим пользователем
-      const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser && existingUser.id !== userId) {
-        console.log(`❌ Username already taken: ${req.body.username}`);
+    // Check if username is already taken (if changing username)
+    if (username && username !== existingUser.username) {
+      const userWithSameName = await storage.getUserByUsername(username);
+      if (userWithSameName) {
         return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
       }
-      updateData.username = req.body.username;
-    }
-    
-    // Проверяем что есть что обновлять
-    if (Object.keys(updateData).length === 0) {
-      console.log(`❌ No valid fields to update`);
-      return res.status(400).json({ error: 'Нет данных для обновления' });
-    }
-    
-    console.log(`📝 Updating user ${userId} with:`, updateData);
-    
-    let updatedUser;
-    
-    // Если обновляется только роль - используем специальный метод
-    if (Object.keys(updateData).length === 1 && updateData.role) {
-      updatedUser = await storage.updateUserRole(userId, updateData.role);
-    } else {
-      // Иначе используем общий метод обновления
-      updatedUser = await storage.updateUser(userId, updateData);
-    }
-    
-    if (!updatedUser) {
-      console.log(`❌ User not found for update: ${userId}`);
-      return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
-    console.log(`✅ User updated: ${updatedUser.username} by ${req.user.username}`);
+    // Prevent admin from changing their own role
+    if (userId === req.user.id && role !== req.user.role) {
+      return res.status(400).json({ error: 'Нельзя изменить собственную роль' });
+    }
+
+    // Update user
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (role) updateData.role = role;
+
+    const updatedUser = await storage.updateUser(userId, updateData);
     
-    const { password, ...userWithoutPassword } = updatedUser;
-    res.json(userWithoutPassword);
+    console.log(`✅ User updated by ${req.user.username}:`, updatedUser);
+    res.json(updatedUser);
   } catch (error) {
     console.error('❌ Error updating user:', error);
-    res.status(500).json({ error: 'Ошибка обновления пользователя' });
+    res.status(500).json({ error: 'Ошибка при обновлении пользователя' });
   }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
-  console.log(`📝 DELETE /api/users/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for user deletion`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for user deletion: ${req.user.username} (role: ${req.user.role})`);
-    return res.status(403).json({ error: 'Нет прав доступа' });
-  }
-
+// Cars routes
+app.get('/api/cars', requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
-    
-    if (userId === req.user.id) {
-      console.log(`❌ Admin trying to delete themselves: ${req.user.username}`);
-      return res.status(400).json({ error: 'Нельзя удалить самого себя' });
-    }
-
-    const deleted = await storage.deleteUser(userId);
-    
-    if (!deleted) {
-      console.log(`❌ User not found for deletion: ${userId}`);
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
-
-    console.log(`✅ User deleted: ${userId} by ${req.user.username}`);
-    res.json({ message: 'Пользователь удален' });
+    console.log(`📝 GET /api/cars - User: ${req.user.username} - Fetching all cars`);
+    await initializeStorage();
+    const cars = await storage.getAllCars();
+    console.log(`📋 Found ${cars.length} cars`);
+    console.log('📤 Cars data:', cars);
+    res.json(cars);
   } catch (error) {
-    console.error('❌ Error deleting user:', error);
-    res.status(500).json({ error: 'Ошибка удаления пользователя' });
+    console.error('❌ Error fetching cars:', error);
+    res.status(500).json({ error: 'Ошибка при получении списка автомобилей' });
   }
 });
 
-// ============ FAVORITES ROUTES ============
-
-app.get('/api/favorites', async (req, res) => {
-  console.log(`📝 GET /api/favorites - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for favorites`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
+app.post('/api/cars', requireAuth, async (req, res) => {
   try {
-    const favorites = await storage.getFavoritesByUser(req.user.id);
+    console.log(`📝 POST /api/cars - User: ${req.user.username}`);
+    const carData = req.body;
+    
+    await initializeStorage();
+    const newCar = await storage.createCar({
+      ...carData,
+      ownerId: req.user.id
+    });
+    
+    console.log(`✅ Car created by ${req.user.username}:`, newCar);
+    res.status(201).json(newCar);
+  } catch (error) {
+    console.error('❌ Error creating car:', error);
+    res.status(500).json({ error: 'Ошибка при создании объявления' });
+  }
+});
+
+// Applications routes
+app.get('/api/applications/pending', requireAuth, async (req, res) => {
+  try {
+    console.log(`📝 GET /api/applications/pending - User: ${req.user.username}`);
+    
+    if (req.user.role !== 'admin' && req.user.role !== 'moderator') {
+      console.log(`❌ User not authenticated for pending applications`);
+      return res.status(403).json({ error: 'Недостаточно прав доступа' });
+    }
+
+    await initializeStorage();
+    const applications = await storage.getPendingApplications();
+    console.log(`📋 Admin ${req.user.username} requested ${applications.length} pending applications`);
+    res.json(applications);
+  } catch (error) {
+    console.error('❌ Error fetching pending applications:', error);
+    res.status(500).json({ error: 'Ошибка при получении заявок' });
+  }
+});
+
+app.get('/api/my-applications', requireAuth, async (req, res) => {
+  try {
+    console.log(`📝 GET /api/my-applications - User: ${req.user.username}`);
+    await initializeStorage();
+    const applications = await storage.getUserApplications(req.user.id);
+    console.log(`📋 User ${req.user.username} has ${applications.length} applications`);
+    res.json(applications);
+  } catch (error) {
+    console.error('❌ Error fetching user applications:', error);
+    res.status(500).json({ error: 'Ошибка при получении ваших заявок' });
+  }
+});
+
+app.post('/api/applications', requireAuth, async (req, res) => {
+  try {
+    console.log(`📝 POST /api/applications - User: ${req.user.username}`);
+    const applicationData = req.body;
+    
+    await initializeStorage();
+    const newApplication = await storage.createApplication({
+      ...applicationData,
+      userId: req.user.id
+    });
+    
+    console.log(`✅ Application created by ${req.user.username}:`, newApplication);
+    res.status(201).json(newApplication);
+  } catch (error) {
+    console.error('❌ Error creating application:', error);
+    res.status(500).json({ error: 'Ошибка при создании заявки' });
+  }
+});
+
+app.post('/api/applications/:id/approve', requireModeratorOrAdmin, async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id);
+    console.log(`📝 POST /api/applications/${applicationId}/approve - User: ${req.user.username}`);
+    
+    await initializeStorage();
+    const result = await storage.approveApplication(applicationId);
+    
+    console.log(`✅ Application ${applicationId} approved by ${req.user.username}:`, result);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Error approving application:', error);
+    res.status(500).json({ error: 'Ошибка при одобрении заявки' });
+  }
+});
+
+app.post('/api/applications/:id/reject', requireModeratorOrAdmin, async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id);
+    const { reason } = req.body;
+    console.log(`📝 POST /api/applications/${applicationId}/reject - User: ${req.user.username}`);
+    
+    await initializeStorage();
+    const result = await storage.rejectApplication(applicationId, reason);
+    
+    console.log(`❌ Application ${applicationId} rejected by ${req.user.username}:`, result);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Error rejecting application:', error);
+    res.status(500).json({ error: 'Ошибка при отклонении заявки' });
+  }
+});
+
+// Favorites routes
+app.get('/api/favorites', requireAuth, async (req, res) => {
+  try {
+    console.log(`📝 GET /api/favorites - User: ${req.user.username}`);
+    await initializeStorage();
+    const favorites = await storage.getUserFavorites(req.user.id);
     console.log(`📋 User ${req.user.username} has ${favorites.length} favorites`);
     res.json(favorites);
   } catch (error) {
     console.error('❌ Error fetching favorites:', error);
-    res.status(500).json({ error: 'Ошибка получения избранного' });
+    res.status(500).json({ error: 'Ошибка при получении избранного' });
   }
 });
 
-app.get('/api/favorites/check', async (req, res) => {
-  console.log(`📝 GET /api/favorites/check - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for favorites check`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const { carId } = req.query;
-    if (!carId) {
-      return res.status(400).json({ error: 'Не указан ID автомобиля' });
-    }
-    
-    const isFavorite = await storage.checkFavorite(req.user.id, parseInt(carId));
-    console.log(`📋 Car ${carId} is favorite for user ${req.user.username}: ${isFavorite}`);
-    res.json({ isFavorite });
-  } catch (error) {
-    console.error('❌ Error checking favorite:', error);
-    res.status(500).json({ error: 'Ошибка проверки избранного' });
-  }
-});
-
-app.post('/api/favorites', async (req, res) => {
-  console.log(`📝 POST /api/favorites - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for adding favorite`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
-  try {
-    const { carId } = req.body;
-    
-    if (!carId) {
-      return res.status(400).json({ error: 'Не указан ID автомобиля' });
-    }
-
-    const favorite = await storage.addToFavorites(req.user.id, parseInt(carId));
-
-    console.log(`✅ Added to favorites: car ${carId} by ${req.user.username}`);
-    res.status(201).json(favorite);
-  } catch (error) {
-    console.error('❌ Error adding to favorites:', error);
-    res.status(500).json({ error: 'Ошибка добавления в избранное' });
-  }
-});
-
-app.delete('/api/favorites/:carId', async (req, res) => {
-  console.log(`📝 DELETE /api/favorites/${req.params.carId} - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for removing favorite`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
+app.post('/api/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
-    const removed = await storage.removeFromFavorites(req.user.id, carId);
+    console.log(`📝 POST /api/favorites/${carId} - User: ${req.user.username}`);
+    
+    await initializeStorage();
+    await storage.addToFavorites(req.user.id, carId);
+    
+    console.log(`⭐ Car ${carId} added to favorites by ${req.user.username}`);
+    res.json({ message: 'Добавлено в избранное' });
+  } catch (error) {
+    console.error('❌ Error adding to favorites:', error);
+    res.status(500).json({ error: 'Ошибка при добавлении в избранное' });
+  }
+});
 
-    if (!removed) {
-      console.log(`❌ Favorite not found for removal: car ${carId} by ${req.user.username}`);
-      return res.status(404).json({ error: 'Избранное не найдено' });
-    }
-
-    console.log(`✅ Removed from favorites: car ${carId} by ${req.user.username}`);
+app.delete('/api/favorites/:carId', requireAuth, async (req, res) => {
+  try {
+    const carId = parseInt(req.params.carId);
+    console.log(`📝 DELETE /api/favorites/${carId} - User: ${req.user.username}`);
+    
+    await initializeStorage();
+    await storage.removeFromFavorites(req.user.id, carId);
+    
+    console.log(`💔 Car ${carId} removed from favorites by ${req.user.username}`);
     res.json({ message: 'Удалено из избранного' });
   } catch (error) {
     console.error('❌ Error removing from favorites:', error);
-    res.status(500).json({ error: 'Ошибка удаления из избранного' });
+    res.status(500).json({ error: 'Ошибка при удалении из избранного' });
   }
 });
 
-// ============ MESSAGES ROUTES ============
-
-app.get('/api/messages/unread-count', async (req, res) => {
-  console.log(`📝 GET /api/messages/unread-count - User: ${req.user?.username || 'not authenticated'}`);
-  
-  if (!req.user) {
-    console.log(`❌ User not authenticated for unread count`);
-    return res.status(401).json({ error: 'Не авторизован' });
-  }
-
+// Messages routes
+app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
   try {
-    const count = await storage.getUnreadCount(req.user.id);
+    console.log(`📝 GET /api/messages/unread-count - User: ${req.user.username}`);
+    await initializeStorage();
+    const count = await storage.getUnreadMessagesCount(req.user.id);
     console.log(`📋 User ${req.user.username} has ${count} unread messages`);
     res.json({ count });
   } catch (error) {
-    console.error('❌ Error fetching unread count:', error);
-    res.status(500).json({ error: 'Ошибка получения количества непрочитанных сообщений' });
+    console.error('❌ Error fetching unread messages count:', error);
+    res.status(500).json({ error: 'Ошибка при получении количества непрочитанных сообщений' });
   }
 });
 
-console.log("🔧 Setting up static files...");
-
-// Serve static files
-app.use(express.static('public'));
-
-// Catch-all handler for SPA (MUST BE LAST!)
-app.get('*', (req, res) => {
-  console.log(`📝 Serving SPA for route: ${req.path}`);
-  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+app.get('/api/messages', requireAuth, async (req, res) => {
+  try {
+    console.log(`📝 GET /api/messages - User: ${req.user.username}`);
+    await initializeStorage();
+    const messages = await storage.getUserMessages(req.user.id);
+    console.log(`📋 User ${req.user.username} has ${messages.length} messages`);
+    res.json(messages);
+  } catch (error) {
+    console.error('❌ Error fetching messages:', error);
+    res.status(500).json({ error: 'Ошибка при получении сообщений' });
+  }
 });
 
-console.log("🔧 About to start listening on port:", process.env.PORT || 3000);
-console.log("🎯 Server setup complete, waiting for connections...");
+app.post('/api/messages', requireAuth, async (req, res) => {
+  try {
+    console.log(`📝 POST /api/messages - User: ${req.user.username}`);
+    const { recipientId, content, carId } = req.body;
+    
+    await initializeStorage();
+    const newMessage = await storage.createMessage({
+      senderId: req.user.id,
+      recipientId,
+      content,
+      carId
+    });
+    
+    console.log(`💬 Message sent by ${req.user.username}:`, newMessage);
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error('❌ Error sending message:', error);
+    res.status(500).json({ error: 'Ошибка при отправке сообщения' });
+  }
+});
 
-// Инициализируем аутентификацию
-setupAuth(app);
+console.log('🔧 Setting up static files...');
 
-// Регистрируем все API роуты
-const server = registerRoutes(app);
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../public')));
+  
+  // Handle React Router
+  app.get('*', (req, res) => {
+    console.log(`📝 Serving SPA for route: ${req.path}`);
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+  });
+} else {
+  console.log('🎯 Setting up static files...');
+  app.use(express.static(path.join(__dirname, '../public')));
+  
+  app.get('*', (req, res) => {
+    console.log(`📝 Serving SPA for route: ${req.path}`);
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+  });
+}
 
-// Запускаем сервер
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+console.log('🔧 About to start listening on port:', PORT);
+console.log('🎯 Server setup complete, waiting for connections...');
+
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server successfully running on port ${PORT}`);
   console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
 });
+
+module.exports = app;
