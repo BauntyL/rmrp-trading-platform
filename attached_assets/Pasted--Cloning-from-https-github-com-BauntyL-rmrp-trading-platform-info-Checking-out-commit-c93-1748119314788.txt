@@ -1,0 +1,48 @@
+==> Cloning from https://github.com/BauntyL/rmrp-trading-platform
+info
+==> Checking out commit c939dc7d5b078fb792f3c2931b96769346f4c697 in branch main
+==> Using Node.js version 22.14.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Using Bun version 1.1.0 (default)
+==> Docs on specifying a bun version: https://render.com/docs/bun-version
+==> Running build command 'npm install --include=dev && npm run build'...
+added 484 packages, and audited 485 packages in 8s
+64 packages are looking for funding
+  run `npm fund` for details
+7 moderate severity vulnerabilities
+To address issues that do not require attention, run:
+  npm audit fix
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+Run `npm audit` for details.
+> rest-express@1.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+vite v5.4.14 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 2580 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/index.html                   2.56 kB │ gzip:   1.11 kB
+../dist/public/assets/index-CSQq4k-B.css   79.02 kB │ gzip:  13.51 kB
+../dist/public/assets/index-ZTp_3oC7.js   597.00 kB │ gzip: 177.88 kB
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.67s
+  dist/index.js  124.0kb
+⚡ Done in 8ms
+==> Uploading build...
+==> Uploaded in 6.0s. Compression took 2.7s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+8:41:56 PM [express] serving on port 5000
+==> Continuing to scan for open port 10000 (from PORT environment variable)...
+==> Continuing to scan for open port 10000 (from PORT environment variable)...
+==> Continuing to scan for open port 10000 (from PORT environment variable)...
