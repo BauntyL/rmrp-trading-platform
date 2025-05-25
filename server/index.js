@@ -563,7 +563,7 @@ app.put('/api/users/:id/role', async (req, res) => {
     const userId = parseInt(req.params.id);
     const { role } = req.body;
     
-    if (!role || !['user', 'admin'].includes(role)) {
+    if (!role || !['user', 'moderator', 'admin'].includes(role)) {
       console.log(`❌ Invalid role provided: ${role}`);
       return res.status(400).json({ error: 'Недопустимая роль пользователя' });
     }
