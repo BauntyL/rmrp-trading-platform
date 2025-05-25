@@ -138,6 +138,20 @@ app.get('/api/auth/me', (req, res) => {
   }
 });
 
+// User routes
+app.get('/api/user', (req, res) => {
+  console.log(`📝 GET /api/user - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (req.user) {
+    const { password, ...userWithoutPassword } = req.user;
+    console.log(`✅ User data sent: ${userWithoutPassword.username}`);
+    res.json(userWithoutPassword);
+  } else {
+    console.log(`❌ User not authenticated`);
+    res.status(401).json({ error: 'Не авторизован' });
+  }
+});
+
 // Cars routes
 app.get('/api/cars', async (req, res) => {
   try {
@@ -293,12 +307,92 @@ app.delete('/api/cars/:id', async (req, res) => {
   }
 });
 
+// Messages routes
+app.get('/api/messages/unread-count', async (req, res) => {
+  console.log(`📝 GET /api/messages/unread-count - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for unread count`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const count = await storage.getUnreadMessageCount(req.user.id);
+    console.log(`📋 User ${req.user.username} has ${count} unread messages`);
+    res.json({ count });
+  } catch (error) {
+    console.error('❌ Error fetching unread count:', error);
+    res.status(500).json({ error: 'Ошибка получения количества непрочитанных сообщений' });
+  }
+});
+
+// Favorites routes
+app.get('/api/favorites', async (req, res) => {
+  console.log(`📝 GET /api/favorites - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for favorites`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const favorites = await storage.getFavoritesByUser(req.user.id);
+    console.log(`📋 User ${req.user.username} has ${favorites.length} favorites`);
+    res.json(favorites);
+  } catch (error) {
+    console.error('❌ Error fetching favorites:', error);
+    res.status(500).json({ error: 'Ошибка получения избранного' });
+  }
+});
+
+app.get('/api/favorites/check', async (req, res) => {
+  console.log(`📝 GET /api/favorites/check - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for favorites check`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const { carId } = req.query;
+    if (!carId) {
+      return res.status(400).json({ error: 'Не указан ID автомобиля' });
+    }
+    
+    const isFavorite = await storage.isFavorite(req.user.id, parseInt(carId));
+    console.log(`📋 Car ${carId} is favorite for user ${req.user.username}: ${isFavorite}`);
+    res.json({ isFavorite });
+  } catch (error) {
+    console.error('❌ Error checking favorite:', error);
+    res.status(500).json({ error: 'Ошибка проверки избранного' });
+  }
+});
+
+// Applications routes
+app.get('/api/my-applications', async (req, res) => {
+  console.log(`📝 GET /api/my-applications - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for applications`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  try {
+    const applications = await storage.getCarApplicationsByUser(req.user.id);
+    console.log(`📋 User ${req.user.username} has ${applications.length} applications`);
+    res.json(applications);
+  } catch (error) {
+    console.error('❌ Error fetching applications:', error);
+    res.status(500).json({ error: 'Ошибка получения заявок' });
+  }
+});
+
 console.log("🔧 Setting up static files...");
 
 // Serve static files
 app.use(express.static('public'));
 
-// Catch-all handler for SPA
+// Catch-all handler for SPA (MUST BE LAST!)
 app.get('*', (req, res) => {
   console.log(`📝 Serving SPA for route: ${req.path}`);
   res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
