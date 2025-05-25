@@ -1,5 +1,5 @@
 console.log('🚀 Starting server...');
-console.log('PORT:', process.env.PORT || 3000);
+console.log('PORT:', process.env.PORT || 10000);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 console.log('📦 Trying to import express...');
@@ -25,7 +25,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 console.log('🔧 Setting up middleware...');
 
@@ -201,3 +201,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server successfully running on port ${PORT}`);
   console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
 });
+
+console.log('🎯 Server setup complete, waiting for connections...');
