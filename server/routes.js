@@ -2,7 +2,6 @@
 import express from "express";
 import path from "path";
 import { createServer } from "http";
-import { WebSocketServer, WebSocket } from "ws";
 
 import { setupAuth } from "./auth.js";
 import { storage } from "./storage.js";
