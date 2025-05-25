@@ -1,13 +1,4 @@
-import { 
-  users, 
-  cars, 
-  carApplications, 
-  favorites,
-  messages
-} from "../shared/schema.js";
-import { db, pool } from "./db.js";
-import { initDatabase } from "./init-database.js";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
+import { pool } from "./db.js";
 
 export class DatabaseStorage {
   constructor() {
@@ -18,7 +9,7 @@ export class DatabaseStorage {
     if (this.initialized) return;
     
     console.log('🔧 Initializing PostgreSQL storage...');
-    await initDatabase();
+    // Инициализация таблиц происходит в db.js
     this.initialized = true;
     console.log('✅ PostgreSQL storage initialized');
   }
@@ -28,52 +19,49 @@ export class DatabaseStorage {
   async createUser(userData) {
     await this.init();
     
-    const [user] = await db
-      .insert(users)
-      .values({
-        username: userData.username,
-        password: userData.password,
-        role: userData.role || 'user'
-      })
-      .returning();
+    const result = await pool.query(
+      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING *',
+      [userData.username, userData.password, userData.role || 'user']
+    );
 
+    const user = result.rows[0];
     console.log(`✅ User created: ${user.username} (ID: ${user.id})`);
     return user;
   }
 
   async getUser(id) {
     await this.init();
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || null;
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    return result.rows[0] || null;
   }
 
   async getUserByUsername(username) {
     await this.init();
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || null;
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    return result.rows[0] || null;
   }
 
   async getAllUsers() {
     await this.init();
-    return await db.select().from(users);
+    const result = await pool.query('SELECT * FROM users ORDER BY "createdAt" DESC');
+    return result.rows;
   }
 
   async updateUserRole(userId, role) {
     await this.init();
     
-    const [user] = await db
-      .update(users)
-      .set({ role })
-      .where(eq(users.id, userId))
-      .returning();
+    const result = await pool.query(
+      'UPDATE users SET role = $1 WHERE id = $2 RETURNING *',
+      [role, userId]
+    );
 
-    return user || null;
+    return result.rows[0] || null;
   }
 
   async deleteUser(userId) {
     await this.init();
     
-    const result = await db.delete(users).where(eq(users.id, userId));
+    const result = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
     return result.rowCount > 0;
   }
 
@@ -84,91 +72,102 @@ export class DatabaseStorage {
     
     console.log(`📝 Creating car: ${carData.name}`);
     
-    const [car] = await db
-      .insert(cars)
-      .values({
-        name: carData.name,
-        imageUrl: carData.imageUrl,
-        price: carData.price,
-        maxSpeed: carData.maxSpeed,
-        acceleration: carData.acceleration,
-        drive: carData.drive,
-        category: carData.category,
-        server: carData.server,
-        serverId: carData.serverId,
-        phone: carData.phone,
-        telegram: carData.telegram,
-        discord: carData.discord,
-        transmission: carData.transmission,
-        fuelType: carData.fuelType,
-        description: carData.description,
-        isPremium: carData.isPremium || false,
-        createdBy: carData.createdBy
-      })
-      .returning();
+    const result = await pool.query(
+      `INSERT INTO cars (name, description, price, category, server, "createdBy", "imageUrl") 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        carData.name,
+        carData.description || '',
+        carData.price,
+        carData.category,
+        carData.server,
+        carData.createdBy,
+        carData.imageUrl || 'https://via.placeholder.com/400x300?text=Car'
+      ]
+    );
 
+    const car = result.rows[0];
     console.log(`✅ Car created with ID: ${car.id} - ${car.name}`);
     return car;
   }
 
   async getAllCars() {
     await this.init();
-    return await db.select().from(cars).orderBy(desc(cars.createdAt));
+    const result = await pool.query('SELECT * FROM cars ORDER BY "createdAt" DESC');
+    return result.rows;
   }
 
   async getCar(id) {
     await this.init();
-    const [car] = await db.select().from(cars).where(eq(cars.id, id));
-    return car || null;
+    const result = await pool.query('SELECT * FROM cars WHERE id = $1', [id]);
+    return result.rows[0] || null;
   }
 
   async getCarsByUser(userId) {
     await this.init();
-    return await db.select().from(cars).where(eq(cars.createdBy, userId));
+    const result = await pool.query('SELECT * FROM cars WHERE "createdBy" = $1 ORDER BY "createdAt" DESC', [userId]);
+    return result.rows;
   }
 
   async searchCars(query, category, server) {
     await this.init();
     
-    let whereConditions = [];
+    let sql = 'SELECT * FROM cars WHERE 1=1';
+    const params = [];
+    let paramCount = 0;
 
     if (query) {
-      whereConditions.push(ilike(cars.name, `%${query}%`));
+      paramCount++;
+      sql += ` AND name ILIKE $${paramCount}`;
+      params.push(`%${query}%`);
     }
 
     if (category && category !== 'all') {
-      whereConditions.push(eq(cars.category, category));
+      paramCount++;
+      sql += ` AND category = $${paramCount}`;
+      params.push(category);
     }
 
     if (server && server !== 'all') {
-      whereConditions.push(eq(cars.server, server));
+      paramCount++;
+      sql += ` AND server = $${paramCount}`;
+      params.push(server);
     }
 
-    if (whereConditions.length === 0) {
-      return await db.select().from(cars).orderBy(desc(cars.createdAt));
-    }
+    sql += ' ORDER BY "createdAt" DESC';
 
-    return await db.select().from(cars)
-      .where(and(...whereConditions))
-      .orderBy(desc(cars.createdAt));
+    const result = await pool.query(sql, params);
+    return result.rows;
   }
 
   async updateCar(id, updateData) {
     await this.init();
     
-    const [car] = await db
-      .update(cars)
-      .set(updateData)
-      .where(eq(cars.id, id))
-      .returning();
+    const fields = [];
+    const values = [];
+    let paramCount = 0;
 
-    return car || null;
+    for (const [key, value] of Object.entries(updateData)) {
+      paramCount++;
+      fields.push(`"${key}" = $${paramCount}`);
+      values.push(value);
+    }
+
+    if (fields.length === 0) return null;
+
+    paramCount++;
+    values.push(id);
+
+    const sql = `UPDATE cars SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    
+    const result = await pool.query(sql, values);
+    return result.rows[0] || null;
   }
 
   async deleteCar(id) {
     await this.init();
     
-    const result = await db.delete(cars).where(eq(cars.id, id));
+    const result = await pool.query('DELETE FROM cars WHERE id = $1', [id]);
     return result.rowCount > 0;
   }
 
@@ -177,34 +176,40 @@ export class DatabaseStorage {
   async createCarApplication(applicationData) {
     await this.init();
     
-    const [application] = await db
-      .insert(carApplications)
-      .values({
-        ...applicationData,
-        status: 'pending'
-      })
-      .returning();
+    const result = await pool.query(
+      `INSERT INTO car_applications (name, description, price, category, server, "createdBy", "imageUrl", status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        applicationData.name,
+        applicationData.description || '',
+        applicationData.price,
+        applicationData.category,
+        applicationData.server,
+        applicationData.createdBy,
+        applicationData.imageUrl || 'https://via.placeholder.com/400x300?text=Car',
+        'pending'
+      ]
+    );
 
-    return application;
+    return result.rows[0];
   }
 
   async getAllCarApplications() {
     await this.init();
-    return await db.select().from(carApplications).orderBy(desc(carApplications.createdAt));
+    const result = await pool.query('SELECT * FROM car_applications ORDER BY "createdAt" DESC');
+    return result.rows;
   }
 
   async getPendingCarApplications() {
     await this.init();
-    return await db.select().from(carApplications)
-      .where(eq(carApplications.status, 'pending'))
-      .orderBy(desc(carApplications.createdAt));
+    const result = await pool.query('SELECT * FROM car_applications WHERE status = $1 ORDER BY "createdAt" DESC', ['pending']);
+    return result.rows;
   }
 
   async getCarApplicationsByUser(userId) {
     await this.init();
-    return await db.select().from(carApplications)
-      .where(eq(carApplications.createdBy, userId))
-      .orderBy(desc(carApplications.createdAt));
+    const result = await pool.query('SELECT * FROM car_applications WHERE "createdBy" = $1 ORDER BY "createdAt" DESC', [userId]);
+    return result.rows;
   }
 
   async updateCarApplicationStatus(applicationId, status, reviewedBy) {
@@ -212,16 +217,12 @@ export class DatabaseStorage {
     
     console.log(`📝 Updating application ${applicationId} to status: ${status}`);
     
-    const [application] = await db
-      .update(carApplications)
-      .set({ 
-        status, 
-        reviewedBy, 
-        reviewedAt: new Date() 
-      })
-      .where(eq(carApplications.id, applicationId))
-      .returning();
+    const result = await pool.query(
+      'UPDATE car_applications SET status = $1, "reviewedBy" = $2, "reviewedAt" = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+      [status, reviewedBy, applicationId]
+    );
 
+    const application = result.rows[0];
     if (!application) {
       console.log(`❌ Application not found: ${applicationId}`);
       return null;
@@ -233,21 +234,11 @@ export class DatabaseStorage {
       
       const carData = {
         name: application.name,
-        imageUrl: application.imageUrl,
+        description: application.description,
         price: application.price,
-        maxSpeed: application.maxSpeed,
-        acceleration: application.acceleration,
-        drive: application.drive,
         category: application.category,
         server: application.server,
-        serverId: application.serverId,
-        phone: application.phone,
-        telegram: application.telegram,
-        discord: application.discord,
-        transmission: application.transmission,
-        fuelType: application.fuelType,
-        description: application.description,
-        isPremium: application.isPremium || false,
+        imageUrl: application.imageUrl,
         createdBy: application.createdBy
       };
       
@@ -265,24 +256,28 @@ export class DatabaseStorage {
     await this.init();
     
     // Check if already in favorites
-    const [existing] = await db.select().from(favorites)
-      .where(and(eq(favorites.userId, userId), eq(favorites.carId, carId)));
+    const existing = await pool.query(
+      'SELECT * FROM favorites WHERE "userId" = $1 AND "carId" = $2',
+      [userId, carId]
+    );
     
-    if (existing) return existing;
+    if (existing.rows.length > 0) return existing.rows[0];
 
-    const [favorite] = await db
-      .insert(favorites)
-      .values({ userId, carId })
-      .returning();
+    const result = await pool.query(
+      'INSERT INTO favorites ("userId", "carId") VALUES ($1, $2) RETURNING *',
+      [userId, carId]
+    );
 
-    return favorite;
+    return result.rows[0];
   }
 
   async removeFromFavorites(userId, carId) {
     await this.init();
     
-    const result = await db.delete(favorites)
-      .where(and(eq(favorites.userId, userId), eq(favorites.carId, carId)));
+    const result = await pool.query(
+      'DELETE FROM favorites WHERE "userId" = $1 AND "carId" = $2',
+      [userId, carId]
+    );
     
     return result.rowCount > 0;
   }
@@ -290,27 +285,30 @@ export class DatabaseStorage {
   async getUserFavorites(userId) {
     await this.init();
     
-    const result = await db
-      .select({
-        car: cars
-      })
-      .from(favorites)
-      .innerJoin(cars, eq(favorites.carId, cars.id))
-      .where(eq(favorites.userId, userId));
+    const result = await pool.query(
+      `SELECT c.* FROM favorites f 
+       JOIN cars c ON f."carId" = c.id 
+       WHERE f."userId" = $1 
+       ORDER BY f."createdAt" DESC`,
+      [userId]
+    );
     
-    return result.map(row => row.car);
+    return result.rows;
   }
 
   async getFavoritesByUser(userId) {
     await this.init();
-    return await db.select().from(favorites).where(eq(favorites.userId, userId));
+    const result = await pool.query('SELECT * FROM favorites WHERE "userId" = $1', [userId]);
+    return result.rows;
   }
 
   async checkFavorite(userId, carId) {
     await this.init();
-    const [favorite] = await db.select().from(favorites)
-      .where(and(eq(favorites.userId, userId), eq(favorites.carId, carId)));
-    return !!favorite;
+    const result = await pool.query(
+      'SELECT * FROM favorites WHERE "userId" = $1 AND "carId" = $2',
+      [userId, carId]
+    );
+    return result.rows.length > 0;
   }
 
   // ============ MESSAGES METHODS ============
@@ -318,54 +316,55 @@ export class DatabaseStorage {
   async createMessage(messageData) {
     await this.init();
     
-    const [message] = await db
-      .insert(messages)
-      .values({
-        ...messageData,
-        isRead: false
-      })
-      .returning();
+    const result = await pool.query(
+      'INSERT INTO messages ("senderId", "receiverId", "carId", content, "isRead") VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [messageData.senderId, messageData.receiverId, messageData.carId, messageData.content, false]
+    );
 
-    return message;
+    return result.rows[0];
   }
 
   async getMessagesByUser(userId) {
     await this.init();
-    return await db.select().from(messages)
-      .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId)))
-      .orderBy(desc(messages.createdAt));
+    const result = await pool.query(
+      'SELECT * FROM messages WHERE "senderId" = $1 OR "receiverId" = $1 ORDER BY "createdAt" DESC',
+      [userId]
+    );
+    return result.rows;
   }
 
   async getUnreadCount(userId) {
     await this.init();
-    const result = await db.select({ count: 'COUNT(*)' }).from(messages)
-      .where(and(eq(messages.receiverId, userId), eq(messages.isRead, false)));
+    const result = await pool.query(
+      'SELECT COUNT(*) as count FROM messages WHERE "receiverId" = $1 AND "isRead" = false',
+      [userId]
+    );
     
-    return parseInt(result[0]?.count || 0);
+    return parseInt(result.rows[0]?.count || 0);
   }
 
   async markMessageAsRead(messageId) {
     await this.init();
     
-    const [message] = await db
-      .update(messages)
-      .set({ isRead: true })
-      .where(eq(messages.id, messageId))
-      .returning();
+    const result = await pool.query(
+      'UPDATE messages SET "isRead" = true WHERE id = $1 RETURNING *',
+      [messageId]
+    );
 
-    return message || null;
+    return result.rows[0] || null;
   }
 
   async deleteMessage(messageId) {
     await this.init();
     
-    const result = await db.delete(messages).where(eq(messages.id, messageId));
+    const result = await pool.query('DELETE FROM messages WHERE id = $1', [messageId]);
     return result.rowCount > 0;
   }
 
   async getAllMessages() {
     await this.init();
-    return await db.select().from(messages);
+    const result = await pool.query('SELECT * FROM messages ORDER BY "createdAt" DESC');
+    return result.rows;
   }
 }
 
