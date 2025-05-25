@@ -494,6 +494,7 @@ app.get('/api/my-applications', async (req, res) => {
   }
 });
 
+// PUT методы для approve/reject
 app.put('/api/applications/:id/approve', async (req, res) => {
   console.log(`📝 PUT /api/applications/${req.params.id}/approve - User: ${req.user?.username || 'not authenticated'}`);
   
@@ -551,6 +552,106 @@ app.put('/api/applications/:id/reject', async (req, res) => {
   } catch (error) {
     console.error('❌ Error rejecting application:', error);
     res.status(500).json({ error: 'Ошибка отклонения заявки' });
+  }
+});
+
+// PATCH методы для approve/reject (дублируем для совместимости)
+app.patch('/api/applications/:id/approve', async (req, res) => {
+  console.log(`📝 PATCH /api/applications/${req.params.id}/approve - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for application approval`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  if (req.user.role !== 'admin') {
+    console.log(`❌ Access denied for application approval: ${req.user.username} (role: ${req.user.role})`);
+    return res.status(403).json({ error: 'Нет прав доступа' });
+  }
+
+  try {
+    const applicationId = parseInt(req.params.id);
+    const application = await storage.updateCarApplicationStatus(applicationId, 'approved', req.user.id);
+    
+    if (!application) {
+      console.log(`❌ Application not found for approval: ${applicationId}`);
+      return res.status(404).json({ error: 'Заявка не найдена' });
+    }
+
+    console.log(`✅ Application approved via PATCH: ${applicationId} by ${req.user.username}`);
+    res.json(application);
+  } catch (error) {
+    console.error('❌ Error approving application:', error);
+    res.status(500).json({ error: 'Ошибка одобрения заявки' });
+  }
+});
+
+app.patch('/api/applications/:id/reject', async (req, res) => {
+  console.log(`📝 PATCH /api/applications/${req.params.id}/reject - User: ${req.user?.username || 'not authenticated'}`);
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for application rejection`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  if (req.user.role !== 'admin') {
+    console.log(`❌ Access denied for application rejection: ${req.user.username} (role: ${req.user.role})`);
+    return res.status(403).json({ error: 'Нет прав доступа' });
+  }
+
+  try {
+    const applicationId = parseInt(req.params.id);
+    const application = await storage.updateCarApplicationStatus(applicationId, 'rejected', req.user.id);
+    
+    if (!application) {
+      console.log(`❌ Application not found for rejection: ${applicationId}`);
+      return res.status(404).json({ error: 'Заявка не найдена' });
+    }
+
+    console.log(`✅ Application rejected via PATCH: ${applicationId} by ${req.user.username}`);
+    res.json(application);
+  } catch (error) {
+    console.error('❌ Error rejecting application:', error);
+    res.status(500).json({ error: 'Ошибка отклонения заявки' });
+  }
+});
+
+// Универсальный роут для обновления статуса заявки
+app.patch('/api/applications/:id', async (req, res) => {
+  console.log(`📝 PATCH /api/applications/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
+  console.log(`📝 Request body:`, JSON.stringify(req.body));
+  
+  if (!req.user) {
+    console.log(`❌ User not authenticated for application update`);
+    return res.status(401).json({ error: 'Не авторизован' });
+  }
+
+  if (req.user.role !== 'admin') {
+    console.log(`❌ Access denied for application update: ${req.user.username} (role: ${req.user.role})`);
+    return res.status(403).json({ error: 'Нет прав доступа' });
+  }
+
+  try {
+    const applicationId = parseInt(req.params.id);
+    const { status } = req.body;
+    
+    if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
+      console.log(`❌ Invalid status provided: ${status}`);
+      return res.status(400).json({ error: 'Недопустимый статус заявки' });
+    }
+
+    const application = await storage.updateCarApplicationStatus(applicationId, status, req.user.id);
+    
+    if (!application) {
+      console.log(`❌ Application not found for update: ${applicationId}`);
+      return res.status(404).json({ error: 'Заявка не найдена' });
+    }
+
+    console.log(`✅ Application status updated via PATCH: ${applicationId} -> ${status} by ${req.user.username}`);
+    res.json(application);
+  } catch (error) {
+    console.error('❌ Error updating application:', error);
+    res.status(500).json({ error: 'Ошибка обновления заявки' });
   }
 });
 
