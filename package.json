@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@tanstack/react-query": "^5.17.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "passport": "^0.7.0",
