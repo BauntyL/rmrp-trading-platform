@@ -870,7 +870,7 @@ app.get('/api/messages/unread-count', async (req, res) => {
   }
 
   try {
-    const count = await storage.getUnreadMessageCount(req.user.id);
+    const count = await storage.getUnreadCount(req.user.id);
     console.log(`📋 User ${req.user.username} has ${count} unread messages`);
     res.json({ count });
   } catch (error) {
