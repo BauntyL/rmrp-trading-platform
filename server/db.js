@@ -1,7 +1,5 @@
 import pkg from 'pg';
 const { Pool } = pkg;
-// Drizzle import removed - using native PostgreSQL
-// Schema import removed - tables created manually
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -13,6 +11,9 @@ export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
+// Добавляем экспорт db для совместимости
+export const db = pool;
 
 // Инициализация таблиц
 export async function initDatabase() {
