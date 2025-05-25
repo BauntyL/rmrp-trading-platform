@@ -23,6 +23,12 @@ console.log("🔧 Setting up middleware...");
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Логирование всех запросов
+app.use((req, res, next) => {
+  console.log(`🌐 ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - Body: ${JSON.stringify(req.body)}`);
+  next();
+});
+
 // Session configuration
 app.use(session({
   secret: 'trading-platform-secret',
@@ -81,6 +87,34 @@ passport.deserializeUser(async (id, done) => {
 });
 
 console.log("🔧 Setting up API routes...");
+
+// Дополнительный роут для /auth (если фронтенд использует этот URL)
+app.post('/auth', (req, res, next) => {
+  console.log(`📝 POST /auth - redirecting to login logic`);
+  
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      console.error('❌ Login error:', err);
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+    
+    if (!user) {
+      console.log(`❌ Login failed: ${info?.message || 'Authentication failed'}`);
+      return res.status(401).json({ error: info?.message || 'Неверные данные для входа' });
+    }
+
+    req.logIn(user, (err) => {
+      if (err) {
+        console.error('❌ Session creation error:', err);
+        return res.status(500).json({ error: 'Ошибка создания сессии' });
+      }
+      
+      console.log(`✅ Login successful via /auth: ${user.username}`);
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    });
+  })(req, res, next);
+});
 
 // Auth routes
 app.post('/api/auth/login', (req, res, next) => {
