@@ -68,13 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
-      const data = await res.json();
       
-      // Если ответ содержит сообщение об ошибке - это не пользователь
-      if (data.message && data.message.includes("не существует")) {
-        throw new Error(data.message);
+      // Проверяем статус ответа
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Ошибка авторизации");
       }
       
+      const data = await res.json();
       return data;
     },
     onSuccess: (user: SelectUser) => {
@@ -88,28 +89,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Полностью очищаем данные пользователя при неудачном входе
       queryClient.setQueryData(["/api/user"], null);
       queryClient.removeQueries({ queryKey: ["/api/user"] });
-      queryClient.clear(); // Очищаем весь кэш
-      localStorage.removeItem("rememberedCredentials");
-      localStorage.clear(); // Очищаем весь localStorage
       
       toast({
         title: "Ошибка авторизации",
         description: error.message,
         variant: "destructive",
       });
-      
-      // Принудительное перенаправление с задержкой
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
-          window.location.replace('/auth');
-        }
-      }, 100);
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/register", credentials);
+      
+      // Проверяем статус ответа для регистрации
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Ошибка регистрации");
+      }
+      
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
