@@ -1,374 +1,435 @@
-import fs from "fs/promises";
-import path from "path";
+import fs from 'fs/promises';
+import path from 'path';
 
-// In-memory storage
-let data = {
-  users: [],
-  cars: [],
-  carApplications: [],
-  favorites: [],
-  messages: []
-};
-
-let nextUserId = 1;
-let nextCarId = 1;
-let nextApplicationId = 1;
-let nextFavoriteId = 1;
-let nextMessageId = 1;
-
-// File path for persistence
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'storage.json');
-
-console.log("📁 Ensuring data directory exists:", DATA_DIR);
-
-// Ensure data directory exists
-try {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  console.log("✅ Data directory created:", DATA_DIR);
-} catch (error) {
-  console.error("❌ Error creating data directory:", error);
-}
-
-// Load data from file
-async function loadData() {
-  try {
-    console.log("🔍 Trying to load data from:", DATA_FILE);
-    
-    // Check if directory exists
-    try {
-      await fs.access(DATA_DIR);
-      console.log("📂 Data directory exists:", true);
-    } catch {
-      console.log("📂 Data directory exists:", false);
-      await fs.mkdir(DATA_DIR, { recursive: true });
-    }
-    
-    // Check if file exists
-    try {
-      await fs.access(DATA_FILE);
-      console.log("📄 Storage file exists:", true);
-    } catch {
-      console.log("📄 Storage file exists:", false);
-      console.log("⚠️ Storage file not found, starting with empty data");
-      return;
-    }
-
-    const fileContent = await fs.readFile(DATA_FILE, 'utf8');
-    const loadedData = JSON.parse(fileContent);
-    
-    data = {
-      users: loadedData.users || [],
-      cars: loadedData.cars || [],
-      carApplications: loadedData.carApplications || [],
-      favorites: loadedData.favorites || [],
-      messages: loadedData.messages || []
+class Storage {
+  constructor() {
+    this.data = {
+      users: [],
+      cars: [],
+      applications: [],
+      favorites: [],
+      messages: []
     };
-    
-    // Update counters
-    nextUserId = Math.max(...data.users.map(u => u.id || 0), 0) + 1;
-    nextCarId = Math.max(...data.cars.map(c => c.id || 0), 0) + 1;
-    nextApplicationId = Math.max(...data.carApplications.map(a => a.id || 0), 0) + 1;
-    nextFavoriteId = Math.max(...data.favorites.map(f => f.id || 0), 0) + 1;
-    nextMessageId = Math.max(...data.messages.map(m => m.id || 0), 0) + 1;
-    
-    console.log("✅ Data loaded successfully");
-    console.log("📊 Loaded state:", {
-      users: data.users.length,
-      cars: data.cars.length,
-      applications: data.carApplications.length,
-      favorites: data.favorites.length,
-      messages: data.messages.length
-    });
-  } catch (error) {
-    console.error("❌ Error loading data:", error);
-    console.log("⚠️ Starting with empty data due to load error");
+    this.nextUserId = 1;
+    this.nextCarId = 1;
+    this.nextApplicationId = 1;
+    this.nextFavoriteId = 1;
+    this.nextMessageId = 1;
+    this.dataFile = path.join(process.cwd(), 'data', 'storage.json');
+    this.initialized = false;
   }
-}
 
-// Save data to file
-async function saveData() {
-  try {
-    console.log("💾 Saving data to:", DATA_FILE);
-    console.log("📊 Saving:", {
-      Users: data.users.length,
-      Cars: data.cars.length,
-      Applications: data.carApplications.length,
-      Favorites: data.favorites.length,
-      Messages: data.messages.length
-    });
+  async init() {
+    if (this.initialized) return;
     
-    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
-    console.log("✅ Data saved successfully");
-  } catch (error) {
-    console.error("❌ Error saving data:", error);
-  }
-}
-
-// Initialize with load
-await loadData();
-
-// Initialize default data if empty
-if (data.users.length === 0) {
-  console.log("🔧 Initializing default data...");
-  console.log("📊 Current state: Users=" + data.users.length + ", Cars=" + data.cars.length);
-  
-  // Create default admin user with bcrypt
-  const bcrypt = await import("bcrypt");
-  const hashedPassword = await bcrypt.hash('lql477kqkvb55vp', 10);
-  
-  console.log("👤 Creating default admin user...");
-  const adminUser = {
-    id: nextUserId++,
-    username: '477-554',
-    password: hashedPassword,
-    role: 'admin',
-    createdAt: new Date().toISOString()
-  };
-  
-  data.users.push(adminUser);
-  console.log("✅ Admin created with ID:", adminUser.id);
-  
-  // Create test cars
-  console.log("🚗 Creating test cars...");
-  const testCars = [
-    {
-      id: nextCarId++,
-      name: "BMW M3",
-      brand: "BMW", 
-      model: "M3",
-      year: 2023,
-      price: 85000,
-      category: "Sport",
-      server: "EU",
-      description: "High-performance sports sedan with twin-turbo engine",
-      image: "https://via.placeholder.com/400x300/0066CC/FFFFFF?text=BMW+M3",
-      createdBy: adminUser.id,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: nextCarId++,
-      name: "Mercedes G-Class",
-      brand: "Mercedes",
-      model: "G-Class", 
-      year: 2023,
-      price: 125000,
-      category: "SUV",
-      server: "US",
-      description: "Luxury off-road SUV with iconic design",
-      image: "https://via.placeholder.com/400x300/000000/FFFFFF?text=Mercedes+G-Class",
-      createdBy: adminUser.id,
-      createdAt: new Date().toISOString()
+    console.log('🔧 Initializing storage...');
+    
+    try {
+      await fs.mkdir(path.dirname(this.dataFile), { recursive: true });
+      
+      try {
+        const data = await fs.readFile(this.dataFile, 'utf8');
+        const parsed = JSON.parse(data);
+        this.data = parsed;
+        
+        // Update next IDs based on existing data
+        if (this.data.users && this.data.users.length > 0) {
+          this.nextUserId = Math.max(...this.data.users.map(u => u.id)) + 1;
+        }
+        if (this.data.cars && this.data.cars.length > 0) {
+          this.nextCarId = Math.max(...this.data.cars.map(c => c.id)) + 1;
+        }
+        if (this.data.applications && this.data.applications.length > 0) {
+          this.nextApplicationId = Math.max(...this.data.applications.map(a => a.id)) + 1;
+        }
+        if (this.data.favorites && this.data.favorites.length > 0) {
+          this.nextFavoriteId = Math.max(...this.data.favorites.map(f => f.id)) + 1;
+        }
+        if (this.data.messages && this.data.messages.length > 0) {
+          this.nextMessageId = Math.max(...this.data.messages.map(m => m.id)) + 1;
+        }
+        
+        console.log('✅ Storage loaded from file');
+        console.log(`📊 Loaded: Users: ${this.data.users?.length || 0}, Cars: ${this.data.cars?.length || 0}, Applications: ${this.data.applications?.length || 0}`);
+      } catch (error) {
+        console.log('📝 No existing storage file, creating default data...');
+        await this.createDefaultData();
+        await this.saveData();
+      }
+    } catch (error) {
+      console.error('❌ Storage initialization error:', error);
+      await this.createDefaultData();
     }
-  ];
-  
-  data.cars.push(...testCars);
-  testCars.forEach(car => {
-    console.log(`🚗 Added car: ${car.name} (ID: ${car.id})`);
-  });
-  
-  await saveData();
-  console.log("🎯 Default data initialization complete");
-}
+    
+    this.initialized = true;
+  }
 
-// Storage methods
-export const storage = {
-  // User methods
-  async getAllUsers() {
-    return [...data.users];
-  },
-  
-  async getUser(id) {
-    return data.users.find(user => user.id === id);
-  },
-  
-  async getUserByUsername(username) {
-    return data.users.find(user => user.username === username);
-  },
-  
+  async createDefaultData() {
+    console.log('🔧 Creating default data...');
+    
+    // Ensure all arrays exist
+    this.data = {
+      users: [],
+      cars: [],
+      applications: [],
+      favorites: [],
+      messages: []
+    };
+
+    // Add default cars
+    const defaultCars = [
+      {
+        id: this.nextCarId++,
+        name: "BMW M3",
+        category: "sport",
+        server: "patriki",
+        price: 25000,
+        maxSpeed: 280,
+        acceleration: "3.5",
+        drive: "RWD",
+        isPremium: true,
+        createdBy: null,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: this.nextCarId++,
+        name: "Mercedes G-Class",
+        category: "suv",
+        server: "patriki",
+        price: 35000,
+        maxSpeed: 220,
+        acceleration: "5.2",
+        drive: "AWD",
+        isPremium: true,
+        createdBy: null,
+        createdAt: new Date().toISOString()
+      }
+    ];
+
+    this.data.cars = defaultCars;
+    console.log('✅ Default data created');
+  }
+
+  async saveData() {
+    try {
+      console.log(`💾 Saving data to: ${this.dataFile}`);
+      console.log(`📊 Saving: { Users: ${this.data.users?.length || 0}, Cars: ${this.data.cars?.length || 0}, Applications: ${this.data.applications?.length || 0}, Favorites: ${this.data.favorites?.length || 0}, Messages: ${this.data.messages?.length || 0} }`);
+      
+      await fs.mkdir(path.dirname(this.dataFile), { recursive: true });
+      await fs.writeFile(this.dataFile, JSON.stringify(this.data, null, 2));
+      console.log('✅ Data saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving data:', error);
+    }
+  }
+
+  // ============ USER METHODS ============
+
   async createUser(userData) {
+    await this.init();
+    
     const user = {
-      id: nextUserId++,
+      id: this.nextUserId++,
       ...userData,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-    data.users.push(user);
-    await saveData();
+
+    this.data.users.push(user);
+    await this.saveData();
     return user;
-  },
-  
+  }
+
+  async getUser(id) {
+    await this.init();
+    return this.data.users.find(user => user.id === id);
+  }
+
+  async getUserByUsername(username) {
+    await this.init();
+    return this.data.users.find(user => user.username === username);
+  }
+
+  async getAllUsers() {
+    await this.init();
+    return this.data.users;
+  }
+
   async updateUserRole(userId, role) {
-    const user = data.users.find(u => u.id === userId);
+    await this.init();
+    
+    const user = this.data.users.find(u => u.id === userId);
     if (!user) return null;
-    
+
     user.role = role;
-    user.updatedAt = new Date().toISOString();
-    await saveData();
+    await this.saveData();
     return user;
-  },
-  
+  }
+
   async deleteUser(userId) {
-    const userIndex = data.users.findIndex(u => u.id === userId);
-    if (userIndex === -1) return false;
+    await this.init();
     
-    data.users.splice(userIndex, 1);
-    await saveData();
+    const index = this.data.users.findIndex(u => u.id === userId);
+    if (index === -1) return false;
+
+    this.data.users.splice(index, 1);
+    await this.saveData();
     return true;
-  },
-  
-  // Car methods
-  async getAllCars() {
-    return [...data.cars];
-  },
-  
-  async getCar(id) {
-    return data.cars.find(car => car.id === id);
-  },
-  
-  async getCarsByUser(userId) {
-    return data.cars.filter(car => car.createdBy === userId);
-  },
-  
+  }
+
+  // ============ CAR METHODS ============
+
   async createCar(carData) {
+    await this.init();
+    
+    console.log(`📝 Creating car: ${carData.name}`);
+    
     const car = {
-      id: nextCarId++,
+      id: this.nextCarId++,
       ...carData,
-      createdAt: new Date().toISOString()
+      createdAt: carData.createdAt || new Date().toISOString(),
     };
-    data.cars.push(car);
-    await saveData();
-    return car;
-  },
-  
-  async updateCar(carId, carData) {
-    const car = data.cars.find(c => c.id === carId);
-    if (!car) return null;
+
+    this.data.cars.push(car);
+    await this.saveData();
     
-    Object.assign(car, carData, { updatedAt: new Date().toISOString() });
-    await saveData();
+    console.log(`✅ Car created with ID: ${car.id} - ${car.name}`);
     return car;
-  },
-  
-  async deleteCar(carId) {
-    const carIndex = data.cars.findIndex(c => c.id === carId);
-    if (carIndex === -1) return false;
-    
-    data.cars.splice(carIndex, 1);
-    await saveData();
-    return true;
-  },
-  
+  }
+
+  async getAllCars() {
+    await this.init();
+    return this.data.cars;
+  }
+
+  async getCar(id) {
+    await this.init();
+    return this.data.cars.find(car => car.id === id);
+  }
+
+  async getCarsByUser(userId) {
+    await this.init();
+    return this.data.cars.filter(car => car.createdBy === userId);
+  }
+
   async searchCars(query, category, server) {
-    let filtered = [...data.cars];
+    await this.init();
     
+    let cars = this.data.cars;
+
     if (query) {
-      const searchTerm = query.toLowerCase();
-      filtered = filtered.filter(car => 
-        car.name.toLowerCase().includes(searchTerm) ||
-        car.brand.toLowerCase().includes(searchTerm) ||
-        car.model.toLowerCase().includes(searchTerm)
+      cars = cars.filter(car => 
+        car.name.toLowerCase().includes(query.toLowerCase())
       );
     }
-    
-    if (category && category !== 'all') {
-      filtered = filtered.filter(car => car.category === category);
-    }
-    
-    if (server && server !== 'all') {
-      filtered = filtered.filter(car => car.server === server);
-    }
-    
-    return filtered;
-  },
-  
-  // Car Application methods
-  async getAllCarApplications() {
-    return [...data.carApplications];
-  },
-  
-  async getPendingCarApplications() {
-    return data.carApplications.filter(app => app.status === 'pending');
-  },
-  
-  async getCarApplicationsByUser(userId) {
-    return data.carApplications.filter(app => app.userId === userId);
-  },
-  
-  async createCarApplication(applicationData) {
-    const application = {
-      id: nextApplicationId++,
-      status: 'pending',
-      ...applicationData,
-      createdAt: new Date().toISOString()
-    };
-    data.carApplications.push(application);
-    await saveData();
-    return application;
-  },
-  
-  async updateCarApplicationStatus(applicationId, status, adminId = null) {
-    const application = data.carApplications.find(app => app.id === applicationId);
-    if (!application) return null;
-    
-    application.status = status;
-    application.updatedAt = new Date().toISOString();
-    
-    if (adminId) {
-      application.reviewedBy = adminId;
-    }
-    
-    await saveData();
-    return application;
-  },
-  
-  // Favorites methods
-  async getFavoritesByUser(userId) {
-    const userFavorites = data.favorites.filter(fav => fav.userId === userId);
-    const favoriteCarIds = userFavorites.map(fav => fav.carId);
-    return data.cars.filter(car => favoriteCarIds.includes(car.id));
-  },
-  
-  async addToFavorites(favoriteData) {
-    // Check if already exists
-    const existing = data.favorites.find(
-      fav => fav.userId === favoriteData.userId && fav.carId === favoriteData.carId
-    );
-    
-    if (existing) {
-      return existing;
-    }
-    
-    const favorite = {
-      id: nextFavoriteId++,
-      ...favoriteData,
-      createdAt: new Date().toISOString()
-    };
-    
-    data.favorites.push(favorite);
-    await saveData();
-    return favorite;
-  },
-  
-  async removeFromFavorites(userId, carId) {
-    const favoriteIndex = data.favorites.findIndex(
-      fav => fav.userId === userId && fav.carId === carId
-    );
-    
-    if (favoriteIndex === -1) return false;
-    
-    data.favorites.splice(favoriteIndex, 1);
-    await saveData();
-    return true;
-  },
-  
-  async isFavorite(userId, carId) {
-    return data.favorites.some(fav => fav.userId === userId && fav.carId === carId);
-  },
-  
-  // Messages methods
-  async getUnreadMessageCount(userId) {
-    return data.messages.filter(msg => msg.recipientId === userId && !msg.read).length;
-  }
-};
 
-console.log("✅ Storage module initialized");
+    if (category && category !== 'all') {
+      cars = cars.filter(car => car.category === category);
+    }
+
+    if (server && server !== 'all') {
+      cars = cars.filter(car => car.server === server);
+    }
+
+    return cars;
+  }
+
+  async updateCar(id, updateData) {
+    await this.init();
+    
+    const car = this.data.cars.find(c => c.id === id);
+    if (!car) return null;
+
+    Object.assign(car, updateData);
+    car.updatedAt = new Date().toISOString();
+    
+    await this.saveData();
+    return car;
+  }
+
+  async deleteCar(id) {
+    await this.init();
+    
+    const index = this.data.cars.findIndex(c => c.id === id);
+    if (index === -1) return false;
+
+    this.data.cars.splice(index, 1);
+    await this.saveData();
+    return true;
+  }
+
+  // ============ APPLICATION METHODS ============
+
+  async createCarApplication(applicationData) {
+    await this.init();
+    
+    const application = {
+      id: this.nextApplicationId++,
+      ...applicationData,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    this.data.applications.push(application);
+    await this.saveData();
+    return application;
+  }
+
+  async getAllCarApplications() {
+    await this.init();
+    return this.data.applications;
+  }
+
+  async getPendingCarApplications() {
+    await this.init();
+    return this.data.applications.filter(app => app.status === 'pending');
+  }
+
+  async getCarApplicationsByUser(userId) {
+    await this.init();
+    return this.data.applications.filter(app => app.userId === userId);
+  }
+
+  async updateCarApplicationStatus(applicationId, status, reviewedBy) {
+    await this.init();
+    
+    console.log(`📝 Updating application ${applicationId} to status: ${status} by user: ${reviewedBy}`);
+    
+    const application = this.data.applications.find(app => app.id === applicationId);
+    if (!application) {
+      console.log(`❌ Application not found: ${applicationId}`);
+      return null;
+    }
+
+    application.status = status;
+    application.reviewedAt = new Date().toISOString();
+    application.reviewedBy = reviewedBy;
+
+    // 🚀 АВТОМАТИЧЕСКИ СОЗДАЕМ АВТОМОБИЛЬ ПРИ ОДОБРЕНИИ
+    if (status === 'approved') {
+      console.log(`✅ Application approved - creating car for: ${application.name}`);
+      
+      const carData = {
+        name: application.name,
+        category: application.category,
+        server: application.server,
+        price: application.price,
+        maxSpeed: application.maxSpeed,
+        acceleration: application.acceleration,
+        drive: application.drive,
+        isPremium: application.isPremium || false,
+        createdBy: application.userId,
+        applicationId: application.id,
+        createdAt: new Date().toISOString()
+      };
+      
+      const newCar = await this.createCar(carData);
+      console.log(`🚗 Car created from approved application: ${newCar.name} (ID: ${newCar.id})`);
+    }
+
+    await this.saveData();
+    console.log(`✅ Application status updated and saved: ${applicationId} -> ${status}`);
+    return application;
+  }
+
+  // ============ FAVORITES METHODS ============
+
+  async addToFavorites(userId, carId) {
+    await this.init();
+    
+    // Check if already in favorites
+    const existing = this.data.favorites.find(f => f.userId === userId && f.carId === carId);
+    if (existing) return existing;
+
+    const favorite = {
+      id: this.nextFavoriteId++,
+      userId,
+      carId,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.data.favorites.push(favorite);
+    await this.saveData();
+    return favorite;
+  }
+
+  async removeFromFavorites(userId, carId) {
+    await this.init();
+    
+    const index = this.data.favorites.findIndex(f => f.userId === userId && f.carId === carId);
+    if (index === -1) return false;
+
+    this.data.favorites.splice(index, 1);
+    await this.saveData();
+    return true;
+  }
+
+  async getUserFavorites(userId) {
+    await this.init();
+    
+    const userFavorites = this.data.favorites.filter(f => f.userId === userId);
+    const favoriteCarIds = userFavorites.map(f => f.carId);
+    
+    return this.data.cars.filter(car => favoriteCarIds.includes(car.id));
+  }
+
+  async getFavoritesByUser(userId) {
+    await this.init();
+    return this.data.favorites.filter(f => f.userId === userId);
+  }
+
+  async checkFavorite(userId, carId) {
+    await this.init();
+    return this.data.favorites.some(f => f.userId === userId && f.carId === carId);
+  }
+
+  // ============ MESSAGES METHODS ============
+
+  async createMessage(messageData) {
+    await this.init();
+    
+    const message = {
+      id: this.nextMessageId++,
+      ...messageData,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.data.messages.push(message);
+    await this.saveData();
+    return message;
+  }
+
+  async getMessagesByUser(userId) {
+    await this.init();
+    return this.data.messages.filter(msg => msg.receiverId === userId);
+  }
+
+  async getUnreadCount(userId) {
+    await this.init();
+    return this.data.messages.filter(msg => msg.receiverId === userId && !msg.isRead).length;
+  }
+
+  async markMessageAsRead(messageId) {
+    await this.init();
+    
+    const message = this.data.messages.find(msg => msg.id === messageId);
+    if (!message) return null;
+
+    message.isRead = true;
+    await this.saveData();
+    return message;
+  }
+
+  async deleteMessage(messageId) {
+    await this.init();
+    
+    const index = this.data.messages.findIndex(msg => msg.id === messageId);
+    if (index === -1) return false;
+
+    this.data.messages.splice(index, 1);
+    await this.saveData();
+    return true;
+  }
+}
+
+export const storage = new Storage();
