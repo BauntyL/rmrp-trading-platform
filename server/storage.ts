@@ -3,17 +3,7 @@ import {
   cars, 
   carApplications, 
   favorites,
-  messages,
-  type User, 
-  type InsertUser, 
-  type Car, 
-  type InsertCar, 
-  type CarApplication, 
-  type InsertCarApplication, 
-  type Favorite, 
-  type InsertFavorite,
-  type Message,
-  type InsertMessage
+  messages
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -22,88 +12,41 @@ import path from "path";
 
 const MemoryStore = createMemoryStore(session);
 
-export interface IStorage {
-  // Users
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  updateUserRole(id: number, role: "user" | "moderator" | "admin"): Promise<User | undefined>;
-  updateUser(id: number, updates: { username?: string; role?: "user" | "moderator" | "admin" }): Promise<User | undefined>;
-  deleteUser(id: number): Promise<boolean>;
-  getAllUsers(): Promise<User[]>;
-
-  // Cars
-  getCar(id: number): Promise<Car | undefined>;
-  getAllCars(): Promise<Car[]>;
-  createCar(car: InsertCar): Promise<Car>;
-  updateCar(id: number, car: Partial<InsertCar>): Promise<Car | undefined>;
-  deleteCar(id: number): Promise<boolean>;
-  getCarsByUser(userId: number): Promise<Car[]>;
-  searchCars(query: string, category?: string, server?: string): Promise<Car[]>;
-
-  // Car Applications
-  getCarApplication(id: number): Promise<CarApplication | undefined>;
-  getAllCarApplications(): Promise<CarApplication[]>;
-  createCarApplication(application: InsertCarApplication): Promise<CarApplication>;
-  updateCarApplicationStatus(id: number, status: "approved" | "rejected", reviewedBy: number): Promise<CarApplication | undefined>;
-  getCarApplicationsByUser(userId: number): Promise<CarApplication[]>;
-  getPendingCarApplications(): Promise<CarApplication[]>;
-
-  // Favorites
-  getFavoritesByUser(userId: number): Promise<Favorite[]>;
-  addToFavorites(favorite: InsertFavorite): Promise<Favorite>;
-  removeFromFavorites(userId: number, carId: number): Promise<boolean>;
-  isFavorite(userId: number, carId: number): Promise<boolean>;
-
-  // Messages
-  getMessagesByUser(userId: number): Promise<any[]>;
-  getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]>;
-  sendMessage(message: InsertMessage): Promise<Message>;
-  markMessageAsRead(messageId: number): Promise<boolean>;
-  markConversationAsRead(carId: number, buyerId: number, sellerId: number, userId: number): Promise<number>;
-  getUnreadMessagesCount(userId: number): Promise<number>;
-  getAllMessages(): Promise<any[]>;
-  deleteMessage(messageId: number): Promise<boolean>;
-
-  sessionStore: session.SessionStore;
-}
-
-export class MemStorage implements IStorage {
-  private users: Map<number, User> = new Map();
-  private cars: Map<number, Car> = new Map();
-  private carApplications: Map<number, CarApplication> = new Map();
-  private favorites: Map<number, Favorite> = new Map();
-  private messages: Map<number, Message> = new Map();
-  
-  private userIdCounter = 1;
-  private carIdCounter = 1;
-  private carApplicationIdCounter = 1;
-  private favoriteIdCounter = 1;
-  private messageIdCounter = 1;
-  
-  // Кэш счетчиков для предотвращения скачков
-  private unreadCountCache = new Map<number, { count: number; lastUpdate: number }>();
-  
-  public sessionStore: session.SessionStore;
-  private dataDir = path.join(process.cwd(), 'data');
-
+export class MemStorage {
   constructor() {
+    this.users = new Map();
+    this.cars = new Map();
+    this.carApplications = new Map();
+    this.favorites = new Map();
+    this.messages = new Map();
+    
+    this.userIdCounter = 1;
+    this.carIdCounter = 1;
+    this.carApplicationIdCounter = 1;
+    this.favoriteIdCounter = 1;
+    this.messageIdCounter = 1;
+    
+    // Кэш счетчиков для предотвращения скачков
+    this.unreadCountCache = new Map();
+    
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
     });
+    
+    this.dataDir = path.join(process.cwd(), 'data');
     
     this.ensureDataDir();
     this.loadData();
     this.initializeDefaultData();
   }
 
-  private ensureDataDir() {
+  ensureDataDir() {
     if (!fs.existsSync(this.dataDir)) {
       fs.mkdirSync(this.dataDir, { recursive: true });
     }
   }
 
-  private saveData() {
+  saveData() {
     try {
       const data = {
         users: Array.from(this.users.entries()),
@@ -126,7 +69,7 @@ export class MemStorage implements IStorage {
     }
   }
 
-  private loadData() {
+  loadData() {
     try {
       const dataPath = path.join(this.dataDir, 'storage.json');
       if (fs.existsSync(dataPath)) {
@@ -163,14 +106,14 @@ export class MemStorage implements IStorage {
     }
   }
 
-  private async initializeDefaultData() {
+  async initializeDefaultData() {
     // Создаем админа по умолчанию если его нет
     const adminExists = Array.from(this.users.values()).some(u => u.role === 'admin');
     if (!adminExists) {
       const bcrypt = await import('bcrypt');
       const hashedPassword = await bcrypt.hash('lql477kqkvb55vp', 10);
       
-      const admin: User = {
+      const admin = {
         id: this.userIdCounter++,
         username: '477-554',
         password: hashedPassword,
@@ -183,16 +126,16 @@ export class MemStorage implements IStorage {
   }
 
   // User methods
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id) {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByUsername(username) {
     return Array.from(this.users.values()).find(user => user.username === username);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const user: User = {
+  async createUser(insertUser) {
+    const user = {
       ...insertUser,
       id: this.userIdCounter++,
       role: insertUser.role || 'user',
@@ -203,7 +146,7 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async updateUserRole(id: number, role: "user" | "moderator" | "admin"): Promise<User | undefined> {
+  async updateUserRole(id, role) {
     const user = this.users.get(id);
     if (user) {
       user.role = role;
@@ -214,7 +157,7 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async updateUser(id: number, updates: { username?: string; role?: "user" | "moderator" | "admin" }): Promise<User | undefined> {
+  async updateUser(id, updates) {
     const user = this.users.get(id);
     if (user) {
       if (updates.username) {
@@ -230,7 +173,7 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async deleteUser(id: number): Promise<boolean> {
+  async deleteUser(id) {
     const existed = this.users.has(id);
     if (existed) {
       // Удаляем пользователя
@@ -254,21 +197,21 @@ export class MemStorage implements IStorage {
     return existed;
   }
 
-  async getAllUsers(): Promise<User[]> {
+  async getAllUsers() {
     return Array.from(this.users.values());
   }
 
   // Car methods
-  async getCar(id: number): Promise<Car | undefined> {
+  async getCar(id) {
     return this.cars.get(id);
   }
 
-  async getAllCars(): Promise<Car[]> {
+  async getAllCars() {
     return Array.from(this.cars.values()).filter(car => car.status === 'active');
   }
 
-  async createCar(insertCar: InsertCar): Promise<Car> {
-    const car: Car = {
+  async createCar(insertCar) {
+    const car = {
       ...insertCar,
       id: this.carIdCounter++,
       status: 'active',
@@ -279,7 +222,7 @@ export class MemStorage implements IStorage {
     return car;
   }
 
-  async updateCar(id: number, updateData: Partial<InsertCar>): Promise<Car | undefined> {
+  async updateCar(id, updateData) {
     const car = this.cars.get(id);
     if (car) {
       Object.assign(car, updateData);
@@ -290,7 +233,7 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async deleteCar(id: number): Promise<boolean> {
+  async deleteCar(id) {
     console.log(`🗃️ Попытка удаления автомобиля ID: ${id} из хранилища`);
     console.log(`🗃️ Количество автомобилей до удаления: ${this.cars.size}`);
     console.log(`🗃️ Автомобиль существует: ${this.cars.has(id)}`);
@@ -306,7 +249,7 @@ export class MemStorage implements IStorage {
     return deleted;
   }
 
-  async getCarsByUser(userId: number): Promise<Car[]> {
+  async getCarsByUser(userId) {
     const allCars = Array.from(this.cars.values());
     const userCars = allCars.filter(car => car.createdBy === userId);
     
@@ -317,7 +260,7 @@ export class MemStorage implements IStorage {
     return userCars;
   }
 
-  async searchCars(query: string, category?: string, server?: string): Promise<Car[]> {
+  async searchCars(query, category, server) {
     let cars = Array.from(this.cars.values()).filter(car => car.status === 'active');
     
     if (query) {
@@ -339,21 +282,19 @@ export class MemStorage implements IStorage {
   }
 
   // Car Application methods
-  async getCarApplication(id: number): Promise<CarApplication | undefined> {
+  async getCarApplication(id) {
     return this.carApplications.get(id);
   }
 
-  async getAllCarApplications(): Promise<CarApplication[]> {
+  async getAllCarApplications() {
     return Array.from(this.carApplications.values());
   }
 
-  async createCarApplication(insertApplication: InsertCarApplication): Promise<CarApplication> {
-    const application: CarApplication = {
+  async createCarApplication(insertApplication) {
+    const application = {
       ...insertApplication,
       id: this.carApplicationIdCounter++,
       status: 'pending',
-      reviewedBy: null,
-      reviewedAt: null,
       createdAt: new Date(),
     };
     this.carApplications.set(application.id, application);
@@ -361,42 +302,34 @@ export class MemStorage implements IStorage {
     return application;
   }
 
-  async updateCarApplicationStatus(id: number, status: "approved" | "rejected", reviewedBy: number): Promise<CarApplication | undefined> {
+  async updateCarApplicationStatus(id, status, reviewedBy) {
     const application = this.carApplications.get(id);
     if (application) {
       application.status = status;
       application.reviewedBy = reviewedBy;
       application.reviewedAt = new Date();
-      
       this.carApplications.set(id, application);
-      
-      // If approved, create the car
-      if (status === 'approved') {
-        const { id: appId, status: appStatus, reviewedBy: rb, reviewedAt: ra, ...carData } = application;
-        await this.createCar(carData);
-      }
-      
       this.saveData();
       return application;
     }
     return undefined;
   }
 
-  async getCarApplicationsByUser(userId: number): Promise<CarApplication[]> {
-    return Array.from(this.carApplications.values()).filter(app => app.createdBy === userId);
+  async getCarApplicationsByUser(userId) {
+    return Array.from(this.carApplications.values()).filter(app => app.userId === userId);
   }
 
-  async getPendingCarApplications(): Promise<CarApplication[]> {
+  async getPendingCarApplications() {
     return Array.from(this.carApplications.values()).filter(app => app.status === 'pending');
   }
 
-  // Favorite methods
-  async getFavoritesByUser(userId: number): Promise<Favorite[]> {
+  // Favorites methods
+  async getFavoritesByUser(userId) {
     return Array.from(this.favorites.values()).filter(fav => fav.userId === userId);
   }
 
-  async addToFavorites(insertFavorite: InsertFavorite): Promise<Favorite> {
-    const favorite: Favorite = {
+  async addToFavorites(insertFavorite) {
+    const favorite = {
       ...insertFavorite,
       id: this.favoriteIdCounter++,
       createdAt: new Date(),
@@ -406,191 +339,169 @@ export class MemStorage implements IStorage {
     return favorite;
   }
 
-  async removeFromFavorites(userId: number, carId: number): Promise<boolean> {
-    const favoriteEntry = Array.from(this.favorites.entries()).find(
-      ([_, fav]) => fav.userId === userId && fav.carId === carId
+  async removeFromFavorites(userId, carId) {
+    const favoriteToRemove = Array.from(this.favorites.values()).find(
+      fav => fav.userId === userId && fav.carId === carId
     );
     
-    if (favoriteEntry) {
-      this.favorites.delete(favoriteEntry[0]);
+    if (favoriteToRemove) {
+      this.favorites.delete(favoriteToRemove.id);
       this.saveData();
       return true;
     }
     return false;
   }
 
-  async isFavorite(userId: number, carId: number): Promise<boolean> {
+  async isFavorite(userId, carId) {
     return Array.from(this.favorites.values()).some(
       fav => fav.userId === userId && fav.carId === carId
     );
   }
 
-  // Messages
-  async getMessagesByUser(userId: number): Promise<any[]> {
-    try {
-      console.log("🔍 Получение сообщений для пользователя:", userId);
-      const messages = Array.from(this.messages.values()).filter(
-        message => message.buyerId === userId || message.sellerId === userId
-      );
+  // Messages methods
+  async getMessagesByUser(userId) {
+    const userMessages = Array.from(this.messages.values()).filter(
+      msg => msg.senderId === userId || msg.recipientId === userId
+    );
+    
+    // Группируем сообщения по парам пользователей и автомобилям
+    const conversations = new Map();
+    
+    userMessages.forEach(msg => {
+      const key = `${msg.carId}-${Math.min(msg.senderId, msg.recipientId)}-${Math.max(msg.senderId, msg.recipientId)}`;
       
-      console.log("📨 Найдено сообщений:", messages.length);
-      
-      if (messages.length === 0) {
-        return [];
+      if (!conversations.has(key)) {
+        conversations.set(key, {
+          carId: msg.carId,
+          participants: [msg.senderId, msg.recipientId].filter(id => id !== userId),
+          lastMessage: msg,
+          unreadCount: 0,
+          messages: []
+        });
       }
-
-      const sortedMessages = messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-      // Добавляем имена пользователей и автомобилей к сообщениям
-      const enrichedMessages = sortedMessages.map(message => {
-        const buyer = this.users.get(message.buyerId);
-        const seller = this.users.get(message.sellerId);
-        const car = this.cars.get(message.carId);
-        
-        return {
-          ...message,
-          buyerName: buyer?.username || `Пользователь #${message.buyerId}`,
-          sellerName: seller?.username || `Пользователь #${message.sellerId}`,
-          carName: car?.name || `Автомобиль #${message.carId}`
-        };
-      });
-
-      console.log("✅ Сообщения обогащены данными:", enrichedMessages.length);
-      return enrichedMessages;
-    } catch (error) {
-      console.error("❌ Ошибка в getMessagesByUser:", error);
-      return [];
-    }
+      
+      const conversation = conversations.get(key);
+      conversation.messages.push(msg);
+      
+      // Обновляем последнее сообщение если это сообщение новее
+      if (msg.createdAt > conversation.lastMessage.createdAt) {
+        conversation.lastMessage = msg;
+      }
+      
+      // Считаем непрочитанные сообщения (где пользователь - получатель и сообщение не прочитано)
+      if (msg.recipientId === userId && !msg.isRead) {
+        conversation.unreadCount++;
+      }
+    });
+    
+    return Array.from(conversations.values());
   }
 
-  async getMessagesByCarAndUsers(carId: number, buyerId: number, sellerId: number): Promise<Message[]> {
-    return Array.from(this.messages.values()).filter(
-      message => message.carId === carId && 
-                message.buyerId === buyerId && 
-                message.sellerId === sellerId
+  async getMessagesByCarAndUsers(carId, buyerId, sellerId) {
+    return Array.from(this.messages.values()).filter(msg => 
+      msg.carId === carId && 
+      ((msg.senderId === buyerId && msg.recipientId === sellerId) ||
+       (msg.senderId === sellerId && msg.recipientId === buyerId))
     ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
-  async sendMessage(insertMessage: InsertMessage): Promise<Message> {
-    const message: Message = {
-      id: this.messageIdCounter++,
+  async sendMessage(insertMessage) {
+    const message = {
       ...insertMessage,
+      id: this.messageIdCounter++,
       isRead: false,
       createdAt: new Date(),
     };
-    
     this.messages.set(message.id, message);
+    this.saveData();
     
-    // Сбрасываем кэш счетчиков для всех участников
-    this.unreadCountCache.delete(message.senderId);
+    // Очищаем кэш для получателя
     this.unreadCountCache.delete(message.recipientId);
     
-    this.saveData();
     return message;
   }
 
-  async markMessageAsRead(messageId: number): Promise<boolean> {
+  async markMessageAsRead(messageId) {
     const message = this.messages.get(messageId);
     if (message) {
       message.isRead = true;
+      this.messages.set(messageId, message);
+      this.saveData();
       
-      // Сбрасываем кэш счетчиков при изменении статуса прочтения
-      this.unreadCountCache.delete(message.senderId);
+      // Очищаем кэш для получателя
       this.unreadCountCache.delete(message.recipientId);
       
-      this.saveData();
       return true;
     }
     return false;
   }
 
-  async markConversationAsRead(carId: number, buyerId: number, sellerId: number, userId: number): Promise<number> {
+  async markConversationAsRead(carId, buyerId, sellerId, userId) {
     let markedCount = 0;
     
-    Array.from(this.messages.values()).forEach(message => {
-      if (message.carId === carId && 
-          ((message.buyerId === buyerId && message.sellerId === sellerId) ||
-           (message.buyerId === sellerId && message.sellerId === buyerId)) &&
-          message.recipientId === userId && 
-          !message.isRead) {
-        message.isRead = true;
+    Array.from(this.messages.values()).forEach(msg => {
+      if (msg.carId === carId && 
+          msg.recipientId === userId && 
+          !msg.isRead &&
+          ((msg.senderId === buyerId && msg.recipientId === sellerId) ||
+           (msg.senderId === sellerId && msg.recipientId === buyerId))) {
+        msg.isRead = true;
+        this.messages.set(msg.id, msg);
         markedCount++;
       }
     });
     
     if (markedCount > 0) {
       this.saveData();
+      // Очищаем кэш для пользователя
+      this.unreadCountCache.delete(userId);
     }
     
     return markedCount;
   }
 
-  async getUnreadMessagesCount(userId: number): Promise<number> {
-    const now = Date.now();
+  async getUnreadMessagesCount(userId) {
+    // Проверяем кэш (действителен 5 секунд)
     const cached = this.unreadCountCache.get(userId);
-    
-    // Используем кэш если он свежий (менее 1 секунды)
-    if (cached && (now - cached.lastUpdate) < 1000) {
-      console.log(`📊 Кэш для пользователя ${userId}: ${cached.count}`);
+    if (cached && Date.now() - cached.lastUpdate < 5000) {
       return cached.count;
     }
     
-    const allMessages = Array.from(this.messages.values());
-    const userMessages = allMessages.filter(message => message.recipientId === userId);
-    const unreadMessages = userMessages.filter(message => !message.isRead);
-    
-    const count = unreadMessages.length;
+    const count = Array.from(this.messages.values()).filter(
+      msg => msg.recipientId === userId && !msg.isRead
+    ).length;
     
     // Обновляем кэш
-    this.unreadCountCache.set(userId, { count, lastUpdate: now });
-    
-    console.log(`🔍 Новый подсчет для пользователя ${userId}: ${count}`);
+    this.unreadCountCache.set(userId, {
+      count,
+      lastUpdate: Date.now()
+    });
     
     return count;
   }
 
-  async getAllMessages(): Promise<any[]> {
-    console.log("🔍 Получение всех сообщений для модерации");
-    const messages = Array.from(this.messages.values());
-    
-    const enrichedMessages = [];
-    
-    for (const message of messages) {
-      const car = await this.getCar(message.carId);
-      const buyer = await this.getUser(message.buyerId);
-      const seller = await this.getUser(message.sellerId);
-      const sender = await this.getUser(message.senderId);
-      const recipient = await this.getUser(message.recipientId);
-      
-      enrichedMessages.push({
-        ...message,
-        carName: car?.name || null,
-        buyerName: buyer?.username || null,
-        sellerName: seller?.username || null,
-        senderName: sender?.username || null,
-        recipientName: recipient?.username || null,
-      });
-    }
-    
-    console.log(`📨 Найдено сообщений для модерации: ${enrichedMessages.length}`);
-    return enrichedMessages;
+  async getAllMessages() {
+    return Array.from(this.messages.values());
   }
 
-  async deleteMessage(messageId: number): Promise<boolean> {
-    console.log(`🗑️ Удаление сообщения: ${messageId}`);
-    
-    if (this.messages.has(messageId)) {
+  async deleteMessage(messageId) {
+    const existed = this.messages.has(messageId);
+    if (existed) {
+      const message = this.messages.get(messageId);
       this.messages.delete(messageId);
       this.saveData();
-      console.log(`✅ Сообщение ${messageId} удалено`);
-      return true;
-    } else {
-      console.log(`❌ Сообщение ${messageId} не найдено`);
-      return false;
+      
+      // Очищаем кэш для получателя
+      if (message) {
+        this.unreadCountCache.delete(message.recipientId);
+      }
     }
+    return existed;
   }
 }
 
-import { DatabaseStorage } from "./database-storage";
+// Создаем единственный экземпляр хранилища
+export const storage = new MemStorage();
 
-export const storage = new DatabaseStorage();
+// Экспортируем также схемы для использования в других местах
+export { users, cars, carApplications, favorites, messages };
