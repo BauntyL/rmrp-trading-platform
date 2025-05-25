@@ -29,7 +29,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Session configuration
+// Session configuration - используем стандартный MemoryStore
 app.use(session({
   secret: 'trading-platform-secret-key-2024',
   resave: false,
@@ -39,8 +39,7 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
     sameSite: 'lax'
-  },
-  store: storage.sessionStore,
+  }
 }));
 
 app.use(passport.initialize());
