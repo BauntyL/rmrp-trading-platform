@@ -3,10 +3,10 @@ import express from "express";
 import path from "path";
 import { createServer } from "http";
 
-import { setupAuth } from "./auth.js";
 import { storage } from "./storage.js";
 import { pool } from "./db.js";
-import { insertCarSchema, insertCarApplicationSchema } from "../shared/schema.js";
+import { insertCarSchema } from "../shared/schema.js";
+// insertCarApplicationSchema removed - not exported from schema
 import { z } from "zod";
 
 // Система модерации сообщений
