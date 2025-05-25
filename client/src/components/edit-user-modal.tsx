@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@shared/schema";
 
+// ✅ ВОССТАНОВЛЕНА поддержка всех ролей
 const editUserSchema = z.object({
   username: z.string().min(3, "Имя пользователя должно содержать минимум 3 символа"),
   role: z.enum(["user", "moderator", "admin"]),
@@ -50,17 +51,20 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
   const editMutation = useMutation({
     mutationFn: async (data: EditUserFormData) => {
       if (!user) throw new Error("Пользователь не выбран");
+      
+      console.log("📤 Отправляем данные:", data);
+      
       const res = await apiRequest("PATCH", `/api/users/${user.id}`, data);
       
-      // Проверяем, что ответ действительно JSON
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Сервер вернул некорректный ответ");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Ошибка обновления данных");
       }
       
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
+      console.log("✅ Пользователь обновлен:", updatedUser);
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Успешно",
@@ -69,6 +73,7 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
       onOpenChange(false);
     },
     onError: (error: Error) => {
+      console.error("❌ Ошибка обновления:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -78,6 +83,7 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
   });
 
   const onSubmit = (data: EditUserFormData) => {
+    console.log("📝 Отправка формы с данными:", data);
     editMutation.mutate(data);
   };
 
