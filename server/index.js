@@ -585,45 +585,73 @@ app.put('/api/users/:id/role', async (req, res) => {
   }
 });
 
-// 🚨 НОВЫЙ PATCH ROUTE ДЛЯ ИСПРАВЛЕНИЯ ПРОБЛЕМЫ
+// 🚨 НОВЫЙ РАСШИРЕННЫЙ PATCH ROUTE ДЛЯ АДМИНОВ
 app.patch('/api/users/:id', async (req, res) => {
   console.log(`📝 PATCH /api/users/${req.params.id} - User: ${req.user?.username || 'not authenticated'}`);
   
   if (!req.user) {
-    console.log(`❌ User not authenticated for role change`);
+    console.log(`❌ User not authenticated for user update`);
     return res.status(401).json({ error: 'Не авторизован' });
   }
 
   if (req.user.role !== 'admin') {
-    console.log(`❌ Access denied for role change: ${req.user.username} (role: ${req.user.role})`);
+    console.log(`❌ Access denied for user update: ${req.user.username} (role: ${req.user.role})`);
     return res.status(403).json({ error: 'Нет прав доступа' });
   }
 
   try {
     const userId = parseInt(req.params.id);
-    const { role } = req.body;
+    const updateData = {};
     
-    console.log(`📝 Updating user ${userId} role to: ${role}`);
-    
-    if (!role || !['user', 'admin'].includes(role)) {
-      console.log(`❌ Invalid role provided: ${role}`);
-      return res.status(400).json({ error: 'Недопустимая роль пользователя' });
+    // Проверяем какие поля нужно обновить
+    if (req.body.role) {
+      if (!['user', 'admin'].includes(req.body.role)) {
+        console.log(`❌ Invalid role provided: ${req.body.role}`);
+        return res.status(400).json({ error: 'Недопустимая роль пользователя' });
+      }
+      updateData.role = req.body.role;
     }
-
-    const updatedUser = await storage.updateUserRole(userId, role);
+    
+    if (req.body.username) {
+      // Проверяем что новое имя не занято другим пользователем
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser && existingUser.id !== userId) {
+        console.log(`❌ Username already taken: ${req.body.username}`);
+        return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
+      }
+      updateData.username = req.body.username;
+    }
+    
+    // Проверяем что есть что обновлять
+    if (Object.keys(updateData).length === 0) {
+      console.log(`❌ No valid fields to update`);
+      return res.status(400).json({ error: 'Нет данных для обновления' });
+    }
+    
+    console.log(`📝 Updating user ${userId} with:`, updateData);
+    
+    let updatedUser;
+    
+    // Если обновляется только роль - используем специальный метод
+    if (Object.keys(updateData).length === 1 && updateData.role) {
+      updatedUser = await storage.updateUserRole(userId, updateData.role);
+    } else {
+      // Иначе используем общий метод обновления
+      updatedUser = await storage.updateUser(userId, updateData);
+    }
     
     if (!updatedUser) {
-      console.log(`❌ User not found for role change: ${userId}`);
+      console.log(`❌ User not found for update: ${userId}`);
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
-    console.log(`✅ User role updated: ${updatedUser.username} -> ${role} by ${req.user.username}`);
+    console.log(`✅ User updated: ${updatedUser.username} by ${req.user.username}`);
     
     const { password, ...userWithoutPassword } = updatedUser;
     res.json(userWithoutPassword);
   } catch (error) {
-    console.error('❌ Error updating user role:', error);
-    res.status(500).json({ error: 'Ошибка изменения роли пользователя' });
+    console.error('❌ Error updating user:', error);
+    res.status(500).json({ error: 'Ошибка обновления пользователя' });
   }
 });
 
