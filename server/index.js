@@ -25,18 +25,20 @@ app.use(express.urlencoded({ extended: false }));
 
 // Логирование всех запросов
 app.use((req, res, next) => {
-  console.log(`🌐 ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - Body: ${JSON.stringify(req.body)}`);
+  console.log(`🌐 ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - Session: ${req.sessionID?.substring(0, 8)}...`);
   next();
 });
 
 // Session configuration
 app.use(session({
-  secret: 'trading-platform-secret',
+  secret: 'trading-platform-secret-key-2024',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: false,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    sameSite: 'lax'
   },
   store: storage.sessionStore,
 }));
@@ -74,14 +76,22 @@ passport.use(new LocalStrategy(
 ));
 
 passport.serializeUser((user, done) => {
+  console.log(`🔧 Serializing user: ${user.username} (ID: ${user.id})`);
   done(null, user.id);
 });
 
 passport.deserializeUser(async (id, done) => {
   try {
+    console.log(`🔧 Deserializing user ID: ${id}`);
     const user = await storage.getUser(id);
+    if (user) {
+      console.log(`✅ User deserialized: ${user.username}`);
+    } else {
+      console.log(`❌ User not found during deserialization: ${id}`);
+    }
     done(null, user);
   } catch (error) {
+    console.error('❌ Deserialization error:', error);
     done(error);
   }
 });
@@ -110,8 +120,14 @@ app.post('/api/login', (req, res, next) => {
       }
       
       console.log(`✅ Login successful via /api/login: ${user.username}`);
+      console.log(`🍪 Session created: ${req.sessionID}`);
+      console.log(`🍪 User in session:`, req.user ? req.user.username : 'none');
+      
       const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+      console.log(`📤 Sending user data to frontend:`, JSON.stringify(userWithoutPassword));
+      
+      // Отправляем пользователя в том же формате, что ожидает фронтенд
+      res.json(userWithoutPassword);
     });
   })(req, res, next);
 });
@@ -155,8 +171,12 @@ app.post('/api/register', async (req, res) => {
       }
       
       console.log(`✅ Auto-login successful after registration: ${user.username}`);
+      console.log(`🍪 Session created after registration: ${req.sessionID}`);
+      console.log(`🍪 User in session:`, req.user ? req.user.username : 'none');
+      
       const { password, ...userWithoutPassword } = user;
-      res.status(201).json({ user: userWithoutPassword });
+      console.log(`📤 Sending registered user data to frontend:`, JSON.stringify(userWithoutPassword));
+      res.status(201).json(userWithoutPassword);
     });
     
   } catch (error) {
@@ -165,97 +185,16 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Дополнительный роут для /auth (если фронтенд использует этот URL)
-app.post('/auth', (req, res, next) => {
-  console.log(`📝 POST /auth - redirecting to login logic`);
-  
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      console.error('❌ Login error:', err);
-      return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-    
-    if (!user) {
-      console.log(`❌ Login failed: ${info?.message || 'Authentication failed'}`);
-      return res.status(401).json({ error: info?.message || 'Неверные данные для входа' });
-    }
-
-    req.logIn(user, (err) => {
-      if (err) {
-        console.error('❌ Session creation error:', err);
-        return res.status(500).json({ error: 'Ошибка создания сессии' });
-      }
-      
-      console.log(`✅ Login successful via /auth: ${user.username}`);
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
-    });
-  })(req, res, next);
-});
-
-// Auth routes
-app.post('/api/auth/login', (req, res, next) => {
-  console.log(`📝 Login attempt for: ${req.body.username}`);
-  
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      console.error('❌ Login error:', err);
-      return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-    
-    if (!user) {
-      console.log(`❌ Login failed: ${info?.message || 'Authentication failed'}`);
-      return res.status(401).json({ error: info?.message || 'Неверные данные для входа' });
-    }
-
-    req.logIn(user, (err) => {
-      if (err) {
-        console.error('❌ Session creation error:', err);
-        return res.status(500).json({ error: 'Ошибка создания сессии' });
-      }
-      
-      console.log(`✅ Login successful: ${user.username}`);
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
-    });
-  })(req, res, next);
-});
-
-app.post('/api/auth/logout', (req, res) => {
-  console.log(`📝 Logout attempt for user: ${req.user?.username || 'unknown'}`);
-  
-  req.logout((err) => {
-    if (err) {
-      console.error('❌ Logout error:', err);
-      return res.status(500).json({ error: 'Ошибка выхода' });
-    }
-    console.log(`✅ Logout successful`);
-    res.json({ message: 'Выход выполнен успешно' });
-  });
-});
-
-app.get('/api/auth/me', (req, res) => {
-  console.log(`📝 Auth check for user: ${req.user?.username || 'not authenticated'}`);
-  console.log(`📝 Session ID: ${req.sessionID}`);
-  console.log(`📝 User object:`, req.user ? 'exists' : 'null');
-  
-  if (req.user) {
-    const { password, ...userWithoutPassword } = req.user;
-    console.log(`✅ User authenticated: ${userWithoutPassword.username}`);
-    res.json({ user: userWithoutPassword });
-  } else {
-    console.log(`❌ User not authenticated`);
-    res.status(401).json({ error: 'Не авторизован' });
-  }
-});
-
-// User routes
+// User routes - добавляем несколько вариантов для разных эндпоинтов
 app.get('/api/user', (req, res) => {
-  console.log(`📝 GET /api/user - User: ${req.user?.username || 'not authenticated'}`);
+  console.log(`📝 GET /api/user - Session: ${req.sessionID?.substring(0, 8)}...`);
+  console.log(`📝 User in request: ${req.user?.username || 'not authenticated'}`);
+  console.log(`📝 Session user ID: ${req.session?.passport?.user || 'none'}`);
   
   if (req.user) {
     const { password, ...userWithoutPassword } = req.user;
-    console.log(`✅ User data sent: ${userWithoutPassword.username}`);
+    console.log(`✅ User data sent via /api/user: ${userWithoutPassword.username}`);
+    console.log(`📤 User object:`, JSON.stringify(userWithoutPassword));
     res.json(userWithoutPassword);
   } else {
     console.log(`❌ User not authenticated`);
@@ -263,12 +202,65 @@ app.get('/api/user', (req, res) => {
   }
 });
 
+app.get('/api/auth/me', (req, res) => {
+  console.log(`📝 GET /api/auth/me - Session: ${req.sessionID?.substring(0, 8)}...`);
+  console.log(`📝 User in request: ${req.user?.username || 'not authenticated'}`);
+  
+  if (req.user) {
+    const { password, ...userWithoutPassword } = req.user;
+    console.log(`✅ User data sent via /api/auth/me: ${userWithoutPassword.username}`);
+    console.log(`📤 User object:`, JSON.stringify(userWithoutPassword));
+    res.json({ user: userWithoutPassword });
+  } else {
+    console.log(`❌ User not authenticated`);
+    res.status(401).json({ error: 'Не авторизован' });
+  }
+});
+
+app.get('/api/me', (req, res) => {
+  console.log(`📝 GET /api/me - Session: ${req.sessionID?.substring(0, 8)}...`);
+  console.log(`📝 User in request: ${req.user?.username || 'not authenticated'}`);
+  
+  if (req.user) {
+    const { password, ...userWithoutPassword } = req.user;
+    console.log(`✅ User data sent via /api/me: ${userWithoutPassword.username}`);
+    console.log(`📤 User object:`, JSON.stringify(userWithoutPassword));
+    res.json(userWithoutPassword);
+  } else {
+    console.log(`❌ User not authenticated`);
+    res.status(401).json({ error: 'Не авторизован' });
+  }
+});
+
+// Logout route
+app.post('/api/logout', (req, res) => {
+  console.log(`📝 Logout attempt for user: ${req.user?.username || 'unknown'}`);
+  
+  req.logout((err) => {
+    if (err) {
+      console.error('❌ Logout error:', err);
+      return res.status(500).json({ error: 'Ошибка выхода' });
+    }
+    
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('❌ Session destroy error:', err);
+        return res.status(500).json({ error: 'Ошибка уничтожения сессии' });
+      }
+      
+      console.log(`✅ Logout successful and session destroyed`);
+      res.json({ message: 'Выход выполнен успешно' });
+    });
+  });
+});
+
 // Cars routes
 app.get('/api/cars', async (req, res) => {
   try {
-    console.log(`📝 GET /api/cars - Fetching all cars`);
+    console.log(`📝 GET /api/cars - User: ${req.user?.username || 'anonymous'} - Fetching all cars`);
     const cars = await storage.getAllCars();
     console.log(`📋 Found ${cars.length} cars`);
+    console.log(`📤 Cars data:`, cars.map(car => `${car.id}: ${car.name}`));
     res.json(cars);
   } catch (error) {
     console.error('❌ Error fetching cars:', error);
