@@ -1,10 +1,7 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-// WebSocket import removed for production compatibility
-import * as schema from "../shared/schema.js";
-
-// WebSocket constructor disabled for production compatibility
-// neonConfig.webSocketConstructor = ws;
+import pkg from 'pg';
+const { Pool } = pkg;
+// Drizzle import removed - using native PostgreSQL
+// Schema import removed - tables created manually
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -12,8 +9,10 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 // Инициализация таблиц
 export async function initDatabase() {
