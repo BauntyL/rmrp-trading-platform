@@ -6,11 +6,14 @@ export function UnreadMessagesCounter() {
   const [lastCount, setLastCount] = useState(0);
   const [showAnimation, setShowAnimation] = useState(false);
 
-  const { data: unreadData } = useQuery({
+  const { data: unreadData, isLoading, error } = useQuery({
     queryKey: ["/api/messages/unread-count"],
-    refetchInterval: 2000, // Быстрое обновление для точности
+    refetchInterval: 1500, // Быстрое обновление каждые 1.5 секунды
     refetchOnWindowFocus: true,
+    refetchOnMount: "always",
     staleTime: 1000, // Короткое время кеша для актуальности
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const unreadCount = unreadData?.count || 0;
@@ -18,6 +21,8 @@ export function UnreadMessagesCounter() {
   // Анимация и звуковое уведомление при новых сообщениях
   useEffect(() => {
     if (unreadCount > lastCount && lastCount > 0) {
+      console.log(`🔔 Новые сообщения: ${unreadCount - lastCount}`);
+      
       // Показываем анимацию
       setShowAnimation(true);
       setTimeout(() => setShowAnimation(false), 2000);
@@ -59,6 +64,23 @@ export function UnreadMessagesCounter() {
     setLastCount(unreadCount);
   }, [unreadCount, lastCount]);
 
+  // Показываем индикатор загрузки только при первой загрузке
+  if (isLoading && lastCount === 0) {
+    return (
+      <div className="ml-auto">
+        <div className="animate-pulse bg-slate-600 rounded-full px-2 py-1 text-xs">
+          ...
+        </div>
+      </div>
+    );
+  }
+
+  // Показываем ошибку только если есть проблемы с загрузкой
+  if (error && unreadCount === 0) {
+    console.error('❌ Ошибка загрузки счетчика сообщений:', error);
+    return null; // Скрываем счетчик при ошибке
+  }
+
   if (unreadCount === 0) {
     return null;
   }
@@ -66,8 +88,9 @@ export function UnreadMessagesCounter() {
   return (
     <Badge 
       className={`ml-auto bg-red-500 text-white text-xs px-2 py-1 transition-all duration-500 ${
-        showAnimation ? "animate-pulse scale-110" : ""
+        showAnimation ? "animate-pulse scale-110 ring-2 ring-red-400" : ""
       }`}
+      title={`У вас ${unreadCount} непрочитанных сообщений`}
     >
       {unreadCount > 99 ? "99+" : unreadCount}
     </Badge>
