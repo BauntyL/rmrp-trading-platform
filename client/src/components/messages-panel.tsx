@@ -1,433 +1,290 @@
-import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { UserStatus } from "@/components/user-status";
-import { deletedMessagesStore } from "@/lib/deleted-messages";
-
-interface Message {
-  id: number;
-  carId: number;
-  buyerId: number;
-  sellerId: number;
-  senderId: number;
-  recipientId: number;
-  content: string;
-  isRead: boolean;
-  createdAt: string;
-  carName?: string;
-  buyerName?: string;
-  sellerName?: string;
-  senderName?: string;
-  receiverName?: string;
-}
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  MessageSquare, 
+  Send, 
+  User, 
+  Car, 
+  Clock,
+  Search
+} from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export function MessagesPanel() {
   const { user } = useAuth();
-  const [selectedConversation, setSelectedConversation] = useState<number | null>(() => {
-    // Восстанавливаем выбранный диалог из localStorage
-    const saved = localStorage.getItem('selectedConversation');
-    return saved ? parseInt(saved, 10) : null;
-  });
+  const [selectedDialog, setSelectedDialog] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
-  const [deletedMessagesUpdate, setDeletedMessagesUpdate] = useState(0);
-  const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Подписываемся на изменения в глобальном хранилище удаленных сообщений
-  useEffect(() => {
-    const unsubscribe = deletedMessagesStore.subscribe(() => {
-      setDeletedMessagesUpdate(prev => prev + 1);
-    });
-    return unsubscribe;
-  }, []);
-
-  const { data: messages = [], isLoading, error } = useQuery({
+  const { data: dialogs = [], isLoading: dialogsLoading } = useQuery({
     queryKey: ["/api/messages"],
-    enabled: !!user,
-    staleTime: 5000,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
-    refetchInterval: 2000, // Быстрое обновление для реального времени
-    retry: 1, 
-    retryDelay: 1000,
+    refetchInterval: 2000,
   });
 
-  // Мутация для отметки сообщений как прочитанных
-  const markReadMutation = useMutation({
-    mutationFn: async ({ carId, buyerId, sellerId }: { carId: number; buyerId: number; sellerId: number }) => {
-      const res = await apiRequest("POST", "/api/messages/mark-read", { carId, buyerId, sellerId });
-      if (!res.ok) {
-        throw new Error(`Ошибка HTTP: ${res.status}`);
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      console.log("✅ Сообщения отмечены как прочитанные:", data);
-      // Принудительно обновляем данные
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-      // Дополнительно обновляем через небольшую задержку
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-      }, 500);
-    },
-    onError: (error) => {
-      console.error("❌ Ошибка при отметке сообщений:", error);
-    },
-  });
-
-  // Функция автоскролла к последнему сообщению
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  // Автоскролл при изменении сообщений или выборе диалога
-  useEffect(() => {
-    if (selectedConversation && messages.length > 0) {
-      setTimeout(scrollToBottom, 100);
-    }
-  }, [selectedConversation, messages]);
-
-  const sendMessageMutation = useMutation({
-    mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
-      console.log('📤 Отправка сообщения:', data);
+  const { data: messages = [], isLoading: messagesLoading } = useQuery({
+    queryKey: ["/api/messages/dialog", selectedDialog?.id],
+    queryFn: async () => {
+      if (!selectedDialog?.id) return [];
       
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(`/api/messages/dialog/${selectedDialog.id}`, {
         credentials: 'include',
-        body: JSON.stringify({
-          carId: data.carId,
-          sellerId: data.sellerId,
-          message: data.message
-        }),
       });
-      
-      console.log('📨 Статус ответа:', response.status);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка отправки сообщения');
+        throw new Error('Failed to fetch messages');
       }
-
-      const result = await response.json();
-      console.log('✅ Сообщение отправлено:', result);
-      return result;
-    },
-    onSuccess: () => {
-      // Принудительно обновляем данные сообщений
-      queryClient.removeQueries({ queryKey: ["/api/messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
       
-      setNewMessage("");
-      toast({
-        title: "Сообщение отправлено",
-        description: "Ваше сообщение успешно доставлено",
-      });
-      // Скролл к новому сообщению
-      setTimeout(scrollToBottom, 200);
+      return response.json();
     },
-    onError: (error: Error) => {
-      console.error('❌ Ошибка отправки сообщения:', error);
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    enabled: !!selectedDialog?.id,
+    refetchInterval: 1000,
   });
 
-  // Фильтруем удаленные модераторами сообщения и группируем по автомобилям
-  const filteredMessages = (messages as Message[]).filter(message => !deletedMessagesStore.has(message.id));
-  
-  const conversationsByCarId = filteredMessages.reduce((acc: Record<number, Message[]>, message: Message) => {
-    if (!acc[message.carId]) {
-      acc[message.carId] = [];
-    }
-    acc[message.carId].push(message);
-    return acc;
-  }, {});
-
-  // Получаем последнее сообщение для каждого диалога и сортируем по времени
-  const latestMessages = Object.values(conversationsByCarId)
-    .map((carMessages: Message[]) => {
-      // Сортируем сообщения по времени создания (новые сверху)
-      const sorted = [...carMessages].sort((a: Message, b: Message) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      return sorted[0]; // Берем самое новое сообщение
-    })
-    .sort((a: Message, b: Message) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ); // Сортируем диалоги по времени последнего сообщения
-
-  // Автоматически отмечаем ВСЕ сообщения как прочитанные при открытии раздела "Сообщения"
-  useEffect(() => {
-    if (!user || !messages || markReadMutation.isPending) return;
-
-    // Находим все непрочитанные сообщения для текущего пользователя
-    const allUnreadMessages = (messages as Message[]).filter(
-      (msg: Message) => !msg.isRead && msg.recipientId === user.id
-    );
-
-    if (allUnreadMessages.length > 0) {
-      console.log(`📖 Автоматически отмечаем ${allUnreadMessages.length} сообщений как прочитанные при открытии раздела "Сообщения"`);
-
-      // Группируем сообщения по диалогам и отмечаем каждый диалог
-      const conversationsToMarkRead = new Map<number, { buyerId: number; sellerId: number }>();
-      
-      allUnreadMessages.forEach((msg: Message) => {
-        if (!conversationsToMarkRead.has(msg.carId)) {
-          conversationsToMarkRead.set(msg.carId, {
-            buyerId: msg.buyerId,
-            sellerId: msg.sellerId
-          });
-        }
-      });
-
-      // Отмечаем каждый диалог как прочитанный
-      conversationsToMarkRead.forEach(({ buyerId, sellerId }, carId) => {
-        markReadMutation.mutate(
-          { carId, buyerId, sellerId },
-          {
-            onSuccess: (result) => {
-              console.log(`✅ Диалог ${carId} отмечен как прочитанный:`, result);
-              queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-            }
-          }
-        );
-      });
-    }
-  }, [user?.id, messages?.length]); // Триггер при загрузке сообщений
-
-  // Функция отправки сообщения
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation || !user) return;
-
-    // Находим получателя из выбранного диалога
-    const conversationMessages = conversationsByCarId[selectedConversation];
-    if (!conversationMessages || conversationMessages.length === 0) return;
-
-    const firstMessage = conversationMessages[0];
+  const filteredDialogs = dialogs.filter((dialog: any) => {
+    if (!searchTerm) return true;
     
-    // Определяем получателя (если текущий пользователь продавец, то получатель - покупатель, и наоборот)
-    let sellerId: number;
-    if (firstMessage.sellerId === user.id) {
-      // Текущий пользователь - продавец, отправляем покупателю
-      sellerId = firstMessage.buyerId;
+    return dialog.carName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           dialog.otherUserName?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newMessage.trim() || !selectedDialog) return;
+
+    try {
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          carId: selectedDialog.carId,
+          sellerId: selectedDialog.sellerId,
+          message: newMessage.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setNewMessage("");
+        // Обновление произойдет автоматически через refetchInterval
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 1) {
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      return `${diffMinutes} мин назад`;
+    } else if (diffHours < 24) {
+      return `${diffHours} ч назад`;
     } else {
-      // Текущий пользователь - покупатель, отправляем продавцу
-      sellerId = firstMessage.sellerId;
-    }
-
-    sendMessageMutation.mutate({
-      carId: selectedConversation,
-      sellerId: sellerId,
-      message: newMessage.trim(),
-    });
-  };
-
-  // Обработка Enter для отправки сообщения
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+      return date.toLocaleDateString('ru-RU');
     }
   };
-
-  // Сохраняем выбранный диалог в localStorage
-  useEffect(() => {
-    if (selectedConversation) {
-      localStorage.setItem('selectedConversation', selectedConversation.toString());
-    }
-  }, [selectedConversation]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-slate-400">Загрузка сообщений...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-400 text-lg">Ошибка загрузки сообщений</p>
-        <p className="text-slate-500 text-sm mt-2">Попробуйте перезагрузить страницу</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Сообщения</h2>
-        <UserStatus />
+      <div>
+        <h1 className="text-3xl font-bold text-white mb-2">Сообщения</h1>
+        <p className="text-slate-400">Ваши диалоги с продавцами и покупателями</p>
       </div>
 
-      <div className="bg-slate-800 rounded-xl border border-slate-700 h-[600px] flex overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
         {/* Список диалогов */}
-        <div className="w-1/3 border-r border-slate-700 flex flex-col">
-          <div className="p-4 border-b border-slate-700">
-            <h3 className="font-semibold text-white">Диалоги</h3>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto">
-            {latestMessages.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-slate-400">Нет сообщений</p>
-              </div>
-            ) : (
-              latestMessages.map((message: Message) => {
-                // Определяем название диалога и имя собеседника
-                const isFromCurrentUser = message.senderId === user?.id;
-                const otherUserName = isFromCurrentUser ? message.receiverName : message.senderName;
-                const carName = message.carName || `Автомобиль #${message.carId}`;
-                
-                // Проверяем есть ли непрочитанные сообщения в этом диалоге
-                const conversationMessages = conversationsByCarId[message.carId];
-                const hasUnreadMessages = conversationMessages?.some(
-                  msg => !msg.isRead && msg.recipientId === user?.id
-                );
-
-                return (
-                  <div
-                    key={message.carId}
-                    className={`p-4 border-b border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors ${
-                      selectedConversation === message.carId ? 'bg-slate-700' : ''
-                    }`}
-                    onClick={() => setSelectedConversation(message.carId)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-white truncate">{carName}</h4>
-                        <p className="text-sm text-slate-400 truncate">
-                          {otherUserName || 'Пользователь'}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate mt-1">
-                          {isFromCurrentUser ? 'Вы: ' : ''}{message.content}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end ml-2">
-                        <span className="text-xs text-slate-500">
-                          {new Date(message.createdAt).toLocaleDateString('ru-RU', {
-                            day: '2-digit',
-                            month: '2-digit'
-                          })}
-                        </span>
-                        {hasUnreadMessages && (
-                          <div className="w-2 h-2 bg-red-500 rounded-full mt-1"></div>
+        <Card className="bg-slate-800 border-slate-700 lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center space-x-2 text-white text-sm">
+              <MessageSquare className="h-4 w-4" />
+              <span>Диалоги ({filteredDialogs.length})</span>
+            </CardTitle>
+            
+            {/* Поиск */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2 h-3 w-3 text-slate-400" />
+              <Input
+                placeholder="Поиск..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-7 h-8 bg-slate-700 border-slate-600 text-white text-xs"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[480px]">
+              {dialogsLoading ? (
+                <div className="p-3 space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-12 bg-slate-700 rounded"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredDialogs.length === 0 ? (
+                <div className="p-4 text-center text-slate-400">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">Нет диалогов</p>
+                </div>
+              ) : (
+                <div>
+                  {filteredDialogs.map((dialog: any) => (
+                    <button
+                      key={dialog.id}
+                      onClick={() => setSelectedDialog(dialog)}
+                      className={`w-full p-3 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
+                        selectedDialog?.id === dialog.id ? 'bg-slate-700' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Car className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                          <span className="text-white font-medium text-xs truncate">
+                            {dialog.carName || 'Неизвестный автомобиль'}
+                          </span>
+                        </div>
+                        {dialog.unreadCount > 0 && (
+                          <Badge className="bg-red-500 text-xs px-1 py-0 text-[10px] min-w-[16px] h-4">
+                            {dialog.unreadCount}
+                          </Badge>
                         )}
                       </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Область сообщений */}
-        <div className="flex-1 flex flex-col">
-          {selectedConversation ? (
-            <>
-              {/* Заголовок диалога */}
-              <div className="p-4 border-b border-slate-700">
-                {(() => {
-                  const conversationMessages = conversationsByCarId[selectedConversation];
-                  if (!conversationMessages || conversationMessages.length === 0) {
-                    return <h4 className="font-semibold text-white">Диалог</h4>;
-                  }
-                  
-                  const firstMessage = conversationMessages[0];
-                  const carName = firstMessage.carName || `Автомобиль #${selectedConversation}`;
-                  const otherUserName = firstMessage.senderId === user?.id 
-                    ? firstMessage.receiverName 
-                    : firstMessage.senderName;
-                  
-                  return (
-                    <div>
-                      <h4 className="font-semibold text-white">{carName}</h4>
-                      <p className="text-sm text-slate-400">
-                        Диалог с {otherUserName || 'пользователем'}
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Сообщения */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {conversationsByCarId[selectedConversation]?.
-                  sort((a: Message, b: Message) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-                  .map((message: Message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.senderId === user?.id
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-slate-700 text-white'
-                        }`}
-                      >
-                        <p className="text-sm">{message.content}</p>
-                        <p className="text-xs opacity-70 mt-1">
-                          {new Date(message.createdAt).toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
+                      
+                      <div className="flex items-center space-x-1 mb-1">
+                        <User className="h-2 w-2 text-slate-400" />
+                        <span className="text-slate-400 text-xs truncate">
+                          {dialog.otherUserName}
+                        </span>
                       </div>
-                    </div>
-                  ))
-                }
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Поле ввода */}
-              <div className="p-4 border-t border-slate-700">
-                <div className="flex space-x-2">
-                  <Input
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Введите сообщение..."
-                    className="flex-1 bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                    maxLength={500}
-                    disabled={sendMessageMutation.isPending}
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sendMessageMutation.isPending}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    {sendMessageMutation.isPending ? "..." : "Отправить"}
-                  </Button>
+                      
+                      {dialog.lastMessage && (
+                        <p className="text-slate-500 text-xs truncate mb-1">
+                          {dialog.lastMessage}
+                        </p>
+                      )}
+                      
+                      <div className="flex items-center space-x-1">
+                        <Clock className="h-2 w-2 text-slate-500" />
+                        <span className="text-slate-500 text-[10px]">
+                          {formatDate(dialog.lastMessageTime)}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {newMessage.length}/500 символов
-                </p>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Чат */}
+        <Card className="bg-slate-800 border-slate-700 lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-white text-sm">
+              {selectedDialog ? (
+                <div className="flex items-center space-x-2">
+                  <Car className="h-4 w-4 text-blue-400" />
+                  <span>{selectedDialog.carName}</span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-400">{selectedDialog.otherUserName}</span>
+                </div>
+              ) : (
+                'Выберите диалог'
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 flex flex-col h-[500px]">
+            {!selectedDialog ? (
+              <div className="flex-1 flex items-center justify-center text-slate-400">
+                <div className="text-center">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Выберите диалог для просмотра сообщений</p>
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-slate-400">Выберите диалог для просмотра сообщений</p>
-            </div>
-          )}
-        </div>
+            ) : (
+              <>
+                {/* Сообщения */}
+                <ScrollArea className="flex-1 p-3">
+                  {messagesLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-12 bg-slate-700 rounded"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-center text-slate-400 py-8">
+                      <p className="text-sm">Нет сообщений</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((message: any) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${
+                            message.senderId === user?.id ? 'justify-end' : 'justify-start'
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[70%] p-2 rounded-lg text-sm ${
+                              message.senderId === user?.id
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-700 text-slate-300'
+                            }`}
+                          >
+                            <p>{message.content}</p>
+                            <p className={`text-xs mt-1 ${
+                              message.senderId === user?.id
+                                ? 'text-blue-200'
+                                : 'text-slate-500'
+                            }`}>
+                              {formatDate(message.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+
+                {/* Отправка сообщения */}
+                <div className="p-3 border-t border-slate-700">
+                  <form onSubmit={handleSendMessage} className="flex space-x-2">
+                    <Input
+                      placeholder="Введите сообщение..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      className="flex-1 bg-slate-700 border-slate-600 text-white text-sm"
+                      maxLength={500}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={!newMessage.trim()}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </form>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {newMessage.length}/500 символов
+                  </p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
