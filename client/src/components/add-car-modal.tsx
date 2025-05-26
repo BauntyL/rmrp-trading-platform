@@ -79,7 +79,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         imageUrl: data.imageUrl || undefined,
         description: data.description || undefined,
       };
-      const res = await apiRequest("POST", "/api/car-applications", cleanData);
+      const res = await apiRequest("POST", "/api/applications", cleanData);
       return await res.json();
     },
     onSuccess: () => {
