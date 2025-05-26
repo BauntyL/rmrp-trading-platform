@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const storage = require('./storage');
+const storage = require('./storage-fixed');
 
 function setupRoutes(app) {
   // Middleware для авторизации
