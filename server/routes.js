@@ -174,57 +174,66 @@ router.post('/applications', requireAuth, async (req, res) => {
     console.log('📝 Creating application for user:', req.user.username);
     console.log('📋 RAW request body:', req.body);
     
-    // ИЗВЛЕКАЕМ ДАННЫЕ ИЗ ПРАВИЛЬНЫХ ПОЛЕЙ
-    const { name, price, category, server, maxSpeed, acceleration, drive, isPremium } = req.body;
-    
-    // ПАРСИМ name НА brand И model
-    const nameParts = name ? name.split(' ') : [];
-    const brand = nameParts[0] || '';
-    const model = nameParts.slice(1).join(' ') || '';
+    // ИЗВЛЕКАЕМ ДАННЫЕ НАПРЯМУЮ БЕЗ ПАРСИНГА name
+    const { 
+      name, 
+      price, 
+      category, 
+      server, 
+      maxSpeed, 
+      acceleration, 
+      drive, 
+      isPremium,
+      serverId,
+      phone,
+      telegram,
+      discord,
+      imageUrl,
+      description
+    } = req.body;
     
     // СОЗДАЕМ ОПИСАНИЕ ИЗ ДОСТУПНЫХ ДАННЫХ
     const descriptionParts = [];
     if (category) descriptionParts.push(`Категория: ${category}`);
     if (server) descriptionParts.push(`Сервер: ${server}`);
     if (maxSpeed) descriptionParts.push(`Макс. скорость: ${maxSpeed} км/ч`);
-    if (acceleration) descriptionParts.push(`Разгон: ${acceleration}с`);
+    if (acceleration) descriptionParts.push(`Разгон: ${acceleration}`);
     if (drive) descriptionParts.push(`Привод: ${drive}`);
     if (isPremium) descriptionParts.push('Премиум автомобиль');
+    if (serverId) descriptionParts.push(`ID на сервере: ${serverId}`);
+    if (phone) descriptionParts.push(`Телефон: ${phone}`);
+    if (telegram) descriptionParts.push(`Telegram: ${telegram}`);
+    if (discord) descriptionParts.push(`Discord: ${discord}`);
+    if (description) descriptionParts.push(description);
     
-    const description = descriptionParts.join(', ') || 'Без описания';
-    
-    // ГЕНЕРИРУЕМ ГОД (или используем текущий)
-    const year = new Date().getFullYear();
+    const fullDescription = descriptionParts.join(', ') || 'Без описания';
     
     console.log('📋 Processed data:', {
-      brand,
-      model,
-      year,
+      name,
       price,
-      description
+      fullDescription
     });
     
     // ПРОВЕРЯЕМ ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
-    if (!brand || !model || !price) {
+    if (!name || !price) {
       console.log('❌ Missing required fields:', {
-        brand: !!brand,
-        model: !!model,
+        name: !!name,
         price: !!price
       });
       return res.status(400).json({
         error: 'Отсутствуют обязательные поля',
-        required: ['name (для brand/model)', 'price'],
-        received: { brand, model, price }
+        required: ['name', 'price'],
+        received: { name, price }
       });
     }
     
+    // ДАННЫЕ БЕЗ brand/model - ТОЛЬКО ТО ЧТО ЕСТЬ В БД
     const applicationData = {
-      brand,
-      model,
-      year,
+      name: name,
       price: parseFloat(price),
-      description,
-      createdBy: req.user.id
+      description: fullDescription,
+      createdBy: req.user.id,
+      status: 'pending'
     };
     
     console.log('📝 Creating application with data:', applicationData);
@@ -290,9 +299,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
     if (status === 'approved') {
       console.log('✅ Creating car listing from approved application');
       await storage.createCarListing({
-        brand: application.brand,
-        model: application.model,
-        year: application.year,
+        name: application.name,
         price: application.price,
         description: application.description,
         ownerId: application.createdBy,
