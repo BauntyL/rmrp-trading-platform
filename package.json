@@ -8,7 +8,7 @@
     "server": "nodemon server/index.js",
     "client": "vite",
     "build": "rm -rf node_modules package-lock.json && npm install --include=dev && vite build && cp -r server dist/ && cp -r shared dist/ && cp package.json dist/",
-    "start": "NODE_ENV=production cd dist && npm ci --production --silent && node server/index.js",
+    "start": "NODE_ENV=production cd dist && npm ci --production && node server/index.js",
     "preview": "vite preview"
   },
   "keywords": [],
