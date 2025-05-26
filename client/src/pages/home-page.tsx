@@ -22,8 +22,8 @@ import { CarCard } from "@/components/car-card.tsx";
 import { AddCarModal } from "@/components/add-car-modal.tsx";
 import { MessagesPanel } from "@/components/messages-panel.tsx";
 import { UnreadMessagesCounter } from "@/components/unread-messages-counter.tsx";
-// import { SecurityPanel } from "@/components/security-panel.tsx";
-// import { MessageModerationPanel } from "@/components/message-moderation-panel.tsx";
+import { SecurityPanel } from "@/components/security-panel";
+import { MessageModerationPanel } from "@/components/message-moderation-panel";
 // import { UserManagementPanel } from "@/components/user-management-panel.tsx";
 import { useAuth } from "@/hooks/use-auth.tsx";
 
@@ -240,12 +240,7 @@ export default function HomePage() {
         );
 
       case 'security':
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl font-bold text-white mb-4">Безопасность</h1>
-            <p className="text-slate-400">Раздел в разработке</p>
-          </div>
-        );
+        return <SecurityPanel />;
 
       case 'pending-cars':
         return (
@@ -291,12 +286,7 @@ export default function HomePage() {
         );
 
       case 'moderation-history':
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl font-bold text-white mb-4">Модерация сообщений</h1>
-            <p className="text-slate-400">Раздел в разработке</p>
-          </div>
-        );
+        return <MessageModerationPanel />;
 
       case 'user-management':
         return (
