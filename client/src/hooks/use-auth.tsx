@@ -26,6 +26,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [showTermsModal, setShowTermsModal] = useState(false);
+  
   const {
     data: user,
     error,
@@ -33,7 +34,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isError,
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async () => {
+      const response = await fetch('/api/user', {
+        credentials: 'include', // ВАЖНО: для сессий
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return null; // Пользователь не авторизован
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('👤 Received user data from API:', data);
+      
+      // ИСПРАВЛЯЕМ: извлекаем user из ответа
+      return data.user || data; // Возвращаем data.user если есть, иначе сам data
+    },
     retry: (failureCount, error) => {
       // Не повторяем запросы при ошибках 401 (неавторизован)
       if (error?.message?.includes('401')) {
@@ -67,22 +88,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // ВАЖНО: для сессий
+        body: JSON.stringify(credentials),
+      });
       
       // Проверяем статус ответа
-      if (!res.ok) {
-        const errorData = await res.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.error || "Ошибка авторизации");
       }
       
-      const data = await res.json();
-      return data;
+      const data = await response.json();
+      console.log('✅ Login response:', data);
+      
+      // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
+      return data.user || data;
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (userData: SelectUser) => {
+      console.log('✅ Setting user data:', userData);
+      queryClient.setQueryData(["/api/user"], userData);
+      
+      // ПРИНУДИТЕЛЬНО ПЕРЕЗАГРУЖАЕМ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Успешная авторизация",
-        description: `Добро пожаловать, ${user.username}!`,
+        description: `Добро пожаловать, ${userData.username}!`,
       });
     },
     onError: (error: Error) => {
@@ -100,21 +136,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // ВАЖНО: для сессий
+        body: JSON.stringify(credentials),
+      });
       
       // Проверяем статус ответа для регистрации
-      if (!res.ok) {
-        const errorData = await res.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.error || "Ошибка регистрации");
       }
       
-      return await res.json();
+      const data = await response.json();
+      
+      // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
+      return data.user || data;
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (userData: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], userData);
       toast({
         title: "Успешная регистрация",
-        description: `Добро пожаловать в АвтоКаталог, ${user.username}!`,
+        description: `Добро пожаловать в АвтоКаталог, ${userData.username}!`,
       });
     },
     onError: (error: Error) => {
@@ -128,10 +174,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Вы вышли из системы",
         description: "До свидания!",
@@ -145,6 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
+
+  console.log('🔍 Current user state:', user);
 
   return (
     <AuthContext.Provider
