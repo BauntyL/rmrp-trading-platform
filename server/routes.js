@@ -174,64 +174,9 @@ router.post('/applications', requireAuth, async (req, res) => {
     console.log('📝 Creating application for user:', req.user.username);
     console.log('📋 RAW request body:', req.body);
     
-    // ИЗВЛЕКАЕМ ДАННЫЕ НАПРЯМУЮ БЕЗ ПАРСИНГА name
-    const { 
-      name, 
-      price, 
-      category, 
-      server, 
-      maxSpeed, 
-      acceleration, 
-      drive, 
-      isPremium,
-      serverId,
-      phone,
-      telegram,
-      discord,
-      imageUrl,
-      description
-    } = req.body;
-    
-    // СОЗДАЕМ ОПИСАНИЕ ИЗ ДОСТУПНЫХ ДАННЫХ
-    const descriptionParts = [];
-    if (category) descriptionParts.push(`Категория: ${category}`);
-    if (server) descriptionParts.push(`Сервер: ${server}`);
-    if (maxSpeed) descriptionParts.push(`Макс. скорость: ${maxSpeed} км/ч`);
-    if (acceleration) descriptionParts.push(`Разгон: ${acceleration}`);
-    if (drive) descriptionParts.push(`Привод: ${drive}`);
-    if (isPremium) descriptionParts.push('Премиум автомобиль');
-    if (serverId) descriptionParts.push(`ID на сервере: ${serverId}`);
-    if (phone) descriptionParts.push(`Телефон: ${phone}`);
-    if (telegram) descriptionParts.push(`Telegram: ${telegram}`);
-    if (discord) descriptionParts.push(`Discord: ${discord}`);
-    if (description) descriptionParts.push(description);
-    
-    const fullDescription = descriptionParts.join(', ') || 'Без описания';
-    
-    console.log('📋 Processed data:', {
-      name,
-      price,
-      fullDescription
-    });
-    
-    // ПРОВЕРЯЕМ ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
-    if (!name || !price) {
-      console.log('❌ Missing required fields:', {
-        name: !!name,
-        price: !!price
-      });
-      return res.status(400).json({
-        error: 'Отсутствуют обязательные поля',
-        required: ['name', 'price'],
-        received: { name, price }
-      });
-    }
-    
-    // ДАННЫЕ БЕЗ brand/model - ТОЛЬКО ТО ЧТО ЕСТЬ В БД
+    // ПЕРЕДАЕМ ВСЕ ПОЛЯ НАПРЯМУЮ
     const applicationData = {
-      name: name,
-      price: parseFloat(price),
-      description: fullDescription,
+      ...req.body,
       createdBy: req.user.id,
       status: 'pending'
     };
