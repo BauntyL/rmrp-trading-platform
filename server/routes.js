@@ -1,13 +1,13 @@
 const express = require('express');
-const passport = require('passport');
 const bcrypt = require('bcrypt');
 const storage = require('./storage-fixed'); // ИСПОЛЬЗУЕМ ИСПРАВЛЕННЫЙ STORAGE
 
 const router = express.Router();
 
-// Middleware для проверки аутентификации
+// Middleware для проверки аутентификации БЕЗ PASSPORT
 function requireAuth(req, res, next) {
-  if (req.isAuthenticated()) {
+  if (req.session && req.session.user) {
+    req.user = req.session.user;
     console.log('🔐 Auth check: User:', req.user.username);
     return next();
   }
@@ -18,11 +18,11 @@ function requireAuth(req, res, next) {
 // Middleware для проверки роли
 function requireRole(roles) {
   return (req, res, next) => {
-    if (!req.isAuthenticated()) {
+    if (!req.session || !req.session.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const userRole = req.user.role;
+    const userRole = req.session.user.role;
     console.log('🛡️ Role check:', userRole);
     
     if (roles.includes(userRole)) {
@@ -34,38 +34,52 @@ function requireRole(roles) {
   };
 }
 
-// Аутентификация
-router.post('/login', (req, res, next) => {
-  const { username } = req.body;
-  console.log('🔑 Login attempt for:', username);
-  
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      console.error('❌ Login error:', err);
-      return res.status(500).json({ error: 'Login failed' });
+// АУТЕНТИФИКАЦИЯ БЕЗ PASSPORT
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    console.log('🔑 Login attempt for:', username);
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
     }
     
+    // Получаем пользователя из базы
+    const user = await storage.getUserByUsername(username);
     if (!user) {
-      console.log('❌ Invalid credentials for:', username);
+      console.log('❌ User not found:', username);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    req.logIn(user, (err) => {
-      if (err) {
-        console.error('❌ Session error:', err);
-        return res.status(500).json({ error: 'Session creation failed' });
+    // ПРОВЕРКА ПАРОЛЯ
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    
+    if (!passwordMatch) {
+      console.log('❌ Invalid password for:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // СОЗДАЕМ СЕССИЮ ВРУЧНУЮ
+    req.session.userId = user.id;
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
+    
+    console.log('✅ Login successful for:', user.username);
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
       }
-      
-      console.log('✅ Login successful for:', user.username);
-      res.json({
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role
-        }
-      });
     });
-  })(req, res, next);
+    
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
 router.post('/register', async (req, res) => {
@@ -109,8 +123,8 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  const username = req.user?.username || 'Unknown';
-  req.logout((err) => {
+  const username = req.session?.user?.username || 'Unknown';
+  req.session.destroy((err) => {
     if (err) {
       console.error('❌ Logout error:', err);
       return res.status(500).json({ error: 'Logout failed' });
@@ -122,14 +136,8 @@ router.post('/logout', (req, res) => {
 
 router.get('/user', (req, res) => {
   console.log('👤 User info requested');
-  if (req.isAuthenticated()) {
-    res.json({
-      user: {
-        id: req.user.id,
-        username: req.user.username,
-        role: req.user.role
-      }
-    });
+  if (req.session && req.session.user) {
+    res.json({ user: req.session.user });
   } else {
     res.status(401).json({ error: 'Not authenticated' });
   }
