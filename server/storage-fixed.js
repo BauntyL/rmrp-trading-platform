@@ -60,23 +60,46 @@ async function getAllUsers() {
   }
 }
 
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ БЕЗ brand/model/year
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ С ВСЕМИ ПОЛЯМИ
 async function createApplication(applicationData) {
   try {
     const client = getClient();
-    const { name, price, description, createdBy, status = 'pending' } = applicationData;
+    const { 
+      name, 
+      price, 
+      description, 
+      createdBy, 
+      status = 'pending',
+      category,
+      server,
+      maxSpeed,
+      acceleration,
+      drive,
+      serverId,
+      phone,
+      telegram,
+      discord,
+      imageUrl,
+      isPremium = false
+    } = applicationData;
     
-    console.log('📝 Creating application with data:', {
-      name, price, description, createdBy, status
-    });
+    console.log('📝 Creating application with ALL data:', applicationData);
     
     const result = await client.query(
-      `INSERT INTO car_applications (name, price, description, "createdBy", status, "createdAt") 
-       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
-      [name, price, description, createdBy, status]
+      `INSERT INTO car_applications (
+        name, price, description, "createdBy", status, "createdAt",
+        category, server, "maxSpeed", acceleration, drive, 
+        "serverId", phone, telegram, discord, "imageUrl", "isPremium"
+      ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+      RETURNING *`,
+      [
+        name, price, description, createdBy, status,
+        category, server, maxSpeed, acceleration, drive,
+        serverId, phone, telegram, discord, imageUrl, isPremium
+      ]
     );
     
-    console.log(`✅ Application created:`, result.rows[0]);
+    console.log(`✅ Application created with all fields:`, result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating application:', error);
@@ -140,7 +163,7 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ БЕЗ brand/model/year
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ
 async function createCarListing(carData) {
   try {
     const client = getClient();
