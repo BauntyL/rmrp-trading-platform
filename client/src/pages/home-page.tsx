@@ -22,8 +22,8 @@ import { CarCard } from "@/components/car-card.tsx";
 import { AddCarModal } from "@/components/add-car-modal.tsx";
 import { MessagesPanel } from "@/components/messages-panel.tsx";
 import { UnreadMessagesCounter } from "@/components/unread-messages-counter.tsx";
-import { SecurityPanel } from "@/components/security-panel";
-import { MessageModerationPanel } from "@/components/message-moderation-panel";
+// import { SecurityPanel } from "@/components/security-panel";
+// import { MessageModerationPanel } from "@/components/message-moderation-panel";
 // import { UserManagementPanel } from "@/components/user-management-panel.tsx";
 import { useAuth } from "@/hooks/use-auth.tsx";
 
@@ -240,7 +240,60 @@ export default function HomePage() {
         );
 
       case 'security':
-        return <SecurityPanel />;
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
+              <Shield className="h-16 w-16 text-green-400 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold text-white mb-2">Безопасность</h1>
+              <p className="text-slate-400">Ваши данные надежно защищены</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <h3 className="text-white font-semibold">Шифрование данных</h3>
+                </div>
+                <p className="text-slate-300 text-sm">Все ваши данные защищены современным шифрованием AES-256.</p>
+              </div>
+              
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <h3 className="text-white font-semibold">Защищенные соединения</h3>
+                </div>
+                <p className="text-slate-300 text-sm">Все коммуникации происходят через защищенный протокол HTTPS.</p>
+              </div>
+              
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <h3 className="text-white font-semibold">Приватность сообщений</h3>
+                </div>
+                <p className="text-slate-300 text-sm">Ваши личные сообщения видны только вам и получателю.</p>
+              </div>
+              
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <h3 className="text-white font-semibold">Модерация контента</h3>
+                </div>
+                <p className="text-slate-300 text-sm">Наша команда модераторов следит за качеством и безопасностью контента.</p>
+              </div>
+            </div>
+            
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+              <h3 className="text-white font-semibold mb-4">Связаться с отделом безопасности</h3>
+              <p className="text-slate-300 text-sm mb-4">
+                Если у вас есть вопросы по безопасности или вы обнаружили уязвимость:
+              </p>
+              <div className="space-y-2 text-sm text-slate-400">
+                <p>📧 Email: security@avtokatalog.ru</p>
+                <p>⏰ Время ответа: в течение 24 часов</p>
+              </div>
+            </div>
+          </div>
+        );
 
       case 'pending-cars':
         return (
@@ -286,13 +339,109 @@ export default function HomePage() {
         );
 
       case 'moderation-history':
-        return <MessageModerationPanel />;
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Модерация сообщений</h1>
+              <p className="text-slate-400">Просмотр и управление диалогами пользователей</p>
+            </div>
+
+            <div className="flex space-x-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Поиск по автомобилю или пользователю..."
+                  className="pl-10 bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center">
+                  <MessageSquare className="h-5 w-5 mr-2" />
+                  Диалоги (0)
+                </h3>
+                <div className="text-center py-8 text-slate-400">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Нет активных диалогов для модерации</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center">
+                  <MessageSquare className="h-5 w-5 mr-2" />
+                  Сообщения
+                </h3>
+                <div className="text-center py-8 text-slate-400">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Выберите диалог для просмотра сообщений</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
 
       case 'user-management':
         return (
-          <div className="p-6">
-            <h1 className="text-3xl font-bold text-white mb-4">Управление пользователями</h1>
-            <p className="text-slate-400">Раздел в разработке</p>
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Управление пользователями</h1>
+              <p className="text-slate-400">Управление ролями и статусами пользователей</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-8 w-8 text-blue-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">1</p>
+                    <p className="text-sm text-slate-400">Всего пользователей</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <User className="h-8 w-8 text-green-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">1</p>
+                    <p className="text-sm text-slate-400">Онлайн</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-8 w-8 text-orange-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">0</p>
+                    <p className="text-sm text-slate-400">Заблокированы</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-8 w-8 text-purple-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">1</p>
+                    <p className="text-sm text-slate-400">Администраторы</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+              <h3 className="text-white font-semibold mb-4 flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Список пользователей
+              </h3>
+              <div className="text-center py-8 text-slate-400">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Функция управления пользователями в разработке</p>
+              </div>
+            </div>
           </div>
         );
 
