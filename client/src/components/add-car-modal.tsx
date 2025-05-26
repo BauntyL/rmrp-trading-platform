@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Upload, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PlusCircle, X } from "lucide-react";
 
 interface AddCarModalProps {
   open: boolean;
@@ -26,48 +27,38 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
 
   const [formData, setFormData] = useState({
     name: "",
-    brand: "",
-    model: "",
+    category: "",
+    series: "",
     year: "",
     price: "",
     mileage: "",
-    fuelType: "",
-    transmission: "",
-    description: "",
+    gearboxType: "",
+    region: "",
+    phone: "",
+    telegram: "",
+    discord: "",
     imageUrl: "",
+    description: "",
+    isPremium: false,
   });
 
   const addCarMutation = useMutation({
     mutationFn: async (carData: any) => {
-      try {
-        console.log('🚗 Добавление автомобиля:', carData);
-        
-        const response = await fetch('/api/cars', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(carData),
-        });
+      const response = await fetch('/api/cars', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(carData),
+      });
 
-        console.log('📡 Статус ответа:', response.status);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Ошибка добавления автомобиля');
-        }
-
-        const result = await response.json();
-        console.log('✅ Автомобиль добавлен:', result);
-        return result;
-      } catch (error) {
-        console.error('❌ Ошибка добавления автомобиля:', error);
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка добавления автомобиля');
       }
+
+      return response.json();
     },
     onSuccess: () => {
-      // Обновляем все связанные кеши
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cars/my"] });
       
@@ -76,47 +67,35 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         description: "Ваш автомобиль отправлен на модерацию",
       });
       
-      // Сбрасываем форму и закрываем модал
+      // Сброс формы
       setFormData({
         name: "",
-        brand: "",
-        model: "",
+        category: "",
+        series: "",
         year: "",
         price: "",
         mileage: "",
-        fuelType: "",
-        transmission: "",
-        description: "",
+        gearboxType: "",
+        region: "",
+        phone: "",
+        telegram: "",
+        discord: "",
         imageUrl: "",
+        description: "",
+        isPremium: false,
       });
       onOpenChange(false);
     },
     onError: (error: any) => {
-      const errorMessage = error.message || "Не удалось добавить автомобиль";
-      
-      if (errorMessage.includes("Authentication required") || errorMessage.includes("авторизац")) {
-        toast({
-          title: "Ошибка авторизации",
-          description: "Необходимо войти в систему для добавления автомобилей",
-          variant: "destructive",
-        });
-      } else if (errorMessage.includes("валидац") || errorMessage.includes("обязательн")) {
-        toast({
-          title: "Ошибка валидации",
-          description: "Проверьте правильность заполнения всех полей",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Ошибка добавления",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Ошибка добавления",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -126,11 +105,11 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Простая валидация
-    if (!formData.name.trim() || !formData.brand.trim() || !formData.model.trim()) {
+    // Валидация
+    if (!formData.name.trim() || !formData.category || !formData.series) {
       toast({
         title: "Заполните обязательные поля",
-        description: "Название, марка и модель обязательны для заполнения",
+        description: "Название, категория и серия обязательны",
         variant: "destructive",
       });
       return;
@@ -139,261 +118,251 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
     if (!formData.year || !formData.price) {
       toast({
         title: "Заполните обязательные поля",
-        description: "Год выпуска и цена обязательны для заполнения",
+        description: "Год и цена обязательны",
         variant: "destructive",
       });
       return;
     }
 
-    const year = parseInt(formData.year);
-    const price = parseInt(formData.price);
-    const mileage = formData.mileage ? parseInt(formData.mileage) : 0;
-
-    if (year < 1900 || year > new Date().getFullYear() + 1) {
-      toast({
-        title: "Неверный год выпуска",
-        description: "Укажите корректный год выпуска автомобиля",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (price <= 0) {
-      toast({
-        title: "Неверная цена",
-        description: "Цена должна быть больше 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Подготавливаем данные для отправки
     const carData = {
       name: formData.name.trim(),
-      brand: formData.brand.trim(),
-      model: formData.model.trim(),
-      year: year,
-      price: price,
-      mileage: mileage,
-      fuelType: formData.fuelType || 'Бензин',
-      transmission: formData.transmission || 'Механическая',
-      description: formData.description.trim() || '',
+      brand: formData.category,
+      model: formData.series,
+      year: parseInt(formData.year),
+      price: parseInt(formData.price),
+      mileage: formData.mileage ? parseInt(formData.mileage) : 0,
+      transmission: formData.gearboxType || 'Не указано',
+      fuelType: 'Не указано',
+      description: formData.description.trim(),
       imageUrl: formData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Нет+фото',
+      // Дополнительные поля для контактов
+      contactPhone: formData.phone.trim(),
+      contactTelegram: formData.telegram.trim(),
+      contactDiscord: formData.discord.trim(),
+      region: formData.region.trim(),
+      isPremium: formData.isPremium,
     };
 
-    console.log('📝 Отправляем данные автомобиля:', carData);
     addCarMutation.mutate(carData);
   };
 
-  // Сброс формы при закрытии
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      setFormData({
-        name: "",
-        brand: "",
-        model: "",
-        year: "",
-        price: "",
-        mileage: "",
-        fuelType: "",
-        transmission: "",
-        description: "",
-        imageUrl: "",
-      });
-    }
-    onOpenChange(open);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white">
-            <PlusCircle className="h-5 w-5" />
-            Добавить автомобиль
+          <DialogTitle className="flex items-center justify-between text-white">
+            <span>Добавить автомобиль</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogTitle>
-          <DialogDescription className="text-slate-300">
-            Заполните информацию о вашем автомобиле. Объявление будет отправлено на модерацию.
-          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Основная информация */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-slate-300">
-                Название объявления *
-              </Label>
-              <Input
-                id="name"
-                placeholder="Например: BMW X5 в отличном состоянии"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                required
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="imageUrl" className="text-slate-300">
-                Ссылка на фото
-              </Label>
-              <Input
-                id="imageUrl"
-                type="url"
-                placeholder="https://example.com/photo.jpg"
-                value={formData.imageUrl}
-                onChange={(e) => handleInputChange('imageUrl', e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-          </div>
-
-          {/* Марка и модель */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="brand" className="text-slate-300">
-                Марка *
-              </Label>
-              <Input
-                id="brand"
-                placeholder="BMW, Mercedes, Toyota..."
-                value={formData.brand}
-                onChange={(e) => handleInputChange('brand', e.target.value)}
-                required
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="model" className="text-slate-300">
-                Модель *
-              </Label>
-              <Input
-                id="model"
-                placeholder="X5, E-класс, Camry..."
-                value={formData.model}
-                onChange={(e) => handleInputChange('model', e.target.value)}
-                required
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-          </div>
-
-          {/* Год и цена */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="year" className="text-slate-300">
-                Год выпуска *
-              </Label>
-              <Input
-                id="year"
-                type="number"
-                placeholder="2020"
-                min="1900"
-                max={new Date().getFullYear() + 1}
-                value={formData.year}
-                onChange={(e) => handleInputChange('year', e.target.value)}
-                required
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="price" className="text-slate-300">
-                Цена (₽) *
-              </Label>
-              <Input
-                id="price"
-                type="number"
-                placeholder="1500000"
-                min="1"
-                value={formData.price}
-                onChange={(e) => handleInputChange('price', e.target.value)}
-                required
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="mileage" className="text-slate-300">
-                Пробег (км)
-              </Label>
-              <Input
-                id="mileage"
-                type="number"
-                placeholder="50000"
-                min="0"
-                value={formData.mileage}
-                onChange={(e) => handleInputChange('mileage', e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-              />
-            </div>
-          </div>
-
-          {/* Тип топлива и коробка */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-slate-300">Тип топлива</Label>
-              <Select value={formData.fuelType} onValueChange={(value) => handleInputChange('fuelType', value)}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Выберите тип топлива" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="Бензин">Бензин</SelectItem>
-                  <SelectItem value="Дизель">Дизель</SelectItem>
-                  <SelectItem value="Гибрид">Гибрид</SelectItem>
-                  <SelectItem value="Электро">Электро</SelectItem>
-                  <SelectItem value="Газ">Газ</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-slate-300">Коробка передач</Label>
-              <Select value={formData.transmission} onValueChange={(value) => handleInputChange('transmission', value)}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Выберите коробку передач" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="Механическая">Механическая</SelectItem>
-                  <SelectItem value="Автоматическая">Автоматическая</SelectItem>
-                  <SelectItem value="Робот">Робот</SelectItem>
-                  <SelectItem value="Вариатор">Вариатор</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Описание */}
+          {/* Название автомобиля */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-slate-300">
-              Описание
-            </Label>
-            <Textarea
-              id="description"
-              placeholder="Дополнительная информация об автомобиле, комплектации, состоянии..."
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              rows={4}
-              className="resize-none bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+            <Label className="text-slate-300">Название автомобиля *</Label>
+            <Input
+              placeholder="Например: BMW M5 Competition"
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              required
+              className="bg-slate-700 border-slate-600 text-white"
             />
           </div>
 
-          {/* Предупреждение */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              <strong>Внимание:</strong> Все объявления проходят предварительную модерацию. 
-              Публикация может занять до 24 часов.
-            </p>
+          {/* Категория и Серия */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Категория *</Label>
+              <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Выберите категорию" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="BMW">BMW</SelectItem>
+                  <SelectItem value="Mercedes">Mercedes</SelectItem>
+                  <SelectItem value="Audi">Audi</SelectItem>
+                  <SelectItem value="Toyota">Toyota</SelectItem>
+                  <SelectItem value="Lada">Lada</SelectItem>
+                  <SelectItem value="Другое">Другое</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Серия *</Label>
+              <Select value={formData.series} onValueChange={(value) => handleInputChange('series', value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Выберите серию" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="M5">M5</SelectItem>
+                  <SelectItem value="X5">X5</SelectItem>
+                  <SelectItem value="E-класс">E-класс</SelectItem>
+                  <SelectItem value="A4">A4</SelectItem>
+                  <SelectItem value="Camry">Camry</SelectItem>
+                  <SelectItem value="Другое">Другое</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
+          {/* Год и Цена */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Год (г) *</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={formData.year}
+                onChange={(e) => handleInputChange('year', e.target.value)}
+                min="1900"
+                max={new Date().getFullYear() + 1}
+                required
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Макс. скорость (км/ч) *</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={formData.price}
+                onChange={(e) => handleInputChange('price', e.target.value)}
+                min="1"
+                required
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+          </div>
+
+          {/* Пробег и Тип привода */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Разгон до 100 км/ч *</Label>
+              <Input
+                placeholder="5.2 сек"
+                value={formData.mileage}
+                onChange={(e) => handleInputChange('mileage', e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Тип привода *</Label>
+              <Select value={formData.gearboxType} onValueChange={(value) => handleInputChange('gearboxType', value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Выберите привод" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="AWD">AWD</SelectItem>
+                  <SelectItem value="RWD">RWD</SelectItem>
+                  <SelectItem value="FWD">FWD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* ID на сервере */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">ID на сервере</Label>
+            <Input
+              placeholder="Например: BMWC-123"
+              value={formData.region}
+              onChange={(e) => handleInputChange('region', e.target.value)}
+              className="bg-slate-700 border-slate-600 text-white"
+            />
+          </div>
+
+          {/* Контактная информация */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-white">Контактная информация</h3>
+            
+            <div className="space-y-2">
+              <Label className="text-slate-300">Телефон</Label>
+              <Input
+                placeholder="+7 (999) 123-45-67"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-300">Telegram</Label>
+                <Input
+                  placeholder="@username"
+                  value={formData.telegram}
+                  onChange={(e) => handleInputChange('telegram', e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-300">Discord</Label>
+                <Input
+                  placeholder="username#1234"
+                  value={formData.discord}
+                  onChange={(e) => handleInputChange('discord', e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Ссылка на изображение</Label>
+              <Input
+                type="url"
+                placeholder="https://example.com/car.jpg"
+                value={formData.imageUrl}
+                onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+          </div>
+
+          {/* Дополнительное описание */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">Дополнительное описание</Label>
+            <Textarea
+              placeholder="Дополнительная информация об автомобиле..."
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              rows={4}
+              className="bg-slate-700 border-slate-600 text-white resize-none"
+            />
+          </div>
+
+          {/* Премиум автомобиль */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="premium"
+              checked={formData.isPremium}
+              onCheckedChange={(checked) => handleInputChange('isPremium', !!checked)}
+              className="border-slate-600"
+            />
+            <Label htmlFor="premium" className="text-slate-300 text-sm">
+              Премиум автомобиль
+            </Label>
+          </div>
+          <p className="text-xs text-slate-500">
+            Отметьте, если хотите для релиза или эксклюзивный автомобиль
+          </p>
+
           {/* Кнопки */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex space-x-3 pt-4">
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => handleOpenChange(false)}
+              onClick={() => onOpenChange(false)}
               className="flex-1 bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
             >
               Отмена
@@ -401,18 +370,15 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             <Button 
               type="submit" 
               disabled={addCarMutation.isPending}
-              className="flex-1 gap-2 bg-primary hover:bg-primary/90"
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
             >
               {addCarMutation.isPending ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Добавление...
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Отправить заявку
                 </>
               ) : (
-                <>
-                  <PlusCircle className="h-4 w-4" />
-                  Добавить автомобиль
-                </>
+                'Отправить заявку'
               )}
             </Button>
           </div>
