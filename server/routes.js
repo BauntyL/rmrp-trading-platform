@@ -228,23 +228,31 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
     // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
     if (status === 'approved') {
       console.log('✅ Creating car listing from approved application');
-      await storage.createCarListing({
-        name: application.name,
-        category: application.category,
-        server: application.server,
-        price: application.price,
-        maxSpeed: application.maxSpeed,
-        acceleration: application.acceleration,
-        drive: application.drive,
-        isPremium: application.isPremium,
-        description: application.description,
-        ownerId: application.createdBy,
-        applicationId: application.id,
-        phone: application.phone,
-        telegram: application.telegram,
-        discord: application.discord,
-        imageUrl: application.imageUrl  // ← ИЗОБРАЖЕНИЕ!
-      });
+      console.log('📋 Application data for car listing:', application);
+      
+      try {
+        await storage.createCarListing({
+          name: application.name,
+          category: application.category,
+          server: application.server,
+          price: application.price,
+          maxSpeed: application.maxSpeed,
+          acceleration: application.acceleration,
+          drive: application.drive,
+          isPremium: application.isPremium,
+          description: application.description,
+          ownerId: application.createdBy,
+          applicationId: application.id,
+          phone: application.phone,
+          telegram: application.telegram,
+          discord: application.discord,
+          imageUrl: application.imageUrl
+        });
+        console.log('✅ Car listing created successfully!');
+      } catch (carError) {
+        console.error('❌ Error creating car listing:', carError);
+        // Не блокируем обновление статуса из-за ошибки создания объявления
+      }
     }
     
     res.json(application);
@@ -480,6 +488,7 @@ router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res)
     console.log('👥 Admin fetching all users:', req.user.username);
     const users = await storage.getAllUsers();
     
+    // Убираем пароли из ответа для безопасности
     const safeUsers = users.map(user => ({
       id: user.id,
       username: user.username,
@@ -506,6 +515,7 @@ router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async
       return res.status(400).json({ error: 'Invalid role' });
     }
     
+    // Не даем админу убрать свою роль
     if (parseInt(id) === req.user.id && role !== 'admin') {
       return res.status(400).json({ error: 'Cannot change your own admin role' });
     }
@@ -524,6 +534,7 @@ router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async
   }
 });
 
+// Получение всех заявок (для админов и модераторов)
 router.get('/applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📋 Fetching all applications for:', req.user.username);
@@ -537,6 +548,7 @@ router.get('/applications', requireAuth, requireRole(['moderator', 'admin']), as
   }
 });
 
+// Статистика (для админов и модераторов)
 router.get('/stats/pending-applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📊 Fetching pending applications count for:', req.user.username);
@@ -551,32 +563,62 @@ router.get('/stats/pending-applications', requireAuth, requireRole(['moderator',
   }
 });
 
-// МИГРАЦИЯ ДЛЯ ИЗОБРАЖЕНИЙ
-router.get('/admin/migrate-images', async (req, res) => {
+// ========================================
+// ФИНАЛЬНАЯ МИГРАЦИЯ ДЛЯ ВСЕХ ПОЛЕЙ
+// ========================================
+
+router.get('/admin/migrate-final', async (req, res) => {
   try {
     const { getClient } = require('./db');
     const client = getClient();
     
-    console.log('🖼️ Adding image column...');
+    console.log('🔧 Adding ALL missing columns to car_listings...');
     
+    // Добавляем ВСЕ недостающие колонки
     await client.query(`
       ALTER TABLE car_listings 
-      ADD COLUMN IF NOT EXISTS "imageUrl" VARCHAR(500);
+      ADD COLUMN IF NOT EXISTS category VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS server VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS "maxSpeed" INTEGER,
+      ADD COLUMN IF NOT EXISTS acceleration VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS drive VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS "isPremium" BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS telegram VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS discord VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
     `);
     
-    console.log('✅ Image column added!');
+    console.log('✅ All columns added successfully!');
+    
+    // Проверяем структуру таблицы
+    const result = await client.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'car_listings'
+      ORDER BY ordinal_position;
+    `);
+    
+    console.log('📋 Final table structure:', result.rows);
     
     res.json({
       success: true,
-      message: '🖼️ Image column added to car_listings!',
-      details: 'Added imageUrl column for car images'
+      message: '🎉 Final migration completed! All columns added to car_listings!',
+      details: 'Added: category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord, imageUrl',
+      tableStructure: result.rows,
+      nextSteps: [
+        '1. Test by approving a car application',
+        '2. Check if car appears in catalog with all details',
+        '3. Verify contacts and images work',
+        '4. Remove this migration endpoint'
+      ]
     });
     
   } catch (error) {
-    console.error('❌ Image migration failed:', error);
+    console.error('❌ Final migration failed:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Image migration failed', 
+      error: 'Final migration failed', 
       details: error.message
     });
   }
