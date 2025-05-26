@@ -564,4 +564,61 @@ router.get('/stats/pending-applications', requireAuth, requireRole(['moderator',
   }
 });
 
+// ========================================
+// ВРЕМЕННЫЙ ENDPOINT ДЛЯ МИГРАЦИИ (УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ!)
+// ========================================
+
+router.get('/admin/migrate', async (req, res) => {
+  try {
+    const { getClient } = require('./db');
+    const client = getClient();
+    
+    console.log('🔧 Starting database migration...');
+    
+    // Добавляем все недостающие колонки
+    await client.query(`
+      ALTER TABLE car_listings 
+      ADD COLUMN IF NOT EXISTS category VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS server VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS "maxSpeed" INTEGER,
+      ADD COLUMN IF NOT EXISTS acceleration VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS drive VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS "isPremium" BOOLEAN DEFAULT false;
+    `);
+    
+    console.log('✅ Migration commands executed successfully!');
+    
+    // Проверяем текущую структуру таблицы
+    const result = await client.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'car_listings'
+      ORDER BY ordinal_position;
+    `);
+    
+    console.log('📋 Updated table structure:', result.rows);
+    
+    res.json({
+      success: true,
+      message: '🎉 Database migration completed successfully!',
+      details: 'Added columns: category, server, maxSpeed, acceleration, drive, isPremium',
+      tableStructure: result.rows,
+      nextSteps: [
+        '1. Test by approving a car application',
+        '2. Check if car appears in catalog',
+        '3. Remove this migration endpoint from routes.js'
+      ]
+    });
+    
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Migration failed', 
+      details: error.message,
+      advice: 'Check console logs for detailed error information'
+    });
+  }
+});
+
 module.exports = router;
