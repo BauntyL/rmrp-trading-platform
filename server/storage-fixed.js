@@ -163,19 +163,36 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
 async function createCarListing(carData) {
   try {
     const client = getClient();
-    const { name, price, description, ownerId, applicationId } = carData;
+    const { 
+      name, 
+      price, 
+      description, 
+      ownerId, 
+      applicationId,
+      category,
+      server,
+      maxSpeed,
+      acceleration,
+      drive,
+      isPremium = false
+    } = carData;
+    
+    console.log('🚗 Creating car listing with ALL fields:', carData);
     
     const result = await client.query(
-      `INSERT INTO car_listings (name, price, description, owner_id, application_id, created_at) 
-       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
-      [name, price, description, ownerId, applicationId]
+      `INSERT INTO car_listings (
+        name, price, description, owner_id, application_id, created_at,
+        category, server, "maxSpeed", acceleration, drive, "isPremium"
+      ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11) 
+      RETURNING *`,
+      [name, price, description, ownerId, applicationId, category, server, maxSpeed, acceleration, drive, isPremium]
     );
     
-    console.log(`✅ Car listing created: ${name}`);
+    console.log(`✅ Car listing created with all fields:`, result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating car listing:', error);
@@ -220,6 +237,60 @@ async function getCarListingById(id) {
     return result.rows[0] || null;
   } catch (error) {
     console.error('❌ Error getting car listing by ID:', error);
+    throw error;
+  }
+}
+
+// НОВАЯ ФУНКЦИЯ УДАЛЕНИЯ
+async function deleteCarListing(carId) {
+  try {
+    const client = getClient();
+    console.log('🗑️ Storage: Deleting car listing:', carId);
+    
+    // Сначала удаляем связанные сообщения
+    await client.query('DELETE FROM messages WHERE "carId" = $1', [carId]);
+    
+    // Удаляем из избранного
+    await client.query('DELETE FROM favorites WHERE "carId" = $1', [carId]);
+    
+    // Удаляем само объявление
+    const result = await client.query(
+      'DELETE FROM car_listings WHERE id = $1 RETURNING *', 
+      [carId]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error('Car listing not found');
+    }
+    
+    console.log('✅ Storage: Car listing deleted successfully:', carId);
+    return result.rows[0];
+    
+  } catch (error) {
+    console.error('❌ Storage: Error deleting car listing:', error);
+    throw error;
+  }
+}
+
+// НОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ АВТО ПОЛЬЗОВАТЕЛЯ
+async function getUserCarListings(userId) {
+  try {
+    const client = getClient();
+    
+    const result = await client.query(`
+      SELECT 
+        c.*,
+        u.username as owner_name
+      FROM car_listings c
+      LEFT JOIN users u ON c.owner_id = u.id
+      WHERE c.owner_id = $1
+      ORDER BY c.created_at DESC
+    `, [userId]);
+    
+    console.log(`✅ Found user car listings: ${result.rows.length} for user ${userId}`);
+    return result.rows;
+  } catch (error) {
+    console.error('❌ Error getting user car listings:', error);
     throw error;
   }
 }
@@ -405,6 +476,8 @@ module.exports = {
   createCarListing,
   getCarListings,
   getCarListingById,
+  deleteCarListing,        // ← ДОБАВЛЕНО!
+  getUserCarListings,      // ← ДОБАВЛЕНО!
   
   // Messages
   createMessage,
