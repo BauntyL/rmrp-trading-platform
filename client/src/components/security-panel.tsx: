@@ -12,7 +12,6 @@ export function SecurityPanel() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Шифрование данных */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -29,7 +28,6 @@ export function SecurityPanel() {
           </CardContent>
         </Card>
 
-        {/* Аутентификация */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -46,7 +44,6 @@ export function SecurityPanel() {
           </CardContent>
         </Card>
 
-        {/* Приватность */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -63,7 +60,6 @@ export function SecurityPanel() {
           </CardContent>
         </Card>
 
-        {/* Серверная безопасность */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -80,7 +76,6 @@ export function SecurityPanel() {
           </CardContent>
         </Card>
 
-        {/* База данных */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -97,7 +92,6 @@ export function SecurityPanel() {
           </CardContent>
         </Card>
 
-        {/* Соответствие стандартам */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -115,7 +109,6 @@ export function SecurityPanel() {
         </Card>
       </div>
 
-      {/* Контакты безопасности */}
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
           <CardTitle className="text-white">Связаться с отделом безопасности</CardTitle>
