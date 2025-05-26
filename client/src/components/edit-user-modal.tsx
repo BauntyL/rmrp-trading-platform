@@ -1,27 +1,19 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { User } from "@shared/schema";
-
-// ✅ ВОССТАНОВЛЕНА поддержка всех ролей
-const editUserSchema = z.object({
-  username: z.string().min(3, "Имя пользователя должно содержать минимум 3 символа"),
-  role: z.enum(["user", "moderator", "admin"]),
-});
-
-type EditUserFormData = z.infer<typeof editUserSchema>;
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { User, Save, X } from "lucide-react";
 
 interface EditUserModalProps {
-  user: User | null;
+  user: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -30,143 +22,163 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const form = useForm<EditUserFormData>({
-    resolver: zodResolver(editUserSchema),
-    defaultValues: {
-      username: user?.username || "",
-      role: user?.role || "user",
-    },
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    firstName: "",
+    lastName: "",
   });
 
-  // Обновляем значения формы при изменении пользователя
   useEffect(() => {
     if (user) {
-      form.reset({
-        username: user.username,
-        role: user.role,
+      setFormData({
+        username: user.username || "",
+        email: user.email || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
       });
     }
-  }, [user, form]);
+  }, [user]);
 
-  const editMutation = useMutation({
-    mutationFn: async (data: EditUserFormData) => {
-      if (!user) throw new Error("Пользователь не выбран");
-      
-      console.log("📤 Отправляем данные:", data);
-      
-      const res = await apiRequest("PATCH", `/api/users/${user.id}`, data);
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Ошибка обновления данных");
+  const updateUserMutation = useMutation({
+    mutationFn: async (userData: any) => {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка обновления пользователя');
       }
-      
-      return await res.json();
+
+      return response.json();
     },
-    onSuccess: (updatedUser) => {
-      console.log("✅ Пользователь обновлен:", updatedUser);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
-        title: "Успешно",
-        description: "Данные пользователя обновлены",
+        title: "Пользователь обновлен",
+        description: "Данные пользователя успешно обновлены",
       });
       onOpenChange(false);
     },
-    onError: (error: Error) => {
-      console.error("❌ Ошибка обновления:", error);
+    onError: (error: any) => {
       toast({
-        title: "Ошибка",
+        title: "Ошибка обновления",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: EditUserFormData) => {
-    console.log("📝 Отправка формы с данными:", data);
-    editMutation.mutate(data);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.username.trim()) {
+      toast({
+        title: "Ошибка валидации",
+        description: "Имя пользователя обязательно",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateUserMutation.mutate(formData);
   };
 
   if (!user) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-slate-800 border-slate-700">
+      <DialogContent className="sm:max-w-[500px] bg-slate-800 border-slate-700">
         <DialogHeader>
-          <DialogTitle className="text-white">Редактировать пользователя</DialogTitle>
-          <DialogDescription className="text-slate-400">
-            Изменение данных пользователя {user.username}
-          </DialogDescription>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">Имя пользователя</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Введите имя пользователя"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">Роль</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                        <SelectValue placeholder="Выберите роль" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-slate-700 border-slate-600">
-                      <SelectItem value="user" className="text-white focus:bg-slate-600">
-                        Пользователь
-                      </SelectItem>
-                      <SelectItem value="moderator" className="text-white focus:bg-slate-600">
-                        Модератор
-                      </SelectItem>
-                      <SelectItem value="admin" className="text-white focus:bg-slate-600">
-                        Администратор
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="border-slate-600 text-slate-300 hover:bg-slate-700"
-              >
-                Отмена
-              </Button>
-              <Button
-                type="submit"
-                disabled={editMutation.isPending}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {editMutation.isPending ? "Сохранение..." : "Сохранить"}
-              </Button>
+          <DialogTitle className="flex items-center justify-between text-white">
+            <div className="flex items-center space-x-2">
+              <User className="h-5 w-5" />
+              <span>Редактировать пользователя</span>
             </div>
-          </form>
-        </Form>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-slate-300">Имя пользователя *</Label>
+            <Input
+              value={formData.username}
+              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+              required
+              className="bg-slate-700 border-slate-600 text-white"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300">Email</Label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              className="bg-slate-700 border-slate-600 text-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Имя</Label>
+              <Input
+                value={formData.firstName}
+                onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Фамилия</Label>
+              <Input
+                value={formData.lastName}
+                onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="flex-1 bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
+            >
+              Отмена
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={updateUserMutation.isPending}
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              {updateUserMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Сохранение...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Сохранить
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
