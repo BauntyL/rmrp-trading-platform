@@ -88,19 +88,6 @@ async function getApplications() {
   try {
     const client = getClient();
     
-    // Сначала покажем схему
-    try {
-      const tableInfo = await client.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'car_applications'
-        ORDER BY column_name
-      `);
-      console.log('📋 car_applications columns:', tableInfo.rows.map(r => r.column_name));
-    } catch (schemaErr) {
-      console.log('❌ Could not get schema info');
-    }
-    
     const result = await client.query(`
       SELECT 
         a.*,
@@ -153,7 +140,7 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// Объявления автомобилей
+// Объявления автомобилей - ИСПРАВЛЕНО!
 async function createCarListing(carData) {
   try {
     const client = getClient();
@@ -177,26 +164,13 @@ async function getCarListings() {
   try {
     const client = getClient();
     
-    // Покажем схему car_listings
-    try {
-      const tableInfo = await client.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'car_listings'
-        ORDER BY column_name
-      `);
-      console.log('📋 car_listings columns:', tableInfo.rows.map(r => r.column_name));
-    } catch (schemaErr) {
-      console.log('❌ Could not get car_listings schema');
-    }
-    
     const result = await client.query(`
       SELECT 
         c.*,
         u.username as owner_name
       FROM car_listings c
       LEFT JOIN users u ON c.owner_id = u.id
-      ORDER BY c."createdAt" DESC
+      ORDER BY c.created_at DESC
     `);
     
     console.log(`✅ Found car listings: ${result.rows.length}`);
@@ -305,24 +279,10 @@ async function getUnreadMessageCount(userId) {
   }
 }
 
-// Избранное
+// Избранное - ИСПРАВЛЕНО!
 async function getUserFavorites(userId) {
   try {
     const client = getClient();
-    
-    // Покажем схему favorites
-    try {
-      const tableInfo = await client.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'favorites'
-        ORDER BY column_name
-      `);
-      console.log('📋 favorites columns:', tableInfo.rows.map(r => r.column_name));
-    } catch (schemaErr) {
-      console.log('❌ Could not get favorites schema - table may not exist');
-      return [];
-    }
     
     const result = await client.query(`
       SELECT 
@@ -335,6 +295,7 @@ async function getUserFavorites(userId) {
       ORDER BY f."createdAt" DESC
     `, [userId]);
     
+    console.log(`✅ Found user favorites: ${result.rows.length}`);
     return result.rows;
   } catch (error) {
     console.error('❌ Error getting user favorites:', error);
