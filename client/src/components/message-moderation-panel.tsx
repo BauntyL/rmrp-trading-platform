@@ -71,7 +71,6 @@ export function MessageModerationPanel() {
   const { data: dialogs = mockDialogs, isLoading } = useQuery({
     queryKey: ["/api/messages/moderation"],
     queryFn: async () => {
-      // В реальном проекте здесь будет запрос к API
       return mockDialogs;
     },
   });
@@ -79,7 +78,6 @@ export function MessageModerationPanel() {
   const { data: messages = mockMessages } = useQuery({
     queryKey: ["/api/messages/dialog", selectedDialog?.id],
     queryFn: async () => {
-      // В реальном проекте здесь будет запрос к API
       return selectedDialog ? mockMessages : [];
     },
     enabled: !!selectedDialog?.id,
