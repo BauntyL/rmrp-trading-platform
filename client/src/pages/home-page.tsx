@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,116 +11,80 @@ import { MessagesPanel } from "@/components/messages-panel";
 import { UnreadMessagesCounter } from "@/components/unread-messages-counter";
 import { useAuth } from "@/hooks/use-auth";
 
-// ИСПРАВЛЯЕМ: убираем импорт Car из схемы, используем any для простоты
-type CarType = any;
-
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const [addCarModalOpen, setAddCarModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("catalog");
 
-  // ИСПРАВЛЯЕМ: добавляем проверки для безопасности
-  const isValidUser = user && 
-                     typeof user === 'object' && 
-                     user.id && 
-                     user.username && 
-                     typeof user.id === 'number';
-
-  console.log('🏠 HomePage render:', { 
-    user, 
-    isValidUser, 
-    userId: user?.id, 
-    userType: typeof user 
-  });
-
-  // Если пользователь невалидный, показываем заглушку
-  if (!isValidUser) {
-    console.log('❌ Invalid user on HomePage, redirecting...');
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-900">
-        <div className="text-center">
-          <p className="text-white mb-4">Ошибка загрузки данных пользователя</p>
-          <Button onClick={() => window.location.reload()}>
-            Перезагрузить страницу
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const { data: cars = [], isLoading: carsLoading } = useQuery<CarType[]>({
+  const { data: cars = [], isLoading: carsLoading } = useQuery({
     queryKey: ["/api/cars"],
-    enabled: isValidUser, // Загружаем только если пользователь валидный
   });
 
-  // ИСПРАВЛЯЕМ: безопасное получение автомобилей пользователя
-  const { data: userCars = [], isLoading: userCarsLoading } = useQuery<CarType[]>({
+  const { data: userCars = [], isLoading: userCarsLoading } = useQuery({
     queryKey: ["/api/cars/my"],
-    enabled: isValidUser, // Загружаем только если пользователь валидный
   });
 
-  // ИСПРАВЛЯЕМ: безопасное получение избранного
-  const { data: favoriteCars = [], isLoading: favoritesLoading } = useQuery<CarType[]>({
+  const { data: favoriteCars = [], isLoading: favoritesLoading } = useQuery({
     queryKey: ["/api/favorites"],
-    enabled: isValidUser, // Загружаем только если пользователь валидный
   });
 
-  // Мемоизируем фильтрацию для производительности
-  const { approvedCars, pendingCars } = useMemo(() => {
-    const approved = cars.filter(car => car.status === 'approved');
-    const pending = cars.filter(car => car.status === 'pending');
-    return { approvedCars: approved, pendingCars: pending };
-  }, [cars]);
+  const approvedCars = cars.filter((car: any) => car.status === 'approved');
+  const pendingCars = cars.filter((car: any) => car.status === 'pending');
 
   const handleLogout = () => {
     logoutMutation.mutate();
   };
 
-  const isAdmin = user.role === 'admin';
-  const isModerator = user.role === 'moderator' || isAdmin;
+  const isAdmin = user?.role === 'admin';
+  const isModerator = user?.role === 'moderator' || isAdmin;
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Car className="h-8 w-8 text-primary" />
-                <h1 className="text-2xl font-bold text-white">АвтоКаталог</h1>
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Car className="h-8 w-8 text-blue-600" />
+                <h1 className="text-2xl font-bold text-gray-900">АвтоКаталог</h1>
               </div>
-              <Badge variant="outline" className="text-primary border-primary">
-                {user.role === 'admin' ? 'Администратор' : 
-                 user.role === 'moderator' ? 'Модератор' : 'Пользователь'}
-              </Badge>
+              {user && (
+                <Badge variant="outline">
+                  {user.role === 'admin' ? 'Администратор' : 
+                   user.role === 'moderator' ? 'Модератор' : 'Пользователь'}
+                </Badge>
+              )}
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-slate-300">
-                <User className="h-4 w-4" />
-                <span>{user.username}</span>
-              </div>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                disabled={logoutMutation.isPending}
-                className="border-slate-600 text-slate-300 hover:bg-slate-700"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                {logoutMutation.isPending ? 'Выход...' : 'Выйти'}
-              </Button>
+            <div className="flex items-center space-x-4">
+              {user && (
+                <>
+                  <div className="flex items-center space-x-2 text-gray-700">
+                    <User className="h-4 w-4" />
+                    <span>{user.username}</span>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                    disabled={logoutMutation.isPending}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {logoutMutation.isPending ? 'Выход...' : 'Выйти'}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-6 bg-slate-800">
+          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-6">
             <TabsTrigger value="catalog" className="flex items-center gap-2">
               <Car className="h-4 w-4" />
               <span className="hidden sm:inline">Каталог</span>
@@ -158,38 +122,38 @@ export default function HomePage() {
           {/* Каталог автомобилей */}
           <TabsContent value="catalog" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-white">Каталог автомобилей</h2>
-              <Button onClick={() => setAddCarModalOpen(true)} className="gap-2">
+              <h2 className="text-3xl font-bold text-gray-900">Каталог автомобилей</h2>
+              <Button onClick={() => setAddCarModalOpen(true)} className="space-x-2">
                 <PlusCircle className="h-4 w-4" />
-                Добавить автомобиль
+                <span>Добавить автомобиль</span>
               </Button>
             </div>
 
             {carsLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-slate-800 rounded-lg p-6 animate-pulse">
-                    <div className="w-full h-48 bg-slate-700 rounded-lg mb-4"></div>
-                    <div className="h-6 bg-slate-700 rounded mb-2"></div>
-                    <div className="h-4 bg-slate-700 rounded mb-4 w-2/3"></div>
-                    <div className="h-8 bg-slate-700 rounded"></div>
+                  <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
+                    <div className="w-full h-48 bg-gray-300 rounded-lg mb-4"></div>
+                    <div className="h-6 bg-gray-300 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-300 rounded mb-4 w-2/3"></div>
+                    <div className="h-8 bg-gray-300 rounded"></div>
                   </div>
                 ))}
               </div>
             ) : approvedCars.length === 0 ? (
               <div className="text-center py-12">
-                <Car className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-slate-400 mb-2">
+                <Car className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">
                   Автомобили не найдены
                 </h3>
-                <p className="text-slate-500">
+                <p className="text-gray-500">
                   Станьте первым, кто добавит автомобиль в каталог!
                 </p>
                 <Button 
                   onClick={() => setAddCarModalOpen(true)} 
-                  className="mt-4 gap-2"
+                  className="mt-4"
                 >
-                  <PlusCircle className="h-4 w-4" />
+                  <PlusCircle className="h-4 w-4 mr-2" />
                   Добавить автомобиль
                 </Button>
               </div>
@@ -210,9 +174,9 @@ export default function HomePage() {
           {/* Мои автомобили */}
           <TabsContent value="my-cars" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-white">Мои автомобили</h2>
-              <Button onClick={() => setAddCarModalOpen(true)} className="gap-2">
-                <PlusCircle className="h-4 w-4" />
+              <h2 className="text-3xl font-bold text-gray-900">Мои автомобили</h2>
+              <Button onClick={() => setAddCarModalOpen(true)}>
+                <PlusCircle className="h-4 w-4 mr-2" />
                 Добавить автомобиль
               </Button>
             </div>
@@ -220,28 +184,25 @@ export default function HomePage() {
             {userCarsLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-slate-800 rounded-lg p-6 animate-pulse">
-                    <div className="w-full h-48 bg-slate-700 rounded-lg mb-4"></div>
-                    <div className="h-6 bg-slate-700 rounded mb-2"></div>
-                    <div className="h-4 bg-slate-700 rounded mb-4 w-2/3"></div>
-                    <div className="h-8 bg-slate-700 rounded"></div>
+                  <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
+                    <div className="w-full h-48 bg-gray-300 rounded-lg mb-4"></div>
+                    <div className="h-6 bg-gray-300 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-300 rounded mb-4 w-2/3"></div>
+                    <div className="h-8 bg-gray-300 rounded"></div>
                   </div>
                 ))}
               </div>
             ) : userCars.length === 0 ? (
               <div className="text-center py-12">
-                <Car className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-slate-400 mb-2">
+                <Car className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">
                   У вас нет автомобилей
                 </h3>
-                <p className="text-slate-500">
+                <p className="text-gray-500">
                   Добавьте свой первый автомобиль в каталог
                 </p>
-                <Button 
-                  onClick={() => setAddCarModalOpen(true)} 
-                  className="mt-4 gap-2"
-                >
-                  <PlusCircle className="h-4 w-4" />
+                <Button onClick={() => setAddCarModalOpen(true)} className="mt-4">
+                  <PlusCircle className="h-4 w-4 mr-2" />
                   Добавить автомобиль
                 </Button>
               </div>
@@ -256,26 +217,26 @@ export default function HomePage() {
 
           {/* Избранное */}
           <TabsContent value="favorites" className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Избранные автомобили</h2>
+            <h2 className="text-3xl font-bold text-gray-900">Избранные автомобили</h2>
 
             {favoritesLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-slate-800 rounded-lg p-6 animate-pulse">
-                    <div className="w-full h-48 bg-slate-700 rounded-lg mb-4"></div>
-                    <div className="h-6 bg-slate-700 rounded mb-2"></div>
-                    <div className="h-4 bg-slate-700 rounded mb-4 w-2/3"></div>
-                    <div className="h-8 bg-slate-700 rounded"></div>
+                  <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
+                    <div className="w-full h-48 bg-gray-300 rounded-lg mb-4"></div>
+                    <div className="h-6 bg-gray-300 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-300 rounded mb-4 w-2/3"></div>
+                    <div className="h-8 bg-gray-300 rounded"></div>
                   </div>
                 ))}
               </div>
             ) : favoriteCars.length === 0 ? (
               <div className="text-center py-12">
-                <Heart className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-slate-400 mb-2">
+                <Heart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">
                   Нет избранных автомобилей
                 </h3>
-                <p className="text-slate-500">
+                <p className="text-gray-500">
                   Добавляйте автомобили в избранное, нажимая на сердечко
                 </p>
               </div>
@@ -291,7 +252,7 @@ export default function HomePage() {
           {/* Модерация */}
           {isModerator && (
             <TabsContent value="moderation" className="space-y-6">
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-3xl font-bold text-gray-900">
                 Модерация объявлений
                 {pendingCars.length > 0 && (
                   <Badge className="ml-2 bg-red-500">
@@ -303,21 +264,21 @@ export default function HomePage() {
               {carsLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-slate-800 rounded-lg p-6 animate-pulse">
-                      <div className="w-full h-48 bg-slate-700 rounded-lg mb-4"></div>
-                      <div className="h-6 bg-slate-700 rounded mb-2"></div>
-                      <div className="h-4 bg-slate-700 rounded mb-4 w-2/3"></div>
-                      <div className="h-8 bg-slate-700 rounded"></div>
+                    <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
+                      <div className="w-full h-48 bg-gray-300 rounded-lg mb-4"></div>
+                      <div className="h-6 bg-gray-300 rounded mb-2"></div>
+                      <div className="h-4 bg-gray-300 rounded mb-4 w-2/3"></div>
+                      <div className="h-8 bg-gray-300 rounded"></div>
                     </div>
                   ))}
                 </div>
               ) : pendingCars.length === 0 ? (
                 <div className="text-center py-12">
-                  <Users className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-400 mb-2">
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">
                     Нет заявок на модерацию
                   </h3>
-                  <p className="text-slate-500">
+                  <p className="text-gray-500">
                     Все объявления рассмотрены
                   </p>
                 </div>
@@ -333,11 +294,7 @@ export default function HomePage() {
         </Tabs>
       </main>
 
-      {/* Модал добавления автомобиля */}
-      <AddCarModal
-        open={addCarModalOpen}
-        onOpenChange={setAddCarModalOpen}
-      />
+      <AddCarModal open={addCarModalOpen} onOpenChange={setAddCarModalOpen} />
     </div>
   );
 }
