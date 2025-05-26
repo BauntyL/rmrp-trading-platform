@@ -60,20 +60,20 @@ async function getAllUsers() {
   }
 }
 
-// ИСПРАВЛЕННЫЕ ФУНКЦИИ С ПРАВИЛЬНЫМИ КОЛОНКАМИ
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ БЕЗ brand/model/year
 async function createApplication(applicationData) {
   try {
     const client = getClient();
-    const { brand, model, year, price, description, createdBy } = applicationData;
+    const { name, price, description, createdBy, status = 'pending' } = applicationData;
     
     console.log('📝 Creating application with data:', {
-      brand, model, year, price, description, createdBy
+      name, price, description, createdBy, status
     });
     
     const result = await client.query(
-      `INSERT INTO car_applications (brand, model, year, price, description, "createdBy") 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [brand, model, year, price, description, createdBy]
+      `INSERT INTO car_applications (name, price, description, "createdBy", status, "createdAt") 
+       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+      [name, price, description, createdBy, status]
     );
     
     console.log(`✅ Application created:`, result.rows[0]);
@@ -140,19 +140,19 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// Объявления автомобилей - ИСПРАВЛЕНО!
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ БЕЗ brand/model/year
 async function createCarListing(carData) {
   try {
     const client = getClient();
-    const { brand, model, year, price, description, ownerId, applicationId } = carData;
+    const { name, price, description, ownerId, applicationId } = carData;
     
     const result = await client.query(
-      `INSERT INTO car_listings (brand, model, year, price, description, owner_id, application_id) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [brand, model, year, price, description, ownerId, applicationId]
+      `INSERT INTO car_listings (name, price, description, owner_id, application_id, created_at) 
+       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+      [name, price, description, ownerId, applicationId]
     );
     
-    console.log(`✅ Car listing created: ${brand} ${model}`);
+    console.log(`✅ Car listing created: ${name}`);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating car listing:', error);
@@ -230,8 +230,7 @@ async function getUserMessages(userId) {
         m.*,
         s.username as sender_name,
         r.username as receiver_name,
-        c.brand as car_brand,
-        c.model as car_model
+        c.name as car_name
       FROM messages m
       LEFT JOIN users s ON m."senderId" = s.id
       LEFT JOIN users r ON m."receiverId" = r.id
@@ -279,7 +278,7 @@ async function getUnreadMessageCount(userId) {
   }
 }
 
-// Избранное - ИСПРАВЛЕНО!
+// Избранное
 async function getUserFavorites(userId) {
   try {
     const client = getClient();
