@@ -240,12 +240,18 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
     
     const application = await storage.updateApplicationStatus(id, status);
     
-    // Если заявка одобрена, создаем объявление
+    // ИСПРАВЛЕННОЕ СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
     if (status === 'approved') {
       console.log('✅ Creating car listing from approved application');
       await storage.createCarListing({
         name: application.name,
+        category: application.category,
+        server: application.server,
         price: application.price,
+        maxSpeed: application.maxSpeed,
+        acceleration: application.acceleration,
+        drive: application.drive,
+        isPremium: application.isPremium,
         description: application.description,
         ownerId: application.createdBy,
         applicationId: application.id
@@ -376,7 +382,7 @@ router.post('/favorites/:carId', requireAuth, async (req, res) => {
 router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const { carId } = req.params;
-    console.log('💔 Removing from favorites:', carId, 'for user:', req.user.username);
+    console.log('⭐ Removing from favorites:', carId, 'for user:', req.user.username);
     
     await storage.removeFromFavorites(req.user.id, carId);
     res.json({ success: true });
@@ -386,45 +392,175 @@ router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   }
 });
 
-// Админские функции
+// ========================================
+// УПРАВЛЕНИЕ АВТОМОБИЛЯМИ
+// ========================================
+
+// Получение автомобилей пользователя
+router.get('/my-cars', requireAuth, async (req, res) => {
+  try {
+    console.log('🚗 Fetching cars for user:', req.user.username);
+    const cars = await storage.getUserCarListings(req.user.id);
+    
+    console.log('📋 User', req.user.username, 'has', cars.length, 'cars');
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error fetching user cars:', error);
+    res.status(500).json({ error: 'Failed to fetch user cars' });
+  }
+});
+
+// Удаление объявления автомобиля (владелец или админ)
+router.delete('/cars/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ Deleting car:', id, 'by user:', req.user.username, 'role:', req.user.role);
+    
+    // Получаем информацию об автомобиле
+    const car = await storage.getCarListingById(id);
+    if (!car) {
+      console.log('❌ Car not found:', id);
+      return res.status(404).json({ error: 'Car not found' });
+    }
+    
+    // Проверяем права: владелец или админ
+    const isOwner = car.owner_id === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    
+    if (!isOwner && !isAdmin) {
+      console.log('❌ Access denied. User:', req.user.id, 'Owner:', car.owner_id, 'IsAdmin:', isAdmin);
+      return res.status(403).json({ error: 'Access denied. You can only delete your own cars or be an admin.' });
+    }
+    
+    // Удаляем автомобиль
+    await storage.deleteCarListing(id);
+    
+    console.log('✅ Car deleted successfully:', id, 'by:', req.user.username);
+    res.json({ 
+      success: true, 
+      message: 'Car deleted successfully',
+      deletedBy: req.user.username,
+      wasOwner: isOwner
+    });
+    
+  } catch (error) {
+    console.error('❌ Error deleting car:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete car',
+      details: error.message 
+    });
+  }
+});
+
+// ДОПОЛНИТЕЛЬНО: Админ endpoint для принудительного удаления
+router.delete('/admin/cars/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🔨 Admin force deleting car:', id, 'by:', req.user.username);
+    
+    const car = await storage.getCarListingById(id);
+    if (!car) {
+      return res.status(404).json({ error: 'Car not found' });
+    }
+    
+    await storage.deleteCarListing(id);
+    
+    console.log('✅ Car force deleted by admin:', id);
+    res.json({ 
+      success: true, 
+      message: 'Car force deleted by admin',
+      originalOwner: car.owner_id 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in admin car deletion:', error);
+    res.status(500).json({ error: 'Failed to delete car' });
+  }
+});
+
+// ========================================
+// ADMIN ENDPOINTS ДЛЯ УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
+// ========================================
+
+// Получение всех пользователей (только для админов)
 router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('👥 Admin fetching all users');
+    console.log('👥 Admin fetching all users:', req.user.username);
     const users = await storage.getAllUsers();
-    res.json(users);
+    
+    // Убираем пароли из ответа для безопасности
+    const safeUsers = users.map(user => ({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      createdAt: user.createdAt
+    }));
+    
+    console.log('📋 Found users:', safeUsers.length);
+    res.json(safeUsers);
   } catch (error) {
     console.error('❌ Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
+// Обновление роли пользователя (только для админов)
 router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
     
-    console.log('🔄 Admin updating user role:', id, 'to:', role);
+    console.log('🛡️ Admin updating user role:', id, 'to:', role, 'by:', req.user.username);
     
     if (!['user', 'moderator', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
     
-    const user = await storage.updateUserRole(id, role);
-    res.json(user);
+    // Не даем админу убрать свою роль
+    if (parseInt(id) === req.user.id && role !== 'admin') {
+      return res.status(400).json({ error: 'Cannot change your own admin role' });
+    }
+    
+    const updatedUser = await storage.updateUserRole(id, role);
+    
+    res.json({
+      id: updatedUser.id,
+      username: updatedUser.username,
+      role: updatedUser.role,
+      createdAt: updatedUser.createdAt
+    });
   } catch (error) {
     console.error('❌ Error updating user role:', error);
     res.status(500).json({ error: 'Failed to update user role' });
   }
 });
 
-// Статистика
+// Получение всех заявок (для админов и модераторов)
+router.get('/applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    console.log('📋 Fetching all applications for:', req.user.username);
+    const applications = await storage.getApplications();
+    
+    console.log('📦 Found applications:', applications.length);
+    res.json(applications);
+  } catch (error) {
+    console.error('❌ Error fetching applications:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// Статистика (для админов и модераторов)
 router.get('/stats/pending-applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
-    const count = await storage.getPendingApplicationsCount();
-    res.json({ count });
+    console.log('📊 Fetching pending applications count for:', req.user.username);
+    const applications = await storage.getApplications();
+    const pendingCount = applications.filter(app => app.status === 'pending').length;
+    
+    console.log('📋 Pending applications count:', pendingCount);
+    res.json({ count: pendingCount });
   } catch (error) {
-    console.error('❌ Error fetching pending applications count:', error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    console.error('❌ Error fetching pending count:', error);
+    res.status(500).json({ error: 'Failed to fetch pending count' });
   }
 });
 
