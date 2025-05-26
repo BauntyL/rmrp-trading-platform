@@ -1,10 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const storage = require('./storage-fixed'); // ИСПОЛЬЗУЕМ ИСПРАВЛЕННЫЙ STORAGE
+const storage = require('./storage-fixed');
 
 const router = express.Router();
 
-// Middleware для проверки аутентификации БЕЗ PASSPORT
+// Middleware для проверки аутентификации
 function requireAuth(req, res, next) {
   if (req.session && req.session.user) {
     req.user = req.session.user;
@@ -34,7 +34,7 @@ function requireRole(roles) {
   };
 }
 
-// ИСПРАВЛЕННАЯ АУТЕНТИФИКАЦИЯ БЕЗ PASSPORT
+// Аутентификация
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -44,14 +44,12 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
     
-    // Получаем пользователя из базы
     const user = await storage.getUserByUsername(username);
     if (!user) {
       console.log('❌ User not found:', username);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    // ПРОВЕРКА ПАРОЛЯ
     const passwordMatch = await bcrypt.compare(password, user.password);
     
     if (!passwordMatch) {
@@ -59,7 +57,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    // СОЗДАЕМ СЕССИЮ ВРУЧНУЮ
     req.session.userId = user.id;
     req.session.user = {
       id: user.id,
@@ -67,7 +64,6 @@ router.post('/login', async (req, res) => {
       role: user.role
     };
     
-    // ПРИНУДИТЕЛЬНО СОХРАНЯЕМ СЕССИЮ
     req.session.save((err) => {
       if (err) {
         console.error('❌ Session save error:', err);
@@ -83,8 +79,6 @@ router.post('/login', async (req, res) => {
       };
       
       console.log('✅ Login successful for:', user.username);
-      console.log('📤 Sending response:', responseData);
-      console.log('🔍 Session after login:', req.session);
       res.json(responseData);
     });
     
@@ -103,17 +97,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
     
-    // Проверка существования пользователя
     const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
       console.log('❌ User already exists:', username);
       return res.status(400).json({ error: 'User already exists' });
     }
     
-    // Хеширование пароля
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Создание пользователя
     const user = await storage.createUser({
       username,
       password: hashedPassword,
@@ -146,11 +137,8 @@ router.post('/logout', (req, res) => {
   });
 });
 
-// ИСПРАВЛЕННЫЙ ENDPOINT ПОЛЬЗОВАТЕЛЯ
 router.get('/user', (req, res) => {
   console.log('👤 User info requested');
-  console.log('🔍 Session data:', req.session);
-  console.log('🔍 Session user:', req.session?.user);
   
   if (req.session && req.session.user) {
     const userData = {
@@ -168,13 +156,12 @@ router.get('/user', (req, res) => {
   }
 });
 
-// ИСПРАВЛЕННЫЙ ENDPOINT ДЛЯ СОЗДАНИЯ ЗАЯВОК
+// Заявки
 router.post('/applications', requireAuth, async (req, res) => {
   try {
     console.log('📝 Creating application for user:', req.user.username);
     console.log('📋 RAW request body:', req.body);
     
-    // ПЕРЕДАЕМ ВСЕ ПОЛЯ НАПРЯМУЮ
     const applicationData = {
       ...req.body,
       createdBy: req.user.id,
@@ -197,7 +184,6 @@ router.post('/applications', requireAuth, async (req, res) => {
   }
 });
 
-// Получение заявок на модерацию (только для модераторов и админов)
 router.get('/applications/pending', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📋 Fetching pending applications for:', req.user.username);
@@ -212,7 +198,6 @@ router.get('/applications/pending', requireAuth, requireRole(['moderator', 'admi
   }
 });
 
-// Получение заявок пользователя
 router.get('/my-applications', requireAuth, async (req, res) => {
   try {
     console.log('📋 Fetching applications for user:', req.user.username);
@@ -226,7 +211,7 @@ router.get('/my-applications', requireAuth, async (req, res) => {
   }
 });
 
-// Обновление статуса заявки (только для модераторов и админов)
+// ИСПРАВЛЕННОЕ СОЗДАНИЕ ОБЪЯВЛЕНИЯ С КОНТАКТАМИ
 router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -240,7 +225,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
     
     const application = await storage.updateApplicationStatus(id, status);
     
-    // ИСПРАВЛЕННОЕ СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
+    // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ И КОНТАКТАМИ
     if (status === 'approved') {
       console.log('✅ Creating car listing from approved application');
       await storage.createCarListing({
@@ -254,7 +239,10 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
         isPremium: application.isPremium,
         description: application.description,
         ownerId: application.createdBy,
-        applicationId: application.id
+        applicationId: application.id,
+        phone: application.phone,        // ← КОНТАКТЫ!
+        telegram: application.telegram,  // ← КОНТАКТЫ!
+        discord: application.discord     // ← КОНТАКТЫ!
       });
     }
     
@@ -265,7 +253,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
   }
 });
 
-// Получение объявлений автомобилей
+// Автомобили
 router.get('/cars', requireAuth, async (req, res) => {
   try {
     console.log('🚗 Fetching car listings...');
@@ -279,7 +267,6 @@ router.get('/cars', requireAuth, async (req, res) => {
   }
 });
 
-// Получение конкретного объявления
 router.get('/cars/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -297,23 +284,95 @@ router.get('/cars/:id', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/my-cars', requireAuth, async (req, res) => {
+  try {
+    console.log('🚗 Fetching cars for user:', req.user.username);
+    const cars = await storage.getUserCarListings(req.user.id);
+    
+    console.log('📋 User', req.user.username, 'has', cars.length, 'cars');
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error fetching user cars:', error);
+    res.status(500).json({ error: 'Failed to fetch user cars' });
+  }
+});
+
+router.delete('/cars/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ Deleting car:', id, 'by user:', req.user.username, 'role:', req.user.role);
+    
+    const car = await storage.getCarListingById(id);
+    if (!car) {
+      console.log('❌ Car not found:', id);
+      return res.status(404).json({ error: 'Car not found' });
+    }
+    
+    const isOwner = car.owner_id === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    
+    if (!isOwner && !isAdmin) {
+      console.log('❌ Access denied. User:', req.user.id, 'Owner:', car.owner_id, 'IsAdmin:', isAdmin);
+      return res.status(403).json({ error: 'Access denied. You can only delete your own cars or be an admin.' });
+    }
+    
+    await storage.deleteCarListing(id);
+    
+    console.log('✅ Car deleted successfully:', id, 'by:', req.user.username);
+    res.json({ 
+      success: true, 
+      message: 'Car deleted successfully',
+      deletedBy: req.user.username,
+      wasOwner: isOwner
+    });
+    
+  } catch (error) {
+    console.error('❌ Error deleting car:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete car',
+      details: error.message 
+    });
+  }
+});
+
 // Сообщения
 router.post('/messages', requireAuth, async (req, res) => {
   try {
     const { receiverId, content, carId } = req.body;
-    console.log('💬 Creating message from:', req.user.username, 'to user:', receiverId);
+    console.log('💬 Creating message from:', req.user.username, 'to user:', receiverId, 'about car:', carId);
+    
+    // Проверяем, что все поля заполнены
+    if (!receiverId || !content || !carId) {
+      return res.status(400).json({ error: 'Missing required fields: receiverId, content, carId' });
+    }
+    
+    // Проверяем, что получатель существует
+    const receiver = await storage.getUserById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ error: 'Receiver not found' });
+    }
+    
+    // Проверяем, что автомобиль существует
+    const car = await storage.getCarListingById(carId);
+    if (!car) {
+      return res.status(404).json({ error: 'Car not found' });
+    }
     
     const message = await storage.createMessage({
       senderId: req.user.id,
-      receiverId,
+      receiverId: parseInt(receiverId),
       content,
-      carId
+      carId: parseInt(carId)
     });
     
+    console.log('✅ Message created:', message.id);
     res.status(201).json(message);
   } catch (error) {
     console.error('❌ Error creating message:', error);
-    res.status(500).json({ error: 'Failed to create message' });
+    res.status(500).json({ 
+      error: 'Failed to create message',
+      details: error.message 
+    });
   }
 });
 
@@ -392,103 +451,12 @@ router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   }
 });
 
-// ========================================
-// УПРАВЛЕНИЕ АВТОМОБИЛЯМИ
-// ========================================
-
-// Получение автомобилей пользователя
-router.get('/my-cars', requireAuth, async (req, res) => {
-  try {
-    console.log('🚗 Fetching cars for user:', req.user.username);
-    const cars = await storage.getUserCarListings(req.user.id);
-    
-    console.log('📋 User', req.user.username, 'has', cars.length, 'cars');
-    res.json(cars);
-  } catch (error) {
-    console.error('❌ Error fetching user cars:', error);
-    res.status(500).json({ error: 'Failed to fetch user cars' });
-  }
-});
-
-// Удаление объявления автомобиля (владелец или админ)
-router.delete('/cars/:id', requireAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log('🗑️ Deleting car:', id, 'by user:', req.user.username, 'role:', req.user.role);
-    
-    // Получаем информацию об автомобиле
-    const car = await storage.getCarListingById(id);
-    if (!car) {
-      console.log('❌ Car not found:', id);
-      return res.status(404).json({ error: 'Car not found' });
-    }
-    
-    // Проверяем права: владелец или админ
-    const isOwner = car.owner_id === req.user.id;
-    const isAdmin = req.user.role === 'admin';
-    
-    if (!isOwner && !isAdmin) {
-      console.log('❌ Access denied. User:', req.user.id, 'Owner:', car.owner_id, 'IsAdmin:', isAdmin);
-      return res.status(403).json({ error: 'Access denied. You can only delete your own cars or be an admin.' });
-    }
-    
-    // Удаляем автомобиль
-    await storage.deleteCarListing(id);
-    
-    console.log('✅ Car deleted successfully:', id, 'by:', req.user.username);
-    res.json({ 
-      success: true, 
-      message: 'Car deleted successfully',
-      deletedBy: req.user.username,
-      wasOwner: isOwner
-    });
-    
-  } catch (error) {
-    console.error('❌ Error deleting car:', error);
-    res.status(500).json({ 
-      error: 'Failed to delete car',
-      details: error.message 
-    });
-  }
-});
-
-// ДОПОЛНИТЕЛЬНО: Админ endpoint для принудительного удаления
-router.delete('/admin/cars/:id', requireAuth, requireRole(['admin']), async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log('🔨 Admin force deleting car:', id, 'by:', req.user.username);
-    
-    const car = await storage.getCarListingById(id);
-    if (!car) {
-      return res.status(404).json({ error: 'Car not found' });
-    }
-    
-    await storage.deleteCarListing(id);
-    
-    console.log('✅ Car force deleted by admin:', id);
-    res.json({ 
-      success: true, 
-      message: 'Car force deleted by admin',
-      originalOwner: car.owner_id 
-    });
-    
-  } catch (error) {
-    console.error('❌ Error in admin car deletion:', error);
-    res.status(500).json({ error: 'Failed to delete car' });
-  }
-});
-
-// ========================================
-// ADMIN ENDPOINTS ДЛЯ УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
-// ========================================
-
-// Получение всех пользователей (только для админов)
+// Админ панель
 router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     console.log('👥 Admin fetching all users:', req.user.username);
     const users = await storage.getAllUsers();
     
-    // Убираем пароли из ответа для безопасности
     const safeUsers = users.map(user => ({
       id: user.id,
       username: user.username,
@@ -504,7 +472,6 @@ router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res)
   }
 });
 
-// Обновление роли пользователя (только для админов)
 router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -516,7 +483,6 @@ router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async
       return res.status(400).json({ error: 'Invalid role' });
     }
     
-    // Не даем админу убрать свою роль
     if (parseInt(id) === req.user.id && role !== 'admin') {
       return res.status(400).json({ error: 'Cannot change your own admin role' });
     }
@@ -535,7 +501,6 @@ router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async
   }
 });
 
-// Получение всех заявок (для админов и модераторов)
 router.get('/applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📋 Fetching all applications for:', req.user.username);
@@ -549,7 +514,6 @@ router.get('/applications', requireAuth, requireRole(['moderator', 'admin']), as
   }
 });
 
-// Статистика (для админов и модераторов)
 router.get('/stats/pending-applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📊 Fetching pending applications count for:', req.user.username);
@@ -564,18 +528,14 @@ router.get('/stats/pending-applications', requireAuth, requireRole(['moderator',
   }
 });
 
-// ========================================
-// ВРЕМЕННЫЙ ENDPOINT ДЛЯ МИГРАЦИИ (УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ!)
-// ========================================
-
+// ОБНОВЛЕННАЯ МИГРАЦИЯ С КОНТАКТАМИ
 router.get('/admin/migrate', async (req, res) => {
   try {
     const { getClient } = require('./db');
     const client = getClient();
     
-    console.log('🔧 Starting database migration...');
+    console.log('🔧 Starting database migration with contacts...');
     
-    // Добавляем все недостающие колонки
     await client.query(`
       ALTER TABLE car_listings 
       ADD COLUMN IF NOT EXISTS category VARCHAR(50),
@@ -583,12 +543,14 @@ router.get('/admin/migrate', async (req, res) => {
       ADD COLUMN IF NOT EXISTS "maxSpeed" INTEGER,
       ADD COLUMN IF NOT EXISTS acceleration VARCHAR(50),
       ADD COLUMN IF NOT EXISTS drive VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS "isPremium" BOOLEAN DEFAULT false;
+      ADD COLUMN IF NOT EXISTS "isPremium" BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS telegram VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS discord VARCHAR(50);
     `);
     
-    console.log('✅ Migration commands executed successfully!');
+    console.log('✅ Migration with contacts executed successfully!');
     
-    // Проверяем текущую структуру таблицы
     const result = await client.query(`
       SELECT column_name, data_type, is_nullable, column_default
       FROM information_schema.columns 
@@ -600,13 +562,14 @@ router.get('/admin/migrate', async (req, res) => {
     
     res.json({
       success: true,
-      message: '🎉 Database migration completed successfully!',
-      details: 'Added columns: category, server, maxSpeed, acceleration, drive, isPremium',
+      message: '🎉 Database migration with contacts completed!',
+      details: 'Added columns: category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord',
       tableStructure: result.rows,
       nextSteps: [
         '1. Test by approving a car application',
-        '2. Check if car appears in catalog',
-        '3. Remove this migration endpoint from routes.js'
+        '2. Check if car appears with contacts in catalog',
+        '3. Test messaging functionality',
+        '4. Remove this migration endpoint'
       ]
     });
     
@@ -615,8 +578,7 @@ router.get('/admin/migrate', async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: 'Migration failed', 
-      details: error.message,
-      advice: 'Check console logs for detailed error information'
+      details: error.message
     });
   }
 });
