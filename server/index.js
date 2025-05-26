@@ -32,16 +32,25 @@ try {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Настройка сессий
+// ИСПРАВЛЕННАЯ НАСТРОЙКА СЕССИЙ
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key-here',
-  resave: false,
-  saveUninitialized: false,
+  secret: process.env.SESSION_SECRET || 'your-secret-key-here-12345',
+  resave: true,              // ИЗМЕНИЛИ НА true
+  saveUninitialized: true,   // ИЗМЕНИЛИ НА true
   cookie: {
     secure: false,
+    httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  },
+  name: 'connect.sid'         // ДОБАВИЛИ ИМЯ СЕССИИ
 }));
+
+// MIDDLEWARE ДЛЯ ОТЛАДКИ СЕССИЙ
+app.use((req, res, next) => {
+  console.log('🔍 Session middleware - Session ID:', req.sessionID);
+  console.log('🔍 Session data before request:', req.session);
+  next();
+});
 
 // Статические файлы
 console.log('📁 Setting up static files middleware...');
