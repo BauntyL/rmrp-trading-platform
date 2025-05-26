@@ -157,12 +157,22 @@ function setupRoutes(app) {
   app.post('/api/applications', requireAuth, async (req, res) => {
     try {
       console.log('📝 Creating application for user:', req.user.username);
-      console.log('📋 Application data:', req.body);
+      console.log('📋 RAW request body:', req.body);
       
       const { brand, model, year, price, description } = req.body;
       
+      console.log('📋 Extracted data:', {
+        brand, model, year, price, description
+      });
+      
       // Валидация данных
       if (!brand || !model || !year || !price) {
+        console.log('❌ Missing required fields:', {
+          brand: !!brand,
+          model: !!model, 
+          year: !!year,
+          price: !!price
+        });
         return res.status(400).json({ error: 'Missing required fields' });
       }
       
@@ -273,7 +283,7 @@ function setupRoutes(app) {
             year: application.year,
             price: application.price,
             description: application.description,
-            ownerId: application.created_by,
+            ownerId: application.createdBy,
             applicationId: application.id
           });
           console.log('🚗 Car listing created successfully');
