@@ -22,9 +22,9 @@ import { CarCard } from "@/components/car-card.tsx";
 import { AddCarModal } from "@/components/add-car-modal.tsx";
 import { MessagesPanel } from "@/components/messages-panel.tsx";
 import { UnreadMessagesCounter } from "@/components/unread-messages-counter.tsx";
-import { SecurityPanel } from "@/components/security-panel.tsx";
-import { MessageModerationPanel } from "@/components/message-moderation-panel.tsx";
-import { UserManagementPanel } from "@/components/user-management-panel.tsx";
+// import { SecurityPanel } from "@/components/security-panel.tsx";
+// import { MessageModerationPanel } from "@/components/message-moderation-panel.tsx";
+// import { UserManagementPanel } from "@/components/user-management-panel.tsx";
 import { useAuth } from "@/hooks/use-auth.tsx";
 
 export default function HomePage() {
@@ -91,7 +91,6 @@ export default function HomePage() {
               </Button>
             </div>
 
-            {/* Фильтры */}
             <div className="flex space-x-4 bg-slate-800 p-4 rounded-lg">
               <div className="flex-1">
                 <Input
@@ -129,7 +128,6 @@ export default function HomePage() {
               Найдено: {approvedCars.length} автомобилей
             </div>
 
-            {/* Каталог */}
             {carsLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -242,7 +240,12 @@ export default function HomePage() {
         );
 
       case 'security':
-        return <SecurityPanel />;
+        return (
+          <div className="p-6">
+            <h1 className="text-3xl font-bold text-white mb-4">Безопасность</h1>
+            <p className="text-slate-400">Раздел в разработке</p>
+          </div>
+        );
 
       case 'pending-cars':
         return (
@@ -288,10 +291,20 @@ export default function HomePage() {
         );
 
       case 'moderation-history':
-        return <MessageModerationPanel />;
+        return (
+          <div className="p-6">
+            <h1 className="text-3xl font-bold text-white mb-4">Модерация сообщений</h1>
+            <p className="text-slate-400">Раздел в разработке</p>
+          </div>
+        );
 
       case 'user-management':
-        return <UserManagementPanel />;
+        return (
+          <div className="p-6">
+            <h1 className="text-3xl font-bold text-white mb-4">Управление пользователями</h1>
+            <p className="text-slate-400">Раздел в разработке</p>
+          </div>
+        );
 
       default:
         return (
