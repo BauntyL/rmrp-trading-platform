@@ -67,15 +67,24 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
   const [deleteUserModalOpen, setDeleteUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const { data: applications = [], isLoading: applicationsLoading } = useQuery<CarApplication[]>({
-    queryKey: ["/api/applications"],
+  // ИСПРАВЛЕННЫЙ ЗАПРОС - ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ ENDPOINT
+  const { data: pendingApplications = [], isLoading: applicationsLoading } = useQuery<CarApplication[]>({
+    queryKey: ["/api/applications/pending"],  // ✅ ИСПРАВЛЕНО!
     enabled: activeTab === "moderation" && (user?.role === "moderator" || user?.role === "admin"),
     refetchInterval: 5000, // Автообновление заявок каждые 5 секунд
     refetchOnWindowFocus: true,
   });
 
+  // ОТДЕЛЬНЫЙ ЗАПРОС ДЛЯ ОБРАБОТАННЫХ ЗАЯВОК
+  const { data: allApplications = [], isLoading: allApplicationsLoading } = useQuery<CarApplication[]>({
+    queryKey: ["/api/applications"],
+    enabled: activeTab === "moderation" && (user?.role === "moderator" || user?.role === "admin"),
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+  });
+
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/admin/users"],
     enabled: activeTab === "users" && user?.role === "admin",
     refetchInterval: 30000, // Автообновление пользователей каждые 30 секунд
     refetchOnWindowFocus: true,
@@ -83,12 +92,13 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
 
   const updateApplicationMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: "approved" | "rejected" }) => {
-      const res = await apiRequest("PATCH", `/api/applications/${id}`, { status });
+      const res = await apiRequest("PATCH", `/api/applications/${id}/status`, { status });
       return await res.json();
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/applications/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/pending-applications"] });
       toast({
         title: status === "approved" ? "Заявка одобрена" : "Заявка отклонена",
         description: status === "approved" 
@@ -108,11 +118,11 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
 
   const updateUserRoleMutation = useMutation({
     mutationFn: async ({ id, role }: { id: number; role: "user" | "moderator" | "admin" }) => {
-      const res = await apiRequest("PATCH", `/api/users/${id}/role`, { role });
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}/role`, { role });
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: "Роль обновлена",
         description: "Роль пользователя успешно изменена",
@@ -145,8 +155,8 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
     });
   };
 
-  const pendingApplications = applications.filter(app => app.status === "pending");
-  const processedApplications = applications.filter(app => app.status !== "pending");
+  // УБИРАЕМ ФИЛЬТРАЦИЮ - ИСПОЛЬЗУЕМ ДАННЫЕ НАПРЯМУЮ
+  const processedApplications = allApplications.filter(app => app.status !== "pending");
 
   return (
     <div className="space-y-6">
@@ -210,11 +220,11 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <span className="text-slate-400">Категория:</span>
-                          <div className="text-white font-medium">{categoryNames[application.category]}</div>
+                          <div className="text-white font-medium">{application.category ? categoryNames[application.category] : 'Не указано'}</div>
                         </div>
                         <div>
                           <span className="text-slate-400">Сервер:</span>
-                          <div className="text-white font-medium">{serverNames[application.server]}</div>
+                          <div className="text-white font-medium">{application.server ? serverNames[application.server] : 'Не указано'}</div>
                         </div>
                         <div>
                           <span className="text-slate-400">Цена:</span>
@@ -222,7 +232,7 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                         </div>
                         <div>
                           <span className="text-slate-400">Макс. скорость:</span>
-                          <div className="text-white font-medium">{application.maxSpeed} км/ч</div>
+                          <div className="text-white font-medium">{application.maxSpeed || 'Не указано'} км/ч</div>
                         </div>
                       </div>
 
@@ -262,11 +272,11 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-slate-400">Категория:</span>
-                                        <span className="text-white">{categoryNames[selectedApplication.category]}</span>
+                                        <span className="text-white">{selectedApplication.category ? categoryNames[selectedApplication.category] : 'Не указано'}</span>
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-slate-400">Сервер:</span>
-                                        <span className="text-white">{serverNames[selectedApplication.server]}</span>
+                                        <span className="text-white">{selectedApplication.server ? serverNames[selectedApplication.server] : 'Не указано'}</span>
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-slate-400">Цена:</span>
@@ -279,42 +289,23 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                                     <div className="space-y-2 text-sm">
                                       <div className="flex justify-between">
                                         <span className="text-slate-400">Макс. скорость:</span>
-                                        <span className="text-white">{selectedApplication.maxSpeed} км/ч</span>
+                                        <span className="text-white">{selectedApplication.maxSpeed || 'Не указано'} км/ч</span>
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-slate-400">Разгон:</span>
-                                        <span className="text-white">{selectedApplication.acceleration}</span>
+                                        <span className="text-white">{selectedApplication.acceleration || 'Не указано'}</span>
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-slate-400">Привод:</span>
-                                        <span className="text-white">{selectedApplication.drive}</span>
+                                        <span className="text-white">{selectedApplication.drive || 'Не указано'}</span>
                                       </div>
-                                      {selectedApplication.serverId && (
-                                        <div className="flex justify-between">
-                                          <span className="text-slate-400">ID сервера:</span>
-                                          <span className="text-white">{selectedApplication.serverId}</span>
-                                        </div>
-                                      )}
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-400">Премиум:</span>
+                                        <span className="text-white">{selectedApplication.isPremium ? 'Да' : 'Нет'}</span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-
-                                {(selectedApplication.phone || selectedApplication.telegram || selectedApplication.discord) && (
-                                  <div>
-                                    <h4 className="font-semibold text-white mb-2">Контакты</h4>
-                                    <div className="space-y-1 text-sm">
-                                      {selectedApplication.phone && (
-                                        <div>Телефон: <span className="text-slate-300">{selectedApplication.phone}</span></div>
-                                      )}
-                                      {selectedApplication.telegram && (
-                                        <div>Telegram: <span className="text-slate-300">{selectedApplication.telegram}</span></div>
-                                      )}
-                                      {selectedApplication.discord && (
-                                        <div>Discord: <span className="text-slate-300">{selectedApplication.discord}</span></div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
 
                                 {selectedApplication.description && (
                                   <div>
@@ -323,25 +314,18 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                                   </div>
                                 )}
 
-                                <div className="flex space-x-3 pt-4 border-t border-slate-700">
+                                <div className="flex space-x-3 pt-4">
                                   <Button
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                    onClick={() => updateApplicationMutation.mutate({ 
-                                      id: selectedApplication.id, 
-                                      status: "approved" 
-                                    })}
+                                    onClick={() => updateApplicationMutation.mutate({ id: selectedApplication.id, status: "approved" })}
+                                    className="bg-green-600 hover:bg-green-700"
                                     disabled={updateApplicationMutation.isPending}
                                   >
                                     <CheckCircle className="h-4 w-4 mr-2" />
                                     Одобрить
                                   </Button>
                                   <Button
+                                    onClick={() => updateApplicationMutation.mutate({ id: selectedApplication.id, status: "rejected" })}
                                     variant="destructive"
-                                    className="flex-1"
-                                    onClick={() => updateApplicationMutation.mutate({ 
-                                      id: selectedApplication.id, 
-                                      status: "rejected" 
-                                    })}
                                     disabled={updateApplicationMutation.isPending}
                                   >
                                     <XCircle className="h-4 w-4 mr-2" />
@@ -354,24 +338,18 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
                         </Dialog>
 
                         <Button
+                          onClick={() => updateApplicationMutation.mutate({ id: application.id, status: "approved" })}
                           size="sm"
                           className="bg-green-600 hover:bg-green-700"
-                          onClick={() => updateApplicationMutation.mutate({ 
-                            id: application.id, 
-                            status: "approved" 
-                          })}
                           disabled={updateApplicationMutation.isPending}
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Одобрить
                         </Button>
                         <Button
-                          variant="destructive"
+                          onClick={() => updateApplicationMutation.mutate({ id: application.id, status: "rejected" })}
                           size="sm"
-                          onClick={() => updateApplicationMutation.mutate({ 
-                            id: application.id, 
-                            status: "rejected" 
-                          })}
+                          variant="destructive"
                           disabled={updateApplicationMutation.isPending}
                         >
                           <XCircle className="h-4 w-4 mr-2" />
@@ -386,147 +364,152 @@ export function ModerationPanel({ activeTab }: ModerationPanelProps) {
           </TabsContent>
 
           <TabsContent value="processed" className="space-y-4">
-            {processedApplications.length === 0 ? (
+            {allApplicationsLoading ? (
+              <div className="text-center py-8">
+                <div className="text-slate-400">Загрузка заявок...</div>
+              </div>
+            ) : processedApplications.length === 0 ? (
               <Card className="bg-slate-800 border-slate-700">
                 <CardContent className="py-8 text-center">
                   <div className="text-slate-400 text-lg mb-2">Нет обработанных заявок</div>
-                  <p className="text-slate-500">Здесь будут отображаться одобренные и отклоненные заявки</p>
+                  <p className="text-slate-500">История модерации пуста</p>
                 </CardContent>
               </Card>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700">
-                    <TableHead className="text-slate-300">Название</TableHead>
-                    <TableHead className="text-slate-300">Категория</TableHead>
-                    <TableHead className="text-slate-300">Статус</TableHead>
-                    <TableHead className="text-slate-300">Дата обработки</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {processedApplications.map((application) => (
-                    <TableRow key={application.id} className="border-slate-700">
-                      <TableCell className="text-white">{application.name}</TableCell>
-                      <TableCell className="text-slate-300">{categoryNames[application.category]}</TableCell>
-                      <TableCell>
+              <div className="space-y-4">
+                {processedApplications.map((application) => (
+                  <Card key={application.id} className="bg-slate-800 border-slate-700">
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-white font-medium">{application.name}</h4>
+                          <p className="text-slate-400 text-sm">
+                            {formatDate(application.createdAt)} • {formatPrice(application.price)}
+                          </p>
+                        </div>
                         <Badge className={`${statusColors[application.status]}`}>
                           {statusNames[application.status]}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-slate-300">
-                        {application.reviewedAt ? formatDate(application.reviewedAt) : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </TabsContent>
         </Tabs>
       )}
 
-      {activeTab === "users" && user?.role === "admin" && (
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader>
-            <CardTitle className="flex items-center text-white">
-              <Users className="h-5 w-5 mr-2" />
-              Пользователи системы
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Управление ролями и правами пользователей
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {usersLoading ? (
-              <div className="text-center py-8">
-                <div className="text-slate-400">Загрузка пользователей...</div>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700">
-                    <TableHead className="text-slate-300">Пользователь</TableHead>
-                    <TableHead className="text-slate-300">Роль</TableHead>
-                    <TableHead className="text-slate-300">Дата регистрации</TableHead>
-                    <TableHead className="text-slate-300">Действия</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((userItem) => (
-                    <TableRow key={userItem.id} className="border-slate-700">
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-primary/40 to-primary rounded-full flex items-center justify-center">
-                            <span className="text-white font-semibold text-sm">
-                              {userItem.username.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <span className="text-white font-medium">{userItem.username}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${roleColors[userItem.role]} flex items-center w-fit`}>
-                          {userItem.role === "admin" && <Crown className="h-3 w-3 mr-1" />}
-                          {userItem.role === "moderator" && <Shield className="h-3 w-3 mr-1" />}
-                          {roleNames[userItem.role]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-slate-300">
-                        {formatDate(userItem.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        {userItem.id !== user.id ? (
-                          <div className="flex items-center space-x-2">
+      {activeTab === "users" && (
+        <div className="space-y-4">
+          {usersLoading ? (
+            <div className="text-center py-8">
+              <div className="text-slate-400">Загрузка пользователей...</div>
+            </div>
+          ) : (
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <Users className="h-5 w-5 mr-2" />
+                  Пользователи ({users.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-700">
+                      <TableHead className="text-slate-300">Пользователь</TableHead>
+                      <TableHead className="text-slate-300">Роль</TableHead>
+                      <TableHead className="text-slate-300">Дата регистрации</TableHead>
+                      <TableHead className="text-slate-300">Действия</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((userItem) => (
+                      <TableRow key={userItem.id} className="border-slate-700">
+                        <TableCell className="text-white font-medium">{userItem.username}</TableCell>
+                        <TableCell>
+                          <Badge className={`${roleColors[userItem.role]}`}>
+                            {userItem.role === "admin" && <Crown className="h-3 w-3 mr-1" />}
+                            {userItem.role === "moderator" && <Shield className="h-3 w-3 mr-1" />}
+                            {roleNames[userItem.role]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-400">
+                          {formatDate(userItem.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Select
+                              value={userItem.role}
+                              onValueChange={(newRole) => {
+                                if (newRole !== userItem.role) {
+                                  updateUserRoleMutation.mutate({ 
+                                    id: userItem.id, 
+                                    role: newRole as "user" | "moderator" | "admin" 
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-32 bg-slate-700 border-slate-600">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="user">Пользователь</SelectItem>
+                                <SelectItem value="moderator">Модератор</SelectItem>
+                                <SelectItem value="admin">Администратор</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Button
-                              size="sm"
                               variant="outline"
+                              size="sm"
                               onClick={() => {
                                 setSelectedUser(userItem);
                                 setEditUserModalOpen(true);
                               }}
                               className="border-slate-600 text-slate-300 hover:bg-slate-700"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Изменить
+                              <Edit className="h-4 w-4" />
                             </Button>
                             <Button
+                              variant="outline"
                               size="sm"
-                              variant="destructive"
                               onClick={() => {
                                 setSelectedUser(userItem);
                                 setDeleteUserModalOpen(true);
                               }}
-                              className="bg-red-600 hover:bg-red-700"
+                              className="border-red-600 text-red-400 hover:bg-red-600/10"
                             >
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Удалить
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                        ) : (
-                          <span className="text-slate-500 text-sm">Текущий пользователь</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
-      {/* Модальные окна управления пользователями */}
-      <EditUserModal
-        user={selectedUser}
-        open={editUserModalOpen}
-        onOpenChange={setEditUserModalOpen}
-      />
-      
-      <DeleteUserModal
-        user={selectedUser}
-        open={deleteUserModalOpen}
-        onOpenChange={setDeleteUserModalOpen}
-      />
+      {/* Модальные окна */}
+      {editUserModalOpen && selectedUser && (
+        <EditUserModal
+          user={selectedUser}
+          open={editUserModalOpen}
+          onOpenChange={setEditUserModalOpen}
+        />
+      )}
+
+      {deleteUserModalOpen && selectedUser && (
+        <DeleteUserModal
+          user={selectedUser}
+          open={deleteUserModalOpen}
+          onOpenChange={setDeleteUserModalOpen}
+        />
+      )}
     </div>
   );
 }
