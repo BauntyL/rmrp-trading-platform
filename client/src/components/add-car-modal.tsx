@@ -69,6 +69,9 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
 
   const createApplicationMutation = useMutation({
     mutationFn: async (data: CarApplicationFormData) => {
+      console.log('🚀 Starting form submission...');
+      console.log('📤 Original form data:', data);
+      
       // Filter out empty strings for optional fields
       const cleanData = {
         ...data,
@@ -79,10 +82,33 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         imageUrl: data.imageUrl || undefined,
         description: data.description || undefined,
       };
-      const res = await apiRequest("POST", "/api/applications", cleanData);
-      return await res.json();
+      
+      console.log('📤 Clean data to send:', cleanData);
+      
+      try {
+        console.log('📡 Making API request to /api/applications...');
+        const res = await apiRequest("POST", "/api/applications", cleanData);
+        console.log('📥 Raw API Response:', res);
+        console.log('📊 Response status:', res.status);
+        console.log('📊 Response ok:', res.ok);
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('❌ API Error response:', errorText);
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+        
+        const result = await res.json();
+        console.log('✅ Parsed API Response:', result);
+        return result;
+        
+      } catch (error) {
+        console.error('💥 API Request failed:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      console.log('🎉 Mutation successful:', result);
       queryClient.invalidateQueries({ queryKey: ["/api/my-applications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/applications/pending"] });
       toast({
@@ -93,6 +119,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
       onOpenChange(false);
     },
     onError: (error: any) => {
+      console.error('💥 Mutation failed:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -102,6 +129,8 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
   });
 
   const onSubmit = (data: CarApplicationFormData) => {
+    console.log('🚀 Form submitted with data:', data);
+    console.log('🔄 Starting mutation...');
     createApplicationMutation.mutate(data);
   };
 
@@ -351,88 +380,86 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
               </div>
             </div>
 
-            {/* Additional Information */}
-            <div className="space-y-4">
-              <h4 className="text-lg font-semibold text-white">Дополнительная информация</h4>
-              
-              <FormField
-                control={form.control}
-                name="imageUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Ссылка на изображение</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="url"
-                        placeholder="https://example.com/image.jpg"
-                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Image URL */}
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-300">Ссылка на изображение</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="url"
+                      placeholder="https://example.com/car-image.jpg"
+                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Описание</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Дополнительная информация об автомобиле..."
-                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 min-h-[80px]"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Description */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-300">Дополнительное описание</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Дополнительная информация об автомобиле..."
+                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 min-h-[80px]"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="isPremium"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        className="border-slate-600 text-primary"
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="text-slate-300">
-                        Премиум размещение
-                      </FormLabel>
-                      <p className="text-sm text-slate-400">
-                        Ваше объявление будет выделено и показано в топе
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Premium checkbox */}
+            <FormField
+              control={form.control}
+              name="isPremium"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-slate-600 p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      className="border-slate-500 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-slate-300 cursor-pointer">
+                      Премиум автомобиль
+                    </FormLabel>
+                    <p className="text-sm text-slate-400">
+                      Отметьте, если это редкий или эксклюзивный автомобиль
+                    </p>
+                  </div>
+                </FormItem>
+              )}
+            />
 
             {/* Submit Button */}
-            <div className="flex space-x-3 pt-4">
+            <div className="flex gap-3 pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+              >
+                Отмена
+              </Button>
               <Button
                 type="submit"
                 className="flex-1 bg-primary hover:bg-primary/90"
                 disabled={createApplicationMutation.isPending}
               >
                 {createApplicationMutation.isPending ? "Отправка..." : "Отправить заявку"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="border-slate-600 text-slate-300 hover:bg-slate-700"
-              >
-                Отмена
               </Button>
             </div>
           </form>
