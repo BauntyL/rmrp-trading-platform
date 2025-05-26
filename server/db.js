@@ -1,86 +1,100 @@
-import pkg from 'pg';
-const { Pool } = pkg;
+const { Client } = require('pg');
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+let client;
+
+async function initDb() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+
+    console.log('🔄 Connecting to database...');
+    
+    client = new Client({
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+
+    await client.connect();
+    console.log('✅ Database connected successfully');
+
+    // Initialize tables
+    await initializeTables();
+
+    return client;
+  } catch (error) {
+    console.error('❌ Database connection failed:', error);
+    throw error;
+  }
 }
 
-export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-
-// Добавляем экспорт db для совместимости
-export const db = pool;
-
-// Инициализация таблиц
-export async function initDatabase() {
+async function initializeTables() {
   try {
     console.log("🔧 Initializing database tables...");
     
-    // Создаем таблицы если не существуют
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'user',
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cars (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT,
-        price INTEGER NOT NULL,
-        category VARCHAR(100) NOT NULL,
-        server VARCHAR(100) NOT NULL,
-        "createdBy" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "imageUrl" TEXT DEFAULT 'https://via.placeholder.com/400x300?text=Car',
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS car_applications (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
+        brand VARCHAR(255) NOT NULL,
+        model VARCHAR(255) NOT NULL,
+        year INTEGER NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
         description TEXT,
-        price INTEGER NOT NULL,
-        category VARCHAR(100) NOT NULL,
-        server VARCHAR(100) NOT NULL,
-        "createdBy" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "imageUrl" TEXT DEFAULT 'https://via.placeholder.com/400x300?text=Car',
         status VARCHAR(50) DEFAULT 'pending',
-        "reviewedBy" INTEGER REFERENCES users(id),
-        "reviewedAt" TIMESTAMP,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        reviewed_by INTEGER REFERENCES users(id),
+        reviewed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS favorites (
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS car_listings (
         id SERIAL PRIMARY KEY,
-        "userId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "carId" INTEGER REFERENCES cars(id) ON DELETE CASCADE,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE("userId", "carId")
+        brand VARCHAR(255) NOT NULL,
+        model VARCHAR(255) NOT NULL,
+        year INTEGER NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        description TEXT,
+        owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        application_id INTEGER REFERENCES car_applications(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
-        "senderId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "receiverId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "carId" INTEGER REFERENCES cars(id) ON DELETE CASCADE,
+        sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        car_id INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
-        "isRead" BOOLEAN DEFAULT FALSE,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        car_id INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, car_id)
       )
     `);
 
@@ -91,3 +105,15 @@ export async function initDatabase() {
     throw error;
   }
 }
+
+function getClient() {
+  if (!client) {
+    throw new Error('Database not initialized. Call initDb() first.');
+  }
+  return client;
+}
+
+module.exports = {
+  initDb,
+  getClient
+};
