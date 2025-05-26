@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface EditUserModalProps {
   user: any;
@@ -16,27 +20,23 @@ interface EditUserModalProps {
 export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
   const [formData, setFormData] = useState({
-    username: user?.username || '',
-    email: user?.email || '',
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    role: user?.role || 'user',
+    username: user?.username || "",
+    email: user?.email || "",
   });
 
-  const updateUserMutation = useMutation({
+  const editUserMutation = useMutation({
     mutationFn: async (data: any) => {
       // В реальном проекте здесь будет запрос к API
       return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      onOpenChange(false);
       toast({
         title: "Пользователь обновлен",
         description: "Данные пользователя успешно обновлены",
       });
-      onOpenChange(false);
     },
     onError: (error: any) => {
       toast({
@@ -49,7 +49,10 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserMutation.mutate({ ...formData, id: user.id });
+    editUserMutation.mutate({
+      id: user.id,
+      ...formData,
+    });
   };
 
   return (
@@ -83,57 +86,21 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="firstName">Имя</Label>
-              <Input
-                id="firstName"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                className="bg-slate-700 border-slate-600 text-white"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="lastName">Фамилия</Label>
-              <Input
-                id="lastName"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                className="bg-slate-700 border-slate-600 text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="role">Роль</Label>
-            <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-700 border-slate-600">
-                <SelectItem value="user">Пользователь</SelectItem>
-                <SelectItem value="moderator">Модератор</SelectItem>
-                <SelectItem value="admin">Администратор</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex space-x-2 pt-4">
-            <Button 
-              type="submit" 
-              disabled={updateUserMutation.isPending}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-            >
-              {updateUserMutation.isPending ? 'Сохранение...' : 'Сохранить'}
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
+          <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => onOpenChange(false)}
-              className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+              className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
             >
               Отмена
+            </Button>
+            <Button
+              type="submit"
+              disabled={editUserMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {editUserMutation.isPending ? "Сохранение..." : "Сохранить"}
             </Button>
           </div>
         </form>
