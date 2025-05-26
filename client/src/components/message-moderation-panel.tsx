@@ -11,9 +11,7 @@ import {
   Car, 
   Clock, 
   Search, 
-  Filter,
   AlertTriangle,
-  CheckCircle,
   XCircle
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,35 +21,66 @@ export function MessageModerationPanel() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedDialog, setSelectedDialog] = useState<any>(null);
 
-  const { data: dialogs = [], isLoading } = useQuery({
+  // Мок данные для примера
+  const mockDialogs = [
+    {
+      id: 1,
+      carName: "BMW X5 2020",
+      buyerName: "Иван Петров",
+      sellerName: "Михаил Сидоров",
+      status: "active",
+      lastMessage: "2024-01-15T14:30:00Z",
+      messageCount: 12,
+      buyerId: 1,
+      sellerId: 2
+    },
+    {
+      id: 2,
+      carName: "Audi A6 2019",
+      buyerName: "Анна Козлова",
+      sellerName: "Дмитрий Волков",
+      status: "flagged",
+      lastMessage: "2024-01-14T16:45:00Z",
+      messageCount: 8,
+      buyerId: 3,
+      sellerId: 4
+    }
+  ];
+
+  const mockMessages = [
+    {
+      id: 1,
+      content: "Добрый день! Интересует ваш автомобиль. Можно договориться о встрече?",
+      senderId: 1,
+      senderName: "Иван Петров",
+      createdAt: "2024-01-15T14:30:00Z",
+      isBlocked: false,
+      isFlagged: false
+    },
+    {
+      id: 2,
+      content: "Здравствуйте! Конечно, давайте встретимся завтра в 15:00.",
+      senderId: 2,
+      senderName: "Михаил Сидоров",
+      createdAt: "2024-01-15T14:35:00Z",
+      isBlocked: false,
+      isFlagged: false
+    }
+  ];
+
+  const { data: dialogs = mockDialogs, isLoading } = useQuery({
     queryKey: ["/api/messages/moderation"],
     queryFn: async () => {
-      const response = await fetch('/api/messages/moderation', {
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch moderation data');
-      }
-      
-      return response.json();
+      // В реальном проекте здесь будет запрос к API
+      return mockDialogs;
     },
   });
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = mockMessages } = useQuery({
     queryKey: ["/api/messages/dialog", selectedDialog?.id],
     queryFn: async () => {
-      if (!selectedDialog?.id) return [];
-      
-      const response = await fetch(`/api/messages/dialog/${selectedDialog.id}`, {
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch messages');
-      }
-      
-      return response.json();
+      // В реальном проекте здесь будет запрос к API
+      return selectedDialog ? mockMessages : [];
     },
     enabled: !!selectedDialog?.id,
   });
@@ -92,7 +121,6 @@ export function MessageModerationPanel() {
       </div>
 
       <div className="flex space-x-4">
-        {/* Фильтры */}
         <div className="flex space-x-2 flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
