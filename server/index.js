@@ -69,7 +69,6 @@ passport.use(new LocalStrategy(
   async (username, password, done) => {
     try {
       console.log(`🔐 Authenticating user: ${username}`);
-      await initializeStorage();
       
       const user = await storage.getUserByUsername(username);
       if (!user) {
@@ -100,7 +99,6 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
   try {
     console.log(`🔧 Deserializing user ID: ${id}`);
-    await initializeStorage();
     const user = await storage.getUserById(id);
     console.log(`✅ User deserialized: ${user?.username || 'not found'}`);
     done(null, user);
@@ -133,8 +131,6 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
     }
 
-    await initializeStorage();
-    
     // Check if user already exists
     const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
@@ -293,7 +289,6 @@ app.get('/api/users', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Недостаточно прав доступа' });
     }
 
-    await initializeStorage();
     const users = await storage.getAllUsers();
     console.log(`📋 Admin ${req.user.username} requested ${users.length} users`);
     res.json(users);
@@ -323,8 +318,6 @@ app.patch('/api/users/:id', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Имя пользователя должно содержать минимум 3 символа' });
     }
 
-    await initializeStorage();
-    
     // Check if user exists
     const existingUser = await storage.getUserById(userId);
     if (!existingUser) {
@@ -364,7 +357,6 @@ app.patch('/api/users/:id', requireAdmin, async (req, res) => {
 app.get('/api/cars', requireAuth, async (req, res) => {
   try {
     console.log(`📝 GET /api/cars - User: ${req.user.username} - Fetching all cars`);
-    await initializeStorage();
     const cars = await storage.getAllCars();
     console.log(`📋 Found ${cars.length} cars`);
     console.log('📤 Cars data:', cars);
@@ -380,7 +372,6 @@ app.post('/api/cars', requireAuth, async (req, res) => {
     console.log(`📝 POST /api/cars - User: ${req.user.username}`);
     const carData = req.body;
     
-    await initializeStorage();
     const newCar = await storage.createCar({
       ...carData,
       createdBy: req.user.id
@@ -404,7 +395,6 @@ app.get('/api/applications/pending', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Недостаточно прав доступа' });
     }
 
-    await initializeStorage();
     const applications = await storage.getPendingApplications();
     console.log(`📋 ${req.user.role} ${req.user.username} requested ${applications.length} pending applications`);
     res.json(applications);
@@ -417,7 +407,6 @@ app.get('/api/applications/pending', requireAuth, async (req, res) => {
 app.get('/api/my-applications', requireAuth, async (req, res) => {
   try {
     console.log(`📝 GET /api/my-applications - User: ${req.user.username}`);
-    await initializeStorage();
     const applications = await storage.getUserApplications(req.user.id);
     console.log(`📋 User ${req.user.username} has ${applications.length} applications`);
     res.json(applications);
@@ -432,10 +421,9 @@ app.post('/api/applications', requireAuth, async (req, res) => {
     console.log(`📝 POST /api/applications - User: ${req.user.username}`);
     const applicationData = req.body;
     
-    await initializeStorage();
     const newApplication = await storage.createApplication({
       ...applicationData,
-      userId: req.user.id
+      createdBy: req.user.id
     });
     
     console.log(`✅ Application created by ${req.user.username}:`, newApplication);
@@ -451,7 +439,6 @@ app.post('/api/applications/:id/approve', requireModeratorOrAdmin, async (req, r
     const applicationId = parseInt(req.params.id);
     console.log(`📝 POST /api/applications/${applicationId}/approve - User: ${req.user.username}`);
     
-    await initializeStorage();
     const result = await storage.approveApplication(applicationId);
     
     console.log(`✅ Application ${applicationId} approved by ${req.user.username}:`, result);
@@ -468,7 +455,6 @@ app.post('/api/applications/:id/reject', requireModeratorOrAdmin, async (req, re
     const { reason } = req.body;
     console.log(`📝 POST /api/applications/${applicationId}/reject - User: ${req.user.username}`);
     
-    await initializeStorage();
     const result = await storage.rejectApplication(applicationId, reason);
     
     console.log(`❌ Application ${applicationId} rejected by ${req.user.username}:`, result);
@@ -483,7 +469,6 @@ app.post('/api/applications/:id/reject', requireModeratorOrAdmin, async (req, re
 app.get('/api/favorites', requireAuth, async (req, res) => {
   try {
     console.log(`📝 GET /api/favorites - User: ${req.user.username}`);
-    await initializeStorage();
     const favorites = await storage.getUserFavorites(req.user.id);
     console.log(`📋 User ${req.user.username} has ${favorites.length} favorites`);
     res.json(favorites);
@@ -498,7 +483,6 @@ app.post('/api/favorites/:carId', requireAuth, async (req, res) => {
     const carId = parseInt(req.params.carId);
     console.log(`📝 POST /api/favorites/${carId} - User: ${req.user.username}`);
     
-    await initializeStorage();
     await storage.addToFavorites(req.user.id, carId);
     
     console.log(`⭐ Car ${carId} added to favorites by ${req.user.username}`);
@@ -514,7 +498,6 @@ app.delete('/api/favorites/:carId', requireAuth, async (req, res) => {
     const carId = parseInt(req.params.carId);
     console.log(`📝 DELETE /api/favorites/${carId} - User: ${req.user.username}`);
     
-    await initializeStorage();
     await storage.removeFromFavorites(req.user.id, carId);
     
     console.log(`💔 Car ${carId} removed from favorites by ${req.user.username}`);
@@ -529,7 +512,6 @@ app.delete('/api/favorites/:carId', requireAuth, async (req, res) => {
 app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
   try {
     console.log(`📝 GET /api/messages/unread-count - User: ${req.user.username}`);
-    await initializeStorage();
     const count = await storage.getUnreadMessagesCount(req.user.id);
     console.log(`📋 User ${req.user.username} has ${count} unread messages`);
     res.json({ count });
@@ -542,7 +524,6 @@ app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
 app.get('/api/messages', requireAuth, async (req, res) => {
   try {
     console.log(`📝 GET /api/messages - User: ${req.user.username}`);
-    await initializeStorage();
     const messages = await storage.getUserMessages(req.user.id);
     console.log(`📋 User ${req.user.username} has ${messages.length} messages`);
     res.json(messages);
@@ -557,7 +538,6 @@ app.post('/api/messages', requireAuth, async (req, res) => {
     console.log(`📝 POST /api/messages - User: ${req.user.username}`);
     const { recipientId, content, carId } = req.body;
     
-    await initializeStorage();
     const newMessage = await storage.createMessage({
       senderId: req.user.id,
       recipientId,
@@ -597,10 +577,27 @@ if (process.env.NODE_ENV === 'production') {
 console.log('🔧 About to start listening on port:', PORT);
 console.log('🎯 Server setup complete, waiting for connections...');
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
+// Start server с оптимизацией для Render
+const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅ Server successfully running on port ${PORT}`);
   console.log(`🌐 Server listening on 0.0.0.0:${PORT}`);
+  
+  // 🚀 ИНИЦИАЛИЗАЦИЯ STORAGE ПОСЛЕ ЗАПУСКА СЕРВЕРА
+  try {
+    await initializeStorage();
+    console.log('🎯 Storage initialized after server start');
+  } catch (error) {
+    console.error('❌ Storage initialization error:', error);
+  }
+});
+
+// Graceful shutdown для Render
+process.on('SIGTERM', () => {
+  console.log('🔄 SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 });
 
 module.exports = app;
