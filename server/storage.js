@@ -51,7 +51,7 @@ async function getAllUsers() {
   try {
     const client = getClient();
     const result = await client.query(
-      'SELECT id, username, role, created_at FROM users ORDER BY created_at DESC'
+      'SELECT id, username, role, "createdAt" FROM users ORDER BY "createdAt" DESC'
     );
     return result.rows;
   } catch (error) {
@@ -67,7 +67,7 @@ async function createApplication(applicationData) {
     const { brand, model, year, price, description, createdBy } = applicationData;
     
     const result = await client.query(
-      `INSERT INTO car_applications (brand, model, year, price, description, created_by) 
+      `INSERT INTO car_applications (brand, model, year, price, description, "createdBy") 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [brand, model, year, price, description, createdBy]
     );
@@ -88,8 +88,8 @@ async function getApplications() {
         a.*,
         u.username as creator_name
       FROM car_applications a
-      LEFT JOIN users u ON a.created_by = u.id
-      ORDER BY a.created_at DESC
+      LEFT JOIN users u ON a."createdBy" = u.id
+      ORDER BY a."createdAt" DESC
     `);
     return result.rows;
   } catch (error) {
@@ -102,7 +102,7 @@ async function getUserApplications(userId) {
   try {
     const client = getClient();
     const result = await client.query(
-      'SELECT * FROM car_applications WHERE created_by = $1 ORDER BY created_at DESC',
+      'SELECT * FROM car_applications WHERE "createdBy" = $1 ORDER BY "createdAt" DESC',
       [userId]
     );
     return result.rows;
@@ -117,7 +117,7 @@ async function updateApplicationStatus(id, status) {
     const client = getClient();
     const result = await client.query(
       `UPDATE car_applications 
-       SET status = $1, updated_at = CURRENT_TIMESTAMP 
+       SET status = $1, "updatedAt" = CURRENT_TIMESTAMP 
        WHERE id = $2 RETURNING *`,
       [status, id]
     );
@@ -137,7 +137,7 @@ async function createCarListing(carData) {
     const { brand, model, year, price, description, ownerId, applicationId } = carData;
     
     const result = await client.query(
-      `INSERT INTO car_listings (brand, model, year, price, description, owner_id, application_id) 
+      `INSERT INTO car_listings (brand, model, year, price, description, "ownerId", "applicationId") 
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [brand, model, year, price, description, ownerId, applicationId]
     );
@@ -158,8 +158,8 @@ async function getCarListings() {
         c.*,
         u.username as owner_name
       FROM car_listings c
-      LEFT JOIN users u ON c.owner_id = u.id
-      ORDER BY c.created_at DESC
+      LEFT JOIN users u ON c."ownerId" = u.id
+      ORDER BY c."createdAt" DESC
     `);
     return result.rows;
   } catch (error) {
@@ -176,7 +176,7 @@ async function getCarListingById(id) {
         c.*,
         u.username as owner_name
       FROM car_listings c
-      LEFT JOIN users u ON c.owner_id = u.id
+      LEFT JOIN users u ON c."ownerId" = u.id
       WHERE c.id = $1
     `, [id]);
     return result.rows[0] || null;
@@ -193,7 +193,7 @@ async function createMessage(messageData) {
     const { senderId, receiverId, content, carId } = messageData;
     
     const result = await client.query(
-      `INSERT INTO messages (sender_id, receiver_id, content, car_id) 
+      `INSERT INTO messages ("senderId", "receiverId", content, "carId") 
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [senderId, receiverId, content, carId]
     );
@@ -217,11 +217,11 @@ async function getUserMessages(userId) {
         c.brand as car_brand,
         c.model as car_model
       FROM messages m
-      LEFT JOIN users s ON m.sender_id = s.id
-      LEFT JOIN users r ON m.receiver_id = r.id
-      LEFT JOIN car_listings c ON m.car_id = c.id
-      WHERE m.sender_id = $1 OR m.receiver_id = $1
-      ORDER BY m.created_at DESC
+      LEFT JOIN users s ON m."senderId" = s.id
+      LEFT JOIN users r ON m."receiverId" = r.id
+      LEFT JOIN car_listings c ON m."carId" = c.id
+      WHERE m."senderId" = $1 OR m."receiverId" = $1
+      ORDER BY m."createdAt" DESC
     `, [userId]);
     return result.rows;
   } catch (error) {
@@ -234,7 +234,7 @@ async function markMessageAsRead(messageId, userId) {
   try {
     const client = getClient();
     await client.query(
-      'UPDATE messages SET is_read = true WHERE id = $1 AND receiver_id = $2',
+      'UPDATE messages SET "isRead" = true WHERE id = $1 AND "receiverId" = $2',
       [messageId, userId]
     );
     console.log(`✅ Message ${messageId} marked as read`);
@@ -248,7 +248,7 @@ async function getUnreadMessageCount(userId) {
   try {
     const client = getClient();
     const result = await client.query(
-      'SELECT COUNT(*) as count FROM messages WHERE receiver_id = $1 AND is_read = false',
+      'SELECT COUNT(*) as count FROM messages WHERE "receiverId" = $1 AND "isRead" = false',
       [userId]
     );
     return parseInt(result.rows[0].count);
@@ -267,10 +267,10 @@ async function getUserFavorites(userId) {
         c.*,
         u.username as owner_name
       FROM favorites f
-      JOIN car_listings c ON f.car_id = c.id
-      LEFT JOIN users u ON c.owner_id = u.id
-      WHERE f.user_id = $1
-      ORDER BY f.created_at DESC
+      JOIN car_listings c ON f."carId" = c.id
+      LEFT JOIN users u ON c."ownerId" = u.id
+      WHERE f."userId" = $1
+      ORDER BY f."createdAt" DESC
     `, [userId]);
     return result.rows;
   } catch (error) {
@@ -283,7 +283,7 @@ async function addToFavorites(userId, carId) {
   try {
     const client = getClient();
     await client.query(
-      'INSERT INTO favorites (user_id, car_id) VALUES ($1, $2) ON CONFLICT (user_id, car_id) DO NOTHING',
+      'INSERT INTO favorites ("userId", "carId") VALUES ($1, $2) ON CONFLICT ("userId", "carId") DO NOTHING',
       [userId, carId]
     );
     console.log(`✅ Car ${carId} added to favorites for user ${userId}`);
@@ -297,7 +297,7 @@ async function removeFromFavorites(userId, carId) {
   try {
     const client = getClient();
     await client.query(
-      'DELETE FROM favorites WHERE user_id = $1 AND car_id = $2',
+      'DELETE FROM favorites WHERE "userId" = $1 AND "carId" = $2',
       [userId, carId]
     );
     console.log(`✅ Car ${carId} removed from favorites for user ${userId}`);
