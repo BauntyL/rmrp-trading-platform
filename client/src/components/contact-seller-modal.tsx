@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Car } from "@shared/schema";
 import {
@@ -30,28 +29,33 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
       try {
-        const res = await apiRequest("POST", "/api/messages", data);
+        console.log('📤 Sending message:', data);
         
-        // Проверяем статус ответа
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText || "Ошибка отправки сообщения");
+        const response = await fetch('/api/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            carId: data.carId,
+            sellerId: data.sellerId,
+            message: data.message
+          }),
+        });
+        
+        console.log('📨 Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Ошибка отправки сообщения');
         }
 
-        // Проверяем, что ответ содержит JSON
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          // Если сервер вернул успешный статус без JSON, значит сообщение отправлено
-          if (res.status === 200 || res.status === 201) {
-            return { success: true };
-          }
-          throw new Error("Ошибка формата ответа сервера");
-        }
-        
-        const result = await res.json();
+        const result = await response.json();
+        console.log('✅ Message sent successfully:', result);
         return result;
       } catch (error) {
-        console.error("Ошибка отправки сообщения:", error);
+        console.error("❌ Error sending message:", error);
         throw error;
       }
     },
@@ -65,13 +69,18 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
     },
     onError: (error: any) => {
-      // Проверяем, если это ошибка модерации
       const errorMessage = error.message || "Не удалось отправить сообщение";
       
       if (errorMessage.includes("заблокировано")) {
         toast({
           title: "🚫 Сообщение заблокировано",
           description: errorMessage,
+          variant: "destructive",
+        });
+      } else if (errorMessage.includes("Authentication required")) {
+        toast({
+          title: "Ошибка авторизации",
+          description: "Необходимо войти в систему для отправки сообщений",
           variant: "destructive",
         });
       } else {
