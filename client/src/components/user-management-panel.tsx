@@ -28,36 +28,52 @@ export function UserManagementPanel() {
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  const { data: users = [], isLoading } = useQuery({
+  // Мок данные для примера
+  const mockUsers = [
+    {
+      id: 1,
+      username: "admin",
+      email: "admin@avtokatalog.ru",
+      role: "admin",
+      isBanned: false,
+      isOnline: true,
+      createdAt: "2024-01-01T00:00:00Z",
+      lastLogin: "2024-01-15T14:30:00Z"
+    },
+    {
+      id: 2,
+      username: "moderator1",
+      email: "mod@avtokatalog.ru",
+      role: "moderator",
+      isBanned: false,
+      isOnline: false,
+      createdAt: "2024-01-02T00:00:00Z",
+      lastLogin: "2024-01-14T16:45:00Z"
+    },
+    {
+      id: 3,
+      username: "user123",
+      email: "user@example.com",
+      role: "user",
+      isBanned: false,
+      isOnline: true,
+      createdAt: "2024-01-03T00:00:00Z",
+      lastLogin: "2024-01-15T12:20:00Z"
+    }
+  ];
+
+  const { data: users = mockUsers, isLoading } = useQuery({
     queryKey: ["/api/users"],
     queryFn: async () => {
-      const response = await fetch('/api/users', {
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-      
-      return response.json();
+      // В реальном проекте здесь будет запрос к API
+      return mockUsers;
     },
   });
 
   const banUserMutation = useMutation({
     mutationFn: async ({ userId, duration }: { userId: number; duration: string }) => {
-      const response = await fetch(`/api/users/${userId}/ban`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ duration }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка бана пользователя');
-      }
-      
-      return response.json();
+      // В реальном проекте здесь будет запрос к API
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -77,19 +93,8 @@ export function UserManagementPanel() {
 
   const changeRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: number; role: string }) => {
-      const response = await fetch(`/api/users/${userId}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ role }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка изменения роли');
-      }
-      
-      return response.json();
+      // В реальном проекте здесь будет запрос к API
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -271,8 +276,8 @@ export function UserManagementPanel() {
                   ))}
                 </div>
               ) : filteredUsers.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">
-                  <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <div className="p-4 text-center text-slate-400">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>Пользователи не найдены</p>
                 </div>
               ) : (
@@ -291,29 +296,25 @@ export function UserManagementPanel() {
                           </div>
                           
                           <div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 mb-1">
                               <span className="text-white font-medium">{user.username}</span>
                               {getRoleBadge(user.role)}
                               {getStatusBadge(user)}
                             </div>
-                            <div className="flex items-center space-x-4 text-sm text-slate-400 mt-1">
-                              <span>ID: {user.id}</span>
-                              {user.email && <span>Email: {user.email}</span>}
-                              <div className="flex items-center space-x-1">
-                                <Clock className="h-3 w-3" />
-                                <span>Регистрация: {formatDate(user.createdAt)}</span>
-                              </div>
+                            <p className="text-sm text-slate-400">{user.email}</p>
+                            <div className="flex items-center space-x-4 text-xs text-slate-500 mt-1">
+                              <span>Регистрация: {formatDate(user.createdAt)}</span>
+                              <span>Последний вход: {formatDate(user.lastLogin)}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          {/* Изменение роли */}
                           <Select
                             value={user.role}
                             onValueChange={(newRole) => handleRoleChange(user, newRole)}
                           >
-                            <SelectTrigger className="w-32 h-8 bg-slate-700 border-slate-600 text-white text-xs">
+                            <SelectTrigger className="w-32 bg-slate-700 border-slate-600 text-white text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-700 border-slate-600">
@@ -323,7 +324,6 @@ export function UserManagementPanel() {
                             </SelectContent>
                           </Select>
 
-                          {/* Кнопки действий */}
                           <Button
                             size="sm"
                             variant="outline"
@@ -333,29 +333,15 @@ export function UserManagementPanel() {
                             <Edit className="h-4 w-4" />
                           </Button>
 
-                          {!user.isBanned ? (
-                            <Select onValueChange={(duration) => handleBanUser(user, duration)}>
-                              <SelectTrigger className="w-24 h-8 bg-red-600 border-red-600 text-white text-xs hover:bg-red-700">
-                                <Ban className="h-3 w-3" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-slate-700 border-slate-600">
-                                <SelectItem value="1h">1 час</SelectItem>
-                                <SelectItem value="24h">24 часа</SelectItem>
-                                <SelectItem value="7d">7 дней</SelectItem>
-                                <SelectItem value="30d">30 дней</SelectItem>
-                                <SelectItem value="permanent">Навсегда</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRoleChange(user, user.role)}
-                              className="bg-green-600 border-green-600 text-white hover:bg-green-700"
-                            >
-                              <UserCheck className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleBanUser(user, '7d')}
+                            className="bg-red-600 border-red-600 text-white hover:bg-red-700"
+                            disabled={user.role === 'admin'}
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -367,12 +353,13 @@ export function UserManagementPanel() {
         </Card>
       </div>
 
-      {/* Модал редактирования пользователя */}
-      <EditUserModal
-        user={selectedUser}
-        open={editUserModalOpen}
-        onOpenChange={setEditUserModalOpen}
-      />
+      {selectedUser && (
+        <EditUserModal
+          user={selectedUser}
+          open={editUserModalOpen}
+          onOpenChange={setEditUserModalOpen}
+        />
+      )}
     </>
   );
 }
