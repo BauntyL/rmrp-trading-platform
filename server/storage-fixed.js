@@ -60,7 +60,7 @@ async function getAllUsers() {
   }
 }
 
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ С ВСЕМИ ПОЛЯМИ
+// ПОЛНАЯ ФУНКЦИЯ СОЗДАНИЯ ЗАЯВКИ
 async function createApplication(applicationData) {
   try {
     const client = getClient();
@@ -163,7 +163,7 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// ПОЛНАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ С КОНТАКТАМИ И ИЗОБРАЖЕНИЕМ
+// ПОЛНАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ
 async function createCarListing(carData) {
   try {
     const client = getClient();
@@ -246,7 +246,6 @@ async function getCarListingById(id) {
   }
 }
 
-// ФУНКЦИЯ УДАЛЕНИЯ
 async function deleteCarListing(carId) {
   try {
     const client = getClient();
@@ -277,7 +276,6 @@ async function deleteCarListing(carId) {
   }
 }
 
-// ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ АВТО ПОЛЬЗОВАТЕЛЯ
 async function getUserCarListings(userId) {
   try {
     const client = getClient();
@@ -300,7 +298,7 @@ async function getUserCarListings(userId) {
   }
 }
 
-// ИСПРАВЛЕННЫЕ СООБЩЕНИЯ
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ СООБЩЕНИЙ
 async function createMessage(messageData) {
   try {
     const client = getClient();
@@ -308,10 +306,10 @@ async function createMessage(messageData) {
     
     console.log('💬 Creating message:', { senderId, receiverId, content, carId });
     
-    // ИСПРАВЛЕНО: Простая вставка без createdAt
+    // СОЗДАЕМ СООБЩЕНИЕ С ПОЛНОЙ ИНФОРМАЦИЕЙ
     const result = await client.query(
-      `INSERT INTO messages ("senderId", "receiverId", content, "carId") 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO messages ("senderId", "receiverId", content, "carId", "createdAt", "isRead") 
+       VALUES ($1, $2, $3, $4, NOW(), FALSE) RETURNING *`,
       [senderId, receiverId, content, carId]
     );
     
@@ -338,7 +336,7 @@ async function getUserMessages(userId) {
       LEFT JOIN users r ON m."receiverId" = r.id
       LEFT JOIN car_listings c ON m."carId" = c.id
       WHERE m."senderId" = $1 OR m."receiverId" = $1
-      ORDER BY m.id DESC
+      ORDER BY m."createdAt" DESC
     `, [userId]);
     
     console.log(`✅ Found user messages: ${result.rows.length}`);
@@ -381,7 +379,7 @@ async function getUnreadMessageCount(userId) {
   }
 }
 
-// ИСПРАВЛЕННЫЕ ИЗБРАННЫЕ
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ ИЗБРАННОГО
 async function getUserFavorites(userId) {
   try {
     const client = getClient();
@@ -394,7 +392,7 @@ async function getUserFavorites(userId) {
       JOIN car_listings c ON f."carId" = c.id
       LEFT JOIN users u ON c.owner_id = u.id
       WHERE f."userId" = $1
-      ORDER BY f.id DESC
+      ORDER BY f."createdAt" DESC
     `, [userId]);
     
     console.log(`✅ Found user favorites: ${result.rows.length}`);
@@ -409,9 +407,15 @@ async function addToFavorites(userId, carId) {
   try {
     const client = getClient();
     
-    // ИСПРАВЛЕНО: Простая вставка без createdAt
+    // ПРОВЕРЯЕМ ЧТО АВТОМОБИЛЬ СУЩЕСТВУЕТ
+    const carExists = await client.query('SELECT id FROM car_listings WHERE id = $1', [carId]);
+    if (carExists.rows.length === 0) {
+      throw new Error('Car not found');
+    }
+    
+    // ДОБАВЛЯЕМ В ИЗБРАННОЕ
     await client.query(
-      'INSERT INTO favorites ("userId", "carId") VALUES ($1, $2) ON CONFLICT ("userId", "carId") DO NOTHING',
+      'INSERT INTO favorites ("userId", "carId", "createdAt") VALUES ($1, $2, NOW()) ON CONFLICT ("userId", "carId") DO NOTHING',
       [userId, carId]
     );
     
