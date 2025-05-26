@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Car } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -49,6 +50,7 @@ interface EditCarModalProps {
 export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const form = useForm<EditCarFormData>({
     resolver: zodResolver(editCarSchema),
@@ -70,6 +72,19 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
       createdBy: 1,
     },
   });
+
+  // Проверяем права доступа - только владелец или админ/модератор
+  const canEdit = React.useMemo(() => {
+    if (!user || !car) return false;
+    
+    // Владелец автомобиля
+    const isOwner = car.createdBy === user.id;
+    
+    // Администратор или модератор
+    const isAdmin = user.role === 'admin' || user.role === 'moderator';
+    
+    return isOwner || isAdmin;
+  }, [user, car]);
 
   // Reset form when car changes
   React.useEffect(() => {
@@ -138,11 +153,43 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
 
   if (!car) return null;
 
+  // Если нет прав на редактирование, показываем сообщение
+  if (!canEdit) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md bg-slate-800 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-white">Нет доступа</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-slate-300">
+              Вы можете редактировать только свои собственные объявления.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
+            >
+              Закрыть
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-800 border-slate-700">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-white">Редактировать автомобиль</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-white">
+            Редактировать автомобиль
+            {user?.role === 'admin' || user?.role === 'moderator' ? (
+              <span className="text-sm text-amber-400 ml-2">(режим модератора)</span>
+            ) : null}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -218,7 +265,7 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
               />
             </div>
 
-            {/* Price and Speed */}
+            {/* Price and Max Speed */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -230,7 +277,7 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
                       <Input
                         {...field}
                         type="number"
-                        placeholder="1500000"
+                        placeholder="1000000"
                         className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
                       />
                     </FormControl>
@@ -270,7 +317,7 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="5.2 сек"
+                        placeholder="3.5 сек"
                         className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
                       />
                     </FormControl>
@@ -284,7 +331,7 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
                 name="drive"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-slate-300">Тип привода *</FormLabel>
+                    <FormLabel className="text-slate-300">Привод *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
@@ -303,47 +350,47 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
               />
             </div>
 
-            {/* Server ID */}
-            <FormField
-              control={form.control}
-              name="serverId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">ID на сервере</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Например: #ABC-123"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Contact Information */}
+            {/* Contact Info */}
             <div className="space-y-4">
-              <h4 className="text-lg font-semibold text-white">Контактная информация</h4>
+              <h3 className="text-lg font-semibold text-white">Контактная информация</h3>
               
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Телефон</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="tel"
-                        placeholder="+7 (999) 123-45-67"
-                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-300">Телефон</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="+7 (999) 123-45-67"
+                          className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="serverId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-300">ID в игре</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="123456"
+                          className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -390,11 +437,10 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
               name="imageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-slate-300">URL изображения</FormLabel>
+                  <FormLabel className="text-slate-300">Ссылка на изображение</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      type="url"
                       placeholder="https://example.com/car-image.jpg"
                       className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
                     />
@@ -414,9 +460,9 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="Расскажите о автомобиле..."
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                      placeholder="Дополнительная информация об автомобиле..."
                       rows={4}
+                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 resize-none"
                     />
                   </FormControl>
                   <FormMessage />
@@ -424,47 +470,49 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
               )}
             />
 
-            {/* Premium Option */}
-            <FormField
-              control={form.control}
-              name="isPremium"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      className="bg-slate-700 border-slate-600"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="text-slate-300">
-                      Премиум объявление
-                    </FormLabel>
-                    <p className="text-slate-400 text-sm">
-                      Будет выделено в каталоге
-                    </p>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Premium Status - только для админов */}
+            {(user?.role === 'admin' || user?.role === 'moderator') && (
+              <FormField
+                control={form.control}
+                name="isPremium"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-slate-600 p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="text-slate-300">
+                        Премиум статус
+                      </FormLabel>
+                      <p className="text-sm text-slate-400">
+                        Объявления с премиум статусом отображаются выше остальных
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
 
-            <div className="flex space-x-3 pt-4">
-              <Button
-                type="submit"
-                className="flex-1 bg-primary hover:bg-primary/90"
-                disabled={updateCarMutation.isPending}
-              >
-                {updateCarMutation.isPending ? "Сохранение..." : "Сохранить изменения"}
-              </Button>
+            {/* Submit Button */}
+            <div className="flex space-x-4 pt-4">
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="bg-slate-700 hover:bg-slate-600"
+                className="flex-1 bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
               >
                 Отмена
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateCarMutation.isPending}
+                className="flex-1 bg-primary hover:bg-primary/90"
+              >
+                {updateCarMutation.isPending ? "Сохранение..." : "Сохранить изменения"}
               </Button>
             </div>
           </form>
