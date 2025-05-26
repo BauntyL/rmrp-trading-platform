@@ -163,7 +163,7 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// ПОЛНАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ С КОНТАКТАМИ
+// ПОЛНАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ С КОНТАКТАМИ И ИЗОБРАЖЕНИЕМ
 async function createCarListing(carData) {
   try {
     const client = getClient();
@@ -181,22 +181,23 @@ async function createCarListing(carData) {
       isPremium = false,
       phone,
       telegram,
-      discord
+      discord,
+      imageUrl
     } = carData;
     
-    console.log('🚗 Creating car listing with ALL fields including contacts:', carData);
+    console.log('🚗 Creating car listing with ALL fields:', carData);
     
     const result = await client.query(
       `INSERT INTO car_listings (
         name, price, description, owner_id, application_id, created_at,
         category, server, "maxSpeed", acceleration, drive, "isPremium",
-        phone, telegram, discord
-      ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+        phone, telegram, discord, "imageUrl"
+      ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
       RETURNING *`,
-      [name, price, description, ownerId, applicationId, category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord]
+      [name, price, description, ownerId, applicationId, category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord, imageUrl]
     );
     
-    console.log(`✅ Car listing created with all fields and contacts:`, result.rows[0]);
+    console.log(`✅ Car listing created with all fields:`, result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating car listing:', error);
@@ -299,19 +300,22 @@ async function getUserCarListings(userId) {
   }
 }
 
-// Сообщения
+// ИСПРАВЛЕННЫЕ СООБЩЕНИЯ
 async function createMessage(messageData) {
   try {
     const client = getClient();
     const { senderId, receiverId, content, carId } = messageData;
     
+    console.log('💬 Creating message:', { senderId, receiverId, content, carId });
+    
+    // ИСПРАВЛЕНО: Простая вставка без createdAt
     const result = await client.query(
-      `INSERT INTO messages ("senderId", "receiverId", content, "carId", "createdAt") 
-       VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
+      `INSERT INTO messages ("senderId", "receiverId", content, "carId") 
+       VALUES ($1, $2, $3, $4) RETURNING *`,
       [senderId, receiverId, content, carId]
     );
     
-    console.log(`✅ Message created from user ${senderId} to ${receiverId}`);
+    console.log(`✅ Message created successfully:`, result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating message:', error);
@@ -334,9 +338,10 @@ async function getUserMessages(userId) {
       LEFT JOIN users r ON m."receiverId" = r.id
       LEFT JOIN car_listings c ON m."carId" = c.id
       WHERE m."senderId" = $1 OR m."receiverId" = $1
-      ORDER BY m."createdAt" DESC
+      ORDER BY m.id DESC
     `, [userId]);
     
+    console.log(`✅ Found user messages: ${result.rows.length}`);
     return result.rows;
   } catch (error) {
     console.error('❌ Error getting user messages:', error);
@@ -365,7 +370,7 @@ async function getUnreadMessageCount(userId) {
     const client = getClient();
     
     const result = await client.query(
-      'SELECT COUNT(*) as count FROM messages WHERE "receiverId" = $1 AND "isRead" = false',
+      'SELECT COUNT(*) as count FROM messages WHERE "receiverId" = $1 AND ("isRead" = false OR "isRead" IS NULL)',
       [userId]
     );
     
@@ -376,7 +381,7 @@ async function getUnreadMessageCount(userId) {
   }
 }
 
-// Избранное
+// ИСПРАВЛЕННЫЕ ИЗБРАННЫЕ
 async function getUserFavorites(userId) {
   try {
     const client = getClient();
@@ -389,7 +394,7 @@ async function getUserFavorites(userId) {
       JOIN car_listings c ON f."carId" = c.id
       LEFT JOIN users u ON c.owner_id = u.id
       WHERE f."userId" = $1
-      ORDER BY f."createdAt" DESC
+      ORDER BY f.id DESC
     `, [userId]);
     
     console.log(`✅ Found user favorites: ${result.rows.length}`);
@@ -404,8 +409,9 @@ async function addToFavorites(userId, carId) {
   try {
     const client = getClient();
     
+    // ИСПРАВЛЕНО: Простая вставка без createdAt
     await client.query(
-      'INSERT INTO favorites ("userId", "carId", "createdAt") VALUES ($1, $2, NOW()) ON CONFLICT ("userId", "carId") DO NOTHING',
+      'INSERT INTO favorites ("userId", "carId") VALUES ($1, $2) ON CONFLICT ("userId", "carId") DO NOTHING',
       [userId, carId]
     );
     
