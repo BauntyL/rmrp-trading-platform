@@ -5,12 +5,26 @@ const session = require('express-session');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// РУЧНОЙ CORS (без пакета cors)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+  
+  // Обработка preflight запросов
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // ПРЯМАЯ ИНИЦИАЛИЗАЦИЯ БД
 try {
   const db = require('./db');
   console.log('🔄 Initializing database...');
   
-  // ВЫЗЫВАЕМ initDb НАПРЯМУЮ
   if (db.initDb) {
     db.initDb();
     console.log('✅ Database initialized successfully');
@@ -35,14 +49,15 @@ app.use(express.urlencoded({ extended: true }));
 // ИСПРАВЛЕННАЯ НАСТРОЙКА СЕССИЙ
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-here-12345',
-  resave: true,              // ИЗМЕНИЛИ НА true
-  saveUninitialized: true,   // ИЗМЕНИЛИ НА true
+  resave: true,
+  saveUninitialized: true,
   cookie: {
     secure: false,
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    httpOnly: false, // ИЗМЕНЯЕМ НА false для отладки
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: 'lax' // ДОБАВЛЯЕМ sameSite
   },
-  name: 'connect.sid'         // ДОБАВИЛИ ИМЯ СЕССИИ
+  name: 'connect.sid'
 }));
 
 // MIDDLEWARE ДЛЯ ОТЛАДКИ СЕССИЙ
@@ -60,6 +75,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   console.log(`${timestamp} - ${req.method} ${req.url}`);
+  console.log('🍪 Cookies:', req.headers.cookie);
   next();
 });
 
@@ -91,7 +107,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API available at http://localhost:10000/api/`);
+  console.log(`🔗 API available at http://localhost:${PORT}/api/`);
   console.log(`📊 Ready to serve requests`);
 });
 
