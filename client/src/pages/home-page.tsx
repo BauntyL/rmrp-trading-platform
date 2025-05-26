@@ -15,13 +15,16 @@ import {
   Users,
   Search,
   Shield,
-  Menu
+  Send
 } from "lucide-react";
 
 import { CarCard } from "@/components/car-card";
 import { AddCarModal } from "@/components/add-car-modal";
 import { MessagesPanel } from "@/components/messages-panel";
 import { UnreadMessagesCounter } from "@/components/unread-messages-counter";
+import { SecurityPanel } from "@/components/security-panel";
+import { MessageModerationPanel } from "@/components/message-moderation-panel";
+import { UserManagementPanel } from "@/components/user-management-panel";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function HomePage() {
@@ -51,6 +54,10 @@ export default function HomePage() {
     logoutMutation.mutate();
   };
 
+  const handleTelegramClick = () => {
+    window.open('https://t.me/bauntyprog', '_blank');
+  };
+
   const isAdmin = user?.role === 'admin';
   const isModerator = user?.role === 'moderator' || isAdmin;
 
@@ -65,7 +72,7 @@ export default function HomePage() {
   const moderationItems = [
     { id: 'pending-cars', label: 'Заявки на модерацию', icon: Users },
     { id: 'moderation-history', label: 'Модерация сообщений', icon: MessageSquare },
-    { id: 'user-management', label: 'Управление пользователями', icon: Settings },
+    ...(isAdmin ? [{ id: 'user-management', label: 'Управление пользователями', icon: Settings }] : []),
   ];
 
   const renderContent = () => {
@@ -234,6 +241,9 @@ export default function HomePage() {
           </div>
         );
 
+      case 'security':
+        return <SecurityPanel />;
+
       case 'pending-cars':
         return (
           <div className="space-y-6">
@@ -276,6 +286,12 @@ export default function HomePage() {
             )}
           </div>
         );
+
+      case 'moderation-history':
+        return <MessageModerationPanel />;
+
+      case 'user-management':
+        return <UserManagementPanel />;
 
       default:
         return (
@@ -389,9 +405,12 @@ export default function HomePage() {
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-700 space-y-2">
-          <button className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left">
-            <User className="h-5 w-5" />
-            <span className="text-sm">Мой в Telegram</span>
+          <button 
+            onClick={handleTelegramClick}
+            className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-blue-600 hover:text-white transition-colors text-left group"
+          >
+            <Send className="h-5 w-5 group-hover:text-white" />
+            <span className="text-sm font-medium">Мы в Telegram</span>
           </button>
           <button 
             onClick={handleLogout}
