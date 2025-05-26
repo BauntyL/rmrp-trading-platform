@@ -34,6 +34,7 @@ async function initializeTables() {
   try {
     console.log("🔧 Initializing database tables...");
     
+    // СОЗДАЕМ ТАБЛИЦУ ПОЛЬЗОВАТЕЛЕЙ
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -44,9 +45,13 @@ async function initializeTables() {
       )
     `);
 
-    // ИСПРАВЛЕННАЯ СХЕМА car_applications С ПРАВИЛЬНЫМИ ПОЛЯМИ
+    // ПРИНУДИТЕЛЬНО ПЕРЕСОЗДАЕМ ТАБЛИЦУ car_applications
+    console.log("🔄 Recreating car_applications table...");
+    
+    await client.query(`DROP TABLE IF EXISTS car_applications CASCADE`);
+    
     await client.query(`
-      CREATE TABLE IF NOT EXISTS car_applications (
+      CREATE TABLE car_applications (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         price INTEGER NOT NULL,
@@ -70,9 +75,13 @@ async function initializeTables() {
       )
     `);
 
-    // ИСПРАВЛЕННАЯ СХЕМА car_listings С ПРАВИЛЬНЫМИ ПОЛЯМИ
+    // ПРИНУДИТЕЛЬНО ПЕРЕСОЗДАЕМ ТАБЛИЦУ car_listings
+    console.log("🔄 Recreating car_listings table...");
+    
+    await client.query(`DROP TABLE IF EXISTS car_listings CASCADE`);
+    
     await client.query(`
-      CREATE TABLE IF NOT EXISTS car_listings (
+      CREATE TABLE car_listings (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         price INTEGER NOT NULL,
@@ -83,8 +92,11 @@ async function initializeTables() {
       )
     `);
 
+    // ПЕРЕСОЗДАЕМ ТАБЛИЦУ СООБЩЕНИЙ
+    await client.query(`DROP TABLE IF EXISTS messages CASCADE`);
+    
     await client.query(`
-      CREATE TABLE IF NOT EXISTS messages (
+      CREATE TABLE messages (
         id SERIAL PRIMARY KEY,
         "senderId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
         "receiverId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -95,8 +107,11 @@ async function initializeTables() {
       )
     `);
 
+    // ПЕРЕСОЗДАЕМ ТАБЛИЦУ ИЗБРАННОГО
+    await client.query(`DROP TABLE IF EXISTS favorites CASCADE`);
+    
     await client.query(`
-      CREATE TABLE IF NOT EXISTS favorites (
+      CREATE TABLE favorites (
         id SERIAL PRIMARY KEY,
         "userId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
         "carId" INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
@@ -105,7 +120,7 @@ async function initializeTables() {
       )
     `);
 
-    console.log("✅ Database tables initialized successfully");
+    console.log("✅ Database tables recreated successfully");
     
     // СОЗДАЕМ АДМИНА ЕСЛИ НЕТ
     await createDefaultAdmin();
