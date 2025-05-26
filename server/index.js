@@ -2,19 +2,25 @@ const express = require('express');
 const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
-const { initializeDatabase } = require('./db');
+
+// ИСПРАВЛЕННЫЕ ИМПОРТЫ
+const db = require('./db');
 const { initializeAuth } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Инициализация базы данных
-initializeDatabase().then(() => {
-  console.log('✅ Database initialized successfully');
-}).catch(err => {
-  console.error('❌ Database initialization failed:', err);
-  process.exit(1);
-});
+// ИСПРАВЛЕННАЯ ИНИЦИАЛИЗАЦИЯ БД
+if (db.initializeDatabase) {
+  db.initializeDatabase().then(() => {
+    console.log('✅ Database initialized successfully');
+  }).catch(err => {
+    console.error('❌ Database initialization failed:', err);
+    process.exit(1);
+  });
+} else {
+  console.log('⚠️ Database initialization function not found, skipping...');
+}
 
 // Middleware
 app.use(express.json());
@@ -26,7 +32,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
+    secure: false,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
@@ -53,7 +59,7 @@ app.use('/api', routes);
 
 console.log('✅ All routes registered successfully');
 
-// SPA fallback - отдаем index.html для всех неизвестных маршрутов
+// SPA fallback
 app.get('*', (req, res) => {
   console.log('📝 Serving SPA for route:', req.path);
   res.sendFile(path.join(__dirname, '../public/index.html'));
