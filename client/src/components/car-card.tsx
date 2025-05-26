@@ -49,14 +49,67 @@ const serverColors = {
 export function CarCard({ car, onViewDetails, onEdit, onDelete, onRemove, onToggleFavorite }: CarCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: favoriteCheck } = useQuery<{ isFavorite: boolean }>({
+  const { data: favoriteCheck, isLoading: favoriteLoading } = useQuery<{ isFavorite: boolean }>({
     queryKey: ["/api/favorites/check", car.id],
     enabled: !!user,
+    refetchInterval: 5000, // Обновляем каждые 5 секунд
+  });
+
+  // Мутация для избранного
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        throw new Error("Необходимо войти в систему");
+      }
+      
+      const response = await apiRequest("POST", `/api/favorites/toggle/${car.id}`, {});
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Необходимо войти в систему");
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+    },
+    onSuccess: (result) => {
+      // Обновляем кеш сразу для мгновенного отклика
+      queryClient.setQueryData(["/api/favorites/check", car.id], { isFavorite: result.isFavorite });
+      
+      // Обновляем все связанные запросы
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
+      
+      toast({
+        title: result.action === "added" ? "Добавлено в избранное" : "Удалено из избранного",
+        description: result.action === "added" 
+          ? "Автомобиль успешно добавлен в избранное"
+          : "Автомобиль успешно удален из избранного",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить избранное",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleToggleFavorite = () => {
-    onToggleFavorite?.();
+    if (!user) {
+      toast({
+        title: "Войдите в систему",
+        description: "Для добавления в избранное необходимо войти в систему",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toggleFavoriteMutation.mutate();
   };
 
   const formatPrice = (price: number) => {
@@ -82,6 +135,12 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onRemove, onTogg
     return defaultImages[car.category];
   };
 
+  // Проверяем права пользователя
+  const isOwner = user && car.createdBy === user.id;
+  const isAdmin = user && (user.role === 'admin' || user.role === 'moderator');
+  const canEdit = isOwner || isAdmin;
+  const canDelete = isOwner || isAdmin;
+
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-slate-600 transition-colors">
       <div className="relative">
@@ -104,23 +163,27 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onRemove, onTogg
           </div>
         )}
         
-        <Button
-          variant="ghost"
-          size="sm"
-          className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white dark:hover:bg-slate-800"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleToggleFavorite();
-          }}
-        >
-          <Heart 
-            className={`h-4 w-4 transition-colors ${
-              favoriteCheck?.isFavorite 
-                ? "text-red-500 fill-current" 
-                : "text-slate-400 hover:text-red-500"
-            }`} 
-          />
-        </Button>
+        {/* Кнопка избранного - показываем только авторизованным пользователям */}
+        {user && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white dark:hover:bg-slate-800"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleFavorite();
+            }}
+            disabled={toggleFavoriteMutation.isPending || favoriteLoading}
+          >
+            <Heart 
+              className={`h-4 w-4 transition-colors ${
+                favoriteCheck?.isFavorite 
+                  ? "text-red-500 fill-current" 
+                  : "text-slate-400 hover:text-red-500"
+              } ${toggleFavoriteMutation.isPending ? "animate-pulse" : ""}`} 
+            />
+          </Button>
+        )}
       </div>
       
       <div className="p-5">
@@ -188,49 +251,49 @@ export function CarCard({ car, onViewDetails, onEdit, onDelete, onRemove, onTogg
             <Phone className="h-4 w-4" />
           </Button>
           
-          {/* Admin/Moderator controls */}
-          {user && (user.role === "admin" || user.role === "moderator") && (
-            <>
-              {onEdit && (
-                <Button 
-                  variant="secondary"
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(car);
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              )}
-              {onDelete && (
-                <Button 
-                  variant="secondary"
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(car);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* Owner controls - Remove from sale */}
-          {user && car.createdBy === user.id && onRemove && (
+          {/* Кнопка редактирования - только для владельца или админа */}
+          {canEdit && onEdit && (
             <Button 
               variant="secondary"
               size="sm"
-              className="bg-orange-600 hover:bg-orange-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(car);
+              }}
+              title={isOwner ? "Редактировать свое объявление" : "Редактировать как администратор"}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          
+          {/* Кнопка удаления - только для владельца или админа */}
+          {canDelete && onDelete && (
+            <Button 
+              variant="secondary"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(car);
+              }}
+              title={isOwner ? "Удалить свое объявление" : "Удалить как администратор"}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+          
+          {/* Кнопка удаления из избранного (отдельная логика) */}
+          {onRemove && (
+            <Button 
+              variant="secondary"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove(car);
               }}
-              title="Снять с продажи"
+              title="Удалить из избранного"
             >
               <X className="h-4 w-4" />
             </Button>
