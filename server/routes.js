@@ -48,7 +48,86 @@ function setupRoutes(app) {
     });
   });
 
-  // Auth routes
+  // Auth routes - ДОБАВЛЕНЫ НЕДОСТАЮЩИЕ!
+  app.post('/api/login', (req, res, next) => {
+    const passport = require('passport');
+    
+    console.log('🔑 Login attempt for:', req.body.username);
+    
+    passport.authenticate('local', (err, user, info) => {
+      if (err) {
+        console.error('❌ Login error:', err);
+        return res.status(500).json({ error: 'Ошибка сервера' });
+      }
+      
+      if (!user) {
+        console.log('❌ Login failed for:', req.body.username);
+        return res.status(401).json({ error: info?.message || 'Неверные данные' });
+      }
+
+      req.logIn(user, (err) => {
+        if (err) {
+          console.error('❌ Login session error:', err);
+          return res.status(500).json({ error: 'Ошибка при создании сессии' });
+        }
+        
+        console.log('✅ Login successful for:', user.username);
+        res.json({
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          createdAt: user.created_at
+        });
+      });
+    })(req, res, next);
+  });
+
+  app.post('/api/register', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      console.log('📝 Registration attempt for:', username);
+
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Имя пользователя и пароль обязательны' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
+      }
+
+      const bcrypt = require('bcrypt');
+      const passwordHash = await bcrypt.hash(password, 10);
+      const newUser = await storage.createUser({
+        username,
+        password: passwordHash
+      });
+
+      req.login(newUser, (err) => {
+        if (err) {
+          console.error('❌ Auto-login error after registration:', err);
+          return res.status(500).json({ error: 'Ошибка при автоматическом входе' });
+        }
+        
+        console.log('✅ User registered and logged in:', username);
+        res.json({
+          id: newUser.id,
+          username: newUser.username,
+          role: newUser.role,
+          createdAt: newUser.created_at
+        });
+      });
+
+    } catch (error) {
+      console.error('❌ Registration error:', error);
+      res.status(500).json({ error: 'Ошибка при регистрации' });
+    }
+  });
+
   app.get('/api/user', (req, res) => {
     console.log('👤 User info requested');
     if (req.isAuthenticated()) {
@@ -130,6 +209,27 @@ function setupRoutes(app) {
       res.json(applications);
     } catch (error) {
       console.error('❌ Error fetching applications:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/applications/pending', requireModeratorOrAdmin, async (req, res) => {
+    try {
+      console.log('📋 Fetching pending applications for:', req.user.username);
+      
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      const applications = await storage.getApplications();
+      const pending = applications.filter(app => app.status === 'pending');
+      console.log('📦 Found pending applications:', pending.length);
+      
+      res.json(pending);
+    } catch (error) {
+      console.error('❌ Error fetching pending applications:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -247,6 +347,25 @@ function setupRoutes(app) {
     }
   });
 
+  app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
+    try {
+      console.log('📬 Fetching unread count for user:', req.user.username);
+      
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      const count = await storage.getUnreadMessageCount(req.user.id);
+      console.log(`📋 User ${req.user.username} has ${count} unread messages`);
+      res.json({ count });
+    } catch (error) {
+      console.error('❌ Error fetching unread count:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   app.post('/api/messages', requireAuth, async (req, res) => {
     try {
       const { receiverId, content, carId } = req.body;
@@ -273,23 +392,6 @@ function setupRoutes(app) {
       res.json({ success: true });
     } catch (error) {
       console.error('❌ Error marking message as read:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Unread counts
-  app.get('/api/unread-count', requireAuth, async (req, res) => {
-    try {
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const count = await storage.getUnreadMessageCount(req.user.id);
-      res.json({ count });
-    } catch (error) {
-      console.error('❌ Error fetching unread count:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -330,6 +432,8 @@ function setupRoutes(app) {
   // Favorites
   app.get('/api/favorites', requireAuth, async (req, res) => {
     try {
+      console.log('⭐ Fetching favorites for user:', req.user.username);
+      
       res.set({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -337,6 +441,7 @@ function setupRoutes(app) {
       });
       
       const favorites = await storage.getUserFavorites(req.user.id);
+      console.log(`📋 User ${req.user.username} has ${favorites.length} favorites`);
       res.json(favorites);
     } catch (error) {
       console.error('❌ Error fetching favorites:', error);
@@ -389,12 +494,13 @@ function setupRoutes(app) {
     maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0'
   }));
 
-  // CATCH-ALL - САМЫМ ПОСЛЕДНИМ (для React Router)
-  console.log('🔄 Setting up catch-all route for React Router...');
+  // SPA fallback - САМЫЙ ПОСЛЕДНИЙ!
   app.get('*', (req, res) => {
-    console.log('📄 Serving React app for:', req.path);
+    console.log('📝 Serving SPA for route:', req.path);
     res.sendFile(path.join(__dirname, '../public/index.html'));
   });
+
+  console.log('✅ All routes registered successfully');
 }
 
 module.exports = setupRoutes;
