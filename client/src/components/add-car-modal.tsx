@@ -351,89 +351,88 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
               </div>
             </div>
 
-            {/* Image URL */}
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">URL изображения</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="url"
-                      placeholder="https://example.com/car-image.jpg"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                    />
-                  </FormControl>
-                  <p className="text-slate-400 text-xs">Оставьте пустым для использования изображения по умолчанию</p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Additional Information */}
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold text-white">Дополнительная информация</h4>
+              
+              <FormField
+                control={form.control}
+                name="imageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-slate-300">Ссылка на изображение</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="url"
+                        placeholder="https://example.com/image.jpg"
+                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">Описание</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Расскажите о своем автомобиле..."
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      rows={4}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-slate-300">Описание</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Дополнительная информация об автомобиле..."
+                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 min-h-[80px]"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Premium Option */}
-            <FormField
-              control={form.control}
-              name="isPremium"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      className="bg-slate-700 border-slate-600"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="text-slate-300">
-                      Премиум объявление
-                    </FormLabel>
-                    <p className="text-slate-400 text-sm">
-                      Будет выделено в каталоге
-                    </p>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="isPremium"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="border-slate-600 text-primary"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="text-slate-300">
+                        Премиум размещение
+                      </FormLabel>
+                      <p className="text-sm text-slate-400">
+                        Ваше объявление будет выделено и показано в топе
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* Submit Buttons */}
-            <div className="flex space-x-4 pt-6 border-t border-slate-700">
-              <Button
-                type="button"
-                variant="secondary"
-                className="flex-1 bg-slate-700 hover:bg-slate-600"
-                onClick={() => onOpenChange(false)}
-              >
-                Отмена
-              </Button>
+            {/* Submit Button */}
+            <div className="flex space-x-3 pt-4">
               <Button
                 type="submit"
                 className="flex-1 bg-primary hover:bg-primary/90"
                 disabled={createApplicationMutation.isPending}
               >
-                {createApplicationMutation.isPending ? "Отправка..." : "Подать заявку"}
+                {createApplicationMutation.isPending ? "Отправка..." : "Отправить заявку"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              >
+                Отмена
               </Button>
             </div>
           </form>
