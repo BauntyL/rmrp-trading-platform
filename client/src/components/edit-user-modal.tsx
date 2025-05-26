@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,40 +16,13 @@ interface EditUserModalProps {
 }
 
 export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [username, setUsername] = useState(user?.username || "");
   const [email, setEmail] = useState(user?.email || "");
 
-  const updateUserMutation = useMutation({
-    mutationFn: async (data: any) => {
-      // В реальном проекте здесь будет запрос к API
-      return { success: true };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({
-        title: "Пользователь обновлен",
-        description: "Данные пользователя успешно обновлены",
-      });
-      onOpenChange(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка обновления",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserMutation.mutate({
-      id: user.id,
-      username,
-      email,
-    });
+    // Здесь будет логика сохранения
+    onOpenChange(false);
   };
 
   return (
@@ -102,10 +73,9 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
             </Button>
             <Button
               type="submit"
-              disabled={updateUserMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {updateUserMutation.isPending ? "Сохранение..." : "Сохранить"}
+              Сохранить
             </Button>
           </div>
         </form>
