@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
+        console.log('🔄 Fetching user data...');
         const response = await fetch('/api/user', {
           credentials: 'include',
           headers: {
@@ -43,21 +44,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
 
+        console.log('📡 User API response status:', response.status);
+
         if (!response.ok) {
           if (response.status === 401) {
-            console.log('👤 User not authenticated');
+            console.log('👤 User not authenticated (401)');
             return null;
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('👤 Received user data from API:', data);
+        console.log('📦 Raw API response:', data);
         
         // ИСПРАВЛЯЕМ: правильно извлекаем user из ответа
-        const userData = data.user || data;
+        const userData = data?.user || data;
         
-        if (userData && userData.id) {
+        if (userData && userData.id && userData.username) {
           console.log('✅ Valid user data:', userData);
           return userData;
         } else {
@@ -66,39 +69,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('❌ Error fetching user:', error);
-        if (error instanceof Error && error.message.includes('401')) {
-          return null;
-        }
-        throw error;
+        return null; // Возвращаем null вместо выброса ошибки
       }
     },
-    retry: (failureCount, error) => {
-      // Не повторяем запросы при ошибках 401 (неавторизован)
-      if (error?.message?.includes('401')) {
-        return false;
-      }
-      return failureCount < 2;
-    },
-    staleTime: 30000, // Кешируем на 30 секунд
-    gcTime: 60000, // Храним в кеше 1 минуту
+    retry: false, // Отключаем повторные попытки
+    staleTime: 30000,
+    gcTime: 60000,
+    refetchOnWindowFocus: false, // Отключаем автообновление при фокусе
   });
 
   // Проверяем, нужно ли показать модальное окно с условиями
   useEffect(() => {
-    if (user && user.id) {
-      const termsAcceptedKey = `terms-accepted-${user.id}`;
-      const hasAcceptedTerms = localStorage.getItem(termsAcceptedKey);
-      
-      if (!hasAcceptedTerms) {
-        setShowTermsModal(true);
+    // ИСПРАВЛЯЕМ: добавляем дополнительные проверки
+    if (user && typeof user === 'object' && user.id && user.username) {
+      try {
+        const termsAcceptedKey = `terms-accepted-${user.id}`;
+        const hasAcceptedTerms = localStorage.getItem(termsAcceptedKey);
+        
+        if (!hasAcceptedTerms) {
+          setShowTermsModal(true);
+        }
+      } catch (error) {
+        console.error('❌ Error checking terms:', error);
       }
     }
   }, [user]);
 
   const acceptTerms = () => {
-    if (user && user.id) {
-      const termsAcceptedKey = `terms-accepted-${user.id}`;
-      localStorage.setItem(termsAcceptedKey, 'true');
+    // ИСПРАВЛЯЕМ: добавляем проверки
+    if (user && typeof user === 'object' && user.id) {
+      try {
+        const termsAcceptedKey = `terms-accepted-${user.id}`;
+        localStorage.setItem(termsAcceptedKey, 'true');
+        setShowTermsModal(false);
+      } catch (error) {
+        console.error('❌ Error accepting terms:', error);
+        setShowTermsModal(false); // Закрываем модал в любом случае
+      }
+    } else {
       setShowTermsModal(false);
     }
   };
@@ -106,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       try {
+        console.log('🔑 Attempting login for:', credentials.username);
+        
         const response = await fetch('/api/login', {
           method: 'POST',
           headers: {
@@ -115,21 +125,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(credentials),
         });
         
+        console.log('📡 Login response status:', response.status);
+        
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || "Ошибка авторизации");
         }
         
         const data = await response.json();
-        console.log('✅ Login response:', data);
+        console.log('📦 Login response data:', data);
         
         // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
-        const userData = data.user || data;
+        const userData = data?.user || data;
         
-        if (!userData || !userData.id) {
+        if (!userData || !userData.id || !userData.username) {
+          console.error('❌ Invalid user data from login:', userData);
           throw new Error("Неверная структура данных пользователя");
         }
         
+        console.log('✅ Login successful:', userData);
         return userData;
       } catch (error) {
         console.error('❌ Login error:', error);
@@ -183,11 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         const data = await response.json();
+        const userData = data?.user || data;
         
-        // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
-        const userData = data.user || data;
-        
-        if (!userData || !userData.id) {
+        if (!userData || !userData.id || !userData.username) {
           throw new Error("Неверная структура данных пользователя");
         }
         
@@ -228,7 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.clear(); // Очищаем весь кеш при выходе
+      queryClient.clear();
       toast({
         title: "Вы вышли из системы",
         description: "До свидания!",
@@ -243,12 +255,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Безопасное логирование состояния
+  const safeUser = user && typeof user === 'object' ? {
+    id: user.id,
+    username: user.username,
+    role: user.role
+  } : null;
+
   console.log('🔍 Current auth state:', { 
-    user: user, 
+    user: safeUser, 
     isLoading, 
     error: error?.message,
     hasUser: !!user,
-    userId: user?.id 
+    isValidUser: !!(user && user.id && user.username)
   });
 
   return (
