@@ -67,14 +67,17 @@ router.post('/login', async (req, res) => {
       role: user.role
     };
     
-    console.log('✅ Login successful for:', user.username);
-    res.json({
+    const responseData = {
       user: {
         id: user.id,
         username: user.username,
         role: user.role
       }
-    });
+    };
+    
+    console.log('✅ Login successful for:', user.username);
+    console.log('📤 Sending response:', responseData);
+    res.json(responseData);
     
   } catch (error) {
     console.error('❌ Login error:', error);
@@ -134,11 +137,24 @@ router.post('/logout', (req, res) => {
   });
 });
 
+// ИСПРАВЛЕННЫЙ ENDPOINT ПОЛЬЗОВАТЕЛЯ
 router.get('/user', (req, res) => {
   console.log('👤 User info requested');
+  console.log('🔍 Session data:', req.session);
+  console.log('🔍 Session user:', req.session?.user);
+  
   if (req.session && req.session.user) {
-    res.json({ user: req.session.user });
+    const userData = {
+      user: {
+        id: req.session.user.id,
+        username: req.session.user.username,
+        role: req.session.user.role
+      }
+    };
+    console.log('✅ Returning user data:', userData);
+    res.json(userData);
   } else {
+    console.log('❌ No user in session');
     res.status(401).json({ error: 'Not authenticated' });
   }
 });
