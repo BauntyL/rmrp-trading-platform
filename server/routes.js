@@ -211,7 +211,7 @@ router.get('/my-applications', requireAuth, async (req, res) => {
   }
 });
 
-// ИСПРАВЛЕННОЕ СОЗДАНИЕ ОБЪЯВЛЕНИЯ С КОНТАКТАМИ
+// СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ И ИЗОБРАЖЕНИЕМ
 router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -225,7 +225,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
     
     const application = await storage.updateApplicationStatus(id, status);
     
-    // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ И КОНТАКТАМИ
+    // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
     if (status === 'approved') {
       console.log('✅ Creating car listing from approved application');
       await storage.createCarListing({
@@ -240,9 +240,10 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
         description: application.description,
         ownerId: application.createdBy,
         applicationId: application.id,
-        phone: application.phone,        // ← КОНТАКТЫ!
-        telegram: application.telegram,  // ← КОНТАКТЫ!
-        discord: application.discord     // ← КОНТАКТЫ!
+        phone: application.phone,
+        telegram: application.telegram,
+        discord: application.discord,
+        imageUrl: application.imageUrl  // ← ИЗОБРАЖЕНИЕ!
       });
     }
     
@@ -335,7 +336,7 @@ router.delete('/cars/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Сообщения
+// ИСПРАВЛЕННЫЕ СООБЩЕНИЯ
 router.post('/messages', requireAuth, async (req, res) => {
   try {
     const { receiverId, content, carId } = req.body;
@@ -366,7 +367,11 @@ router.post('/messages', requireAuth, async (req, res) => {
     });
     
     console.log('✅ Message created:', message.id);
-    res.status(201).json(message);
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully',
+      data: message
+    });
   } catch (error) {
     console.error('❌ Error creating message:', error);
     res.status(500).json({ 
@@ -412,7 +417,7 @@ router.get('/messages/unread-count', requireAuth, async (req, res) => {
   }
 });
 
-// Избранное
+// ИСПРАВЛЕННЫЕ ИЗБРАННЫЕ
 router.get('/favorites', requireAuth, async (req, res) => {
   try {
     console.log('⭐ Fetching favorites for user:', req.user.username);
@@ -430,11 +435,23 @@ router.post('/favorites/:carId', requireAuth, async (req, res) => {
     const { carId } = req.params;
     console.log('⭐ Adding to favorites:', carId, 'for user:', req.user.username);
     
-    await storage.addToFavorites(req.user.id, carId);
-    res.json({ success: true });
+    // Проверяем что автомобиль существует
+    const car = await storage.getCarListingById(carId);
+    if (!car) {
+      return res.status(404).json({ error: 'Car not found' });
+    }
+    
+    await storage.addToFavorites(req.user.id, parseInt(carId));
+    res.json({ 
+      success: true,
+      message: 'Added to favorites'
+    });
   } catch (error) {
     console.error('❌ Error adding to favorites:', error);
-    res.status(500).json({ error: 'Failed to add to favorites' });
+    res.status(500).json({ 
+      error: 'Failed to add to favorites',
+      details: error.message 
+    });
   }
 });
 
@@ -443,11 +460,17 @@ router.delete('/favorites/:carId', requireAuth, async (req, res) => {
     const { carId } = req.params;
     console.log('⭐ Removing from favorites:', carId, 'for user:', req.user.username);
     
-    await storage.removeFromFavorites(req.user.id, carId);
-    res.json({ success: true });
+    await storage.removeFromFavorites(req.user.id, parseInt(carId));
+    res.json({ 
+      success: true,
+      message: 'Removed from favorites'
+    });
   } catch (error) {
     console.error('❌ Error removing from favorites:', error);
-    res.status(500).json({ error: 'Failed to remove from favorites' });
+    res.status(500).json({ 
+      error: 'Failed to remove from favorites',
+      details: error.message 
+    });
   }
 });
 
@@ -528,56 +551,32 @@ router.get('/stats/pending-applications', requireAuth, requireRole(['moderator',
   }
 });
 
-// ОБНОВЛЕННАЯ МИГРАЦИЯ С КОНТАКТАМИ
-router.get('/admin/migrate', async (req, res) => {
+// МИГРАЦИЯ ДЛЯ ИЗОБРАЖЕНИЙ
+router.get('/admin/migrate-images', async (req, res) => {
   try {
     const { getClient } = require('./db');
     const client = getClient();
     
-    console.log('🔧 Starting database migration with contacts...');
+    console.log('🖼️ Adding image column...');
     
     await client.query(`
       ALTER TABLE car_listings 
-      ADD COLUMN IF NOT EXISTS category VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS server VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS "maxSpeed" INTEGER,
-      ADD COLUMN IF NOT EXISTS acceleration VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS drive VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS "isPremium" BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS telegram VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS discord VARCHAR(50);
+      ADD COLUMN IF NOT EXISTS "imageUrl" VARCHAR(500);
     `);
     
-    console.log('✅ Migration with contacts executed successfully!');
-    
-    const result = await client.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'car_listings'
-      ORDER BY ordinal_position;
-    `);
-    
-    console.log('📋 Updated table structure:', result.rows);
+    console.log('✅ Image column added!');
     
     res.json({
       success: true,
-      message: '🎉 Database migration with contacts completed!',
-      details: 'Added columns: category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord',
-      tableStructure: result.rows,
-      nextSteps: [
-        '1. Test by approving a car application',
-        '2. Check if car appears with contacts in catalog',
-        '3. Test messaging functionality',
-        '4. Remove this migration endpoint'
-      ]
+      message: '🖼️ Image column added to car_listings!',
+      details: 'Added imageUrl column for car images'
     });
     
   } catch (error) {
-    console.error('❌ Migration failed:', error);
+    console.error('❌ Image migration failed:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Migration failed', 
+      error: 'Image migration failed', 
       details: error.message
     });
   }
