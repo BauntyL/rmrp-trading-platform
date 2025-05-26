@@ -2,98 +2,78 @@ const express = require('express');
 const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
-const setupAuth = require('./auth');
-const setupRoutes = require('./routes');
-const db = require('./db');
+const { initializeDatabase } = require('./db');
+const { initializeAuth } = require('./auth');
 
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-// Логирование всех запросов для отладки
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
+// Инициализация базы данных
+initializeDatabase().then(() => {
+  console.log('✅ Database initialized successfully');
+}).catch(err => {
+  console.error('❌ Database initialization failed:', err);
+  process.exit(1);
 });
 
-// Основные middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// CORS для development
-if (process.env.NODE_ENV !== 'production') {
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
-}
-
-// Session configuration
+// Настройка сессий
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'rmrp-trading-platform-secret-key-2025',
+  secret: process.env.SESSION_SECRET || 'your-secret-key-here',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    secure: false, // Для Render.com должно быть false
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 часа
+  cookie: {
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
-// Passport middleware
+// Инициализация аутентификации
+initializeAuth();
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Настройка авторизации
-setupAuth(passport);
+// Статические файлы
+console.log('📁 Setting up static files middleware...');
+app.use(express.static(path.join(__dirname, '../public')));
 
-// ВАЖНО: API ROUTES ПЕРВЫМИ!
-setupRoutes(app);
-
-const PORT = process.env.PORT || 3000;
-
-// Инициализация базы данных и запуск сервера
-async function startServer() {
-  try {
-    console.log('🔄 Initializing database...');
-    await db.initDb();
-    console.log('✅ Database initialized successfully');
-    
-    // Запуск сервера
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server running on port ${PORT}`);
-      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 API available at http://localhost:${PORT}/api/`);
-      console.log(`📊 Database connected: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'Local'}`);
-    });
-
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('🔄 SIGTERM received, shutting down gracefully');
-      server.close(() => {
-        console.log('✅ Process terminated');
-        process.exit(0);
-      });
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Error handling
-process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
-  process.exit(1);
+// Middleware для логирования запросов
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`${timestamp} - ${req.method} ${req.url}`);
+  next();
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+// API routes
+const routes = require('./routes');
+app.use('/api', routes);
+
+console.log('✅ All routes registered successfully');
+
+// SPA fallback - отдаем index.html для всех неизвестных маршрутов
+app.get('*', (req, res) => {
+  console.log('📝 Serving SPA for route:', req.path);
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-startServer();
+// Глобальный обработчик ошибок
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
+
+// Запуск сервера
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 API available at http://localhost:${PORT}/api/`);
+  console.log(`📊 Database connected: PostgreSQL`);
+});
+
+module.exports = app;
