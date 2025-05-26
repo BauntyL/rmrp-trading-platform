@@ -1,516 +1,446 @@
 const express = require('express');
-const path = require('path');
-const storage = require('./storage-fixed');
+const passport = require('passport');
+const bcrypt = require('bcrypt');
+const storage = require('./storage-fixed'); // ИСПОЛЬЗУЕМ ИСПРАВЛЕННЫЙ STORAGE
 
-function setupRoutes(app) {
-  // Middleware для авторизации
-  function requireAuth(req, res, next) {
-    console.log('🔐 Auth check:', req.isAuthenticated() ? `User: ${req.user?.username}` : 'Not authenticated');
-    if (req.isAuthenticated()) {
-      return next();
-    }
-    res.status(401).json({ error: 'Unauthorized' });
+const router = express.Router();
+
+// Middleware для проверки аутентификации
+function requireAuth(req, res, next) {
+  if (req.isAuthenticated()) {
+    console.log('🔐 Auth check: User:', req.user.username);
+    return next();
   }
-
-  function requireModeratorOrAdmin(req, res, next) {
-    console.log('🛡️ Role check:', req.user?.role);
-    if (req.isAuthenticated() && (req.user.role === 'moderator' || req.user.role === 'admin')) {
-      return next();
-    }
-    res.status(403).json({ error: 'Forbidden - Moderator or Admin role required' });
-  }
-
-  function requireAdmin(req, res, next) {
-    if (req.isAuthenticated() && req.user.role === 'admin') {
-      return next();
-    }
-    res.status(403).json({ error: 'Forbidden - Admin role required' });
-  }
-
-  // API Routes - ДОЛЖНЫ БЫТЬ ПЕРВЫМИ!
-  
-  // Test endpoint
-  app.get('/api/test', (req, res) => {
-    console.log('🧪 Test endpoint called');
-    res.json({ 
-      message: 'API is working!', 
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  });
-
-  // Health check
-  app.get('/api/health', (req, res) => {
-    res.json({ 
-      status: 'OK', 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
-
-  // Auth routes - ДОБАВЛЕНЫ НЕДОСТАЮЩИЕ!
-  app.post('/api/login', (req, res, next) => {
-    const passport = require('passport');
-    
-    console.log('🔑 Login attempt for:', req.body.username);
-    
-    passport.authenticate('local', (err, user, info) => {
-      if (err) {
-        console.error('❌ Login error:', err);
-        return res.status(500).json({ error: 'Ошибка сервера' });
-      }
-      
-      if (!user) {
-        console.log('❌ Login failed for:', req.body.username);
-        return res.status(401).json({ error: info?.message || 'Неверные данные' });
-      }
-
-      req.logIn(user, (err) => {
-        if (err) {
-          console.error('❌ Login session error:', err);
-          return res.status(500).json({ error: 'Ошибка при создании сессии' });
-        }
-        
-        console.log('✅ Login successful for:', user.username);
-        res.json({
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          createdAt: user.created_at
-        });
-      });
-    })(req, res, next);
-  });
-
-  app.post('/api/register', async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      console.log('📝 Registration attempt for:', username);
-
-      if (!username || !password) {
-        return res.status(400).json({ error: 'Имя пользователя и пароль обязательны' });
-      }
-
-      if (password.length < 6) {
-        return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
-      }
-
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ error: 'Пользователь с таким именем уже существует' });
-      }
-
-      const bcrypt = require('bcrypt');
-      const passwordHash = await bcrypt.hash(password, 10);
-      const newUser = await storage.createUser({
-        username,
-        password: passwordHash
-      });
-
-      req.login(newUser, (err) => {
-        if (err) {
-          console.error('❌ Auto-login error after registration:', err);
-          return res.status(500).json({ error: 'Ошибка при автоматическом входе' });
-        }
-        
-        console.log('✅ User registered and logged in:', username);
-        res.json({
-          id: newUser.id,
-          username: newUser.username,
-          role: newUser.role,
-          createdAt: newUser.created_at
-        });
-      });
-
-    } catch (error) {
-      console.error('❌ Registration error:', error);
-      res.status(500).json({ error: 'Ошибка при регистрации' });
-    }
-  });
-
-  app.get('/api/user', (req, res) => {
-    console.log('👤 User info requested');
-    if (req.isAuthenticated()) {
-      res.json({
-        id: req.user.id,
-        username: req.user.username,
-        role: req.user.role,
-        createdAt: req.user.created_at
-      });
-    } else {
-      res.status(401).json({ error: 'Not authenticated' });
-    }
-  });
-
-  app.post('/api/logout', (req, res) => {
-    console.log('🚪 Logout requested');
-    req.logout((err) => {
-      if (err) {
-        console.error('❌ Logout error:', err);
-        return res.status(500).json({ error: 'Logout failed' });
-      }
-      res.json({ message: 'Logged out successfully' });
-    });
-  });
-
-  // Car applications
-  app.post('/api/applications', requireAuth, async (req, res) => {
-    try {
-      console.log('📝 Creating application for user:', req.user.username);
-      console.log('📋 RAW request body:', req.body);
-      
-      const { brand, model, year, price, description } = req.body;
-      
-      console.log('📋 Extracted data:', {
-        brand, model, year, price, description
-      });
-      
-      // Валидация данных
-      if (!brand || !model || !year || !price) {
-        console.log('❌ Missing required fields:', {
-          brand: !!brand,
-          model: !!model, 
-          year: !!year,
-          price: !!price
-        });
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-      
-      const application = await storage.createApplication({
-        brand: brand.trim(),
-        model: model.trim(),
-        year: parseInt(year),
-        price: parseFloat(price),
-        description: description?.trim() || '',
-        createdBy: req.user.id
-      });
-
-      console.log('✅ Application created with ID:', application.id);
-      res.status(201).json(application);
-    } catch (error) {
-      console.error('❌ Error creating application:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.get('/api/applications', requireModeratorOrAdmin, async (req, res) => {
-    try {
-      console.log('📋 Fetching applications for moderator/admin:', req.user.username);
-      
-      // No-cache headers
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const applications = await storage.getApplications();
-      console.log('📦 Found applications count:', applications.length);
-      
-      if (applications.length > 0) {
-        console.log('📄 First application:', {
-          id: applications[0].id,
-          brand: applications[0].brand,
-          model: applications[0].model,
-          status: applications[0].status
-        });
-      }
-      
-      res.json(applications);
-    } catch (error) {
-      console.error('❌ Error fetching applications:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.get('/api/applications/pending', requireModeratorOrAdmin, async (req, res) => {
-    try {
-      console.log('📋 Fetching pending applications for:', req.user.username);
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const applications = await storage.getApplications();
-      const pending = applications.filter(app => app.status === 'pending');
-      console.log('📦 Found pending applications:', pending.length);
-      
-      res.json(pending);
-    } catch (error) {
-      console.error('❌ Error fetching pending applications:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.get('/api/my-applications', requireAuth, async (req, res) => {
-    try {
-      console.log('📋 Fetching applications for user:', req.user.username);
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const applications = await storage.getUserApplications(req.user.id);
-      console.log('📦 Found user applications:', applications.length);
-      
-      res.json(applications);
-    } catch (error) {
-      console.error('❌ Error fetching user applications:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.patch('/api/applications/:id', requireModeratorOrAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { status } = req.body;
-      
-      console.log(`🔄 Updating application ${id} to status: ${status} by ${req.user.username}`);
-
-      const application = await storage.updateApplicationStatus(parseInt(id), status);
-      
-      // Если заявка одобрена, создаем объявление
-      if (status === 'approved') {
-        console.log('✅ Application approved, creating car listing...');
-        try {
-          await storage.createCarListing({
-            brand: application.brand,
-            model: application.model,
-            year: application.year,
-            price: application.price,
-            description: application.description,
-            ownerId: application.createdBy,
-            applicationId: application.id
-          });
-          console.log('🚗 Car listing created successfully');
-        } catch (listingError) {
-          console.error('❌ Error creating car listing:', listingError);
-        }
-      }
-
-      res.json(application);
-    } catch (error) {
-      console.error('❌ Error updating application:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Car listings
-  app.get('/api/cars', async (req, res) => {
-    try {
-      console.log('🚗 Fetching car listings...');
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const cars = await storage.getCarListings();
-      console.log('🚗 Found cars:', cars.length);
-      
-      res.json(cars);
-    } catch (error) {
-      console.error('❌ Error fetching cars:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.get('/api/cars/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      console.log('🚗 Fetching car by ID:', id);
-      
-      const car = await storage.getCarListingById(parseInt(id));
-      
-      if (!car) {
-        return res.status(404).json({ error: 'Car not found' });
-      }
-
-      res.json(car);
-    } catch (error) {
-      console.error('❌ Error fetching car:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Messages
-  app.get('/api/messages', requireAuth, async (req, res) => {
-    try {
-      console.log('💬 Fetching messages for user:', req.user.username);
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const messages = await storage.getUserMessages(req.user.id);
-      res.json(messages);
-    } catch (error) {
-      console.error('❌ Error fetching messages:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.get('/api/messages/unread-count', requireAuth, async (req, res) => {
-    try {
-      console.log('📬 Fetching unread count for user:', req.user.username);
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const count = await storage.getUnreadMessageCount(req.user.id);
-      console.log(`📋 User ${req.user.username} has ${count} unread messages`);
-      res.json({ count });
-    } catch (error) {
-      console.error('❌ Error fetching unread count:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.post('/api/messages', requireAuth, async (req, res) => {
-    try {
-      const { receiverId, content, carId } = req.body;
-      console.log('💬 Creating message from:', req.user.username);
-      
-      const message = await storage.createMessage({
-        senderId: req.user.id,
-        receiverId: parseInt(receiverId),
-        content,
-        carId: carId ? parseInt(carId) : null
-      });
-
-      res.status(201).json(message);
-    } catch (error) {
-      console.error('❌ Error creating message:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.patch('/api/messages/:id/read', requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.markMessageAsRead(parseInt(id), req.user.id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('❌ Error marking message as read:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // User management (admin only)
-  app.get('/api/users', requireAdmin, async (req, res) => {
-    try {
-      console.log('👥 Fetching users for admin:', req.user.username);
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const users = await storage.getAllUsers();
-      res.json(users);
-    } catch (error) {
-      console.error('❌ Error fetching users:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.patch('/api/users/:id/role', requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { role } = req.body;
-      console.log(`👤 Updating user ${id} role to: ${role}`);
-      
-      const user = await storage.updateUserRole(parseInt(id), role);
-      res.json(user);
-    } catch (error) {
-      console.error('❌ Error updating user role:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Favorites
-  app.get('/api/favorites', requireAuth, async (req, res) => {
-    try {
-      console.log('⭐ Fetching favorites for user:', req.user.username);
-      
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const favorites = await storage.getUserFavorites(req.user.id);
-      console.log(`📋 User ${req.user.username} has ${favorites.length} favorites`);
-      res.json(favorites);
-    } catch (error) {
-      console.error('❌ Error fetching favorites:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.post('/api/favorites', requireAuth, async (req, res) => {
-    try {
-      const { carId } = req.body;
-      await storage.addToFavorites(req.user.id, parseInt(carId));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('❌ Error adding to favorites:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.delete('/api/favorites/:carId', requireAuth, async (req, res) => {
-    try {
-      const { carId } = req.params;
-      await storage.removeFromFavorites(req.user.id, parseInt(carId));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('❌ Error removing from favorites:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Pending applications count for moderators/admins
-  app.get('/api/pending', requireModeratorOrAdmin, async (req, res) => {
-    try {
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      const count = await storage.getPendingApplicationsCount();
-      res.json({ count });
-    } catch (error) {
-      console.error('❌ Error fetching pending count:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // STATIC FILES - ПОСЛЕ ВСЕХ API ROUTES
-  console.log('📁 Setting up static files middleware...');
-  app.use(express.static(path.join(__dirname, '../public'), {
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0'
-  }));
-
-  // SPA fallback - САМЫЙ ПОСЛЕДНИЙ!
-  app.get('*', (req, res) => {
-    console.log('📝 Serving SPA for route:', req.path);
-    res.sendFile(path.join(__dirname, '../public/index.html'));
-  });
-
-  console.log('✅ All routes registered successfully');
+  console.log('❌ Auth required but user not authenticated');
+  res.status(401).json({ error: 'Authentication required' });
 }
 
-module.exports = setupRoutes;
+// Middleware для проверки роли
+function requireRole(roles) {
+  return (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const userRole = req.user.role;
+    console.log('🛡️ Role check:', userRole);
+    
+    if (roles.includes(userRole)) {
+      return next();
+    }
+    
+    console.log('❌ Access denied. Required roles:', roles, 'User role:', userRole);
+    res.status(403).json({ error: 'Insufficient permissions' });
+  };
+}
+
+// Аутентификация
+router.post('/login', (req, res, next) => {
+  const { username } = req.body;
+  console.log('🔑 Login attempt for:', username);
+  
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      console.error('❌ Login error:', err);
+      return res.status(500).json({ error: 'Login failed' });
+    }
+    
+    if (!user) {
+      console.log('❌ Invalid credentials for:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    req.logIn(user, (err) => {
+      if (err) {
+        console.error('❌ Session error:', err);
+        return res.status(500).json({ error: 'Session creation failed' });
+      }
+      
+      console.log('✅ Login successful for:', user.username);
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      });
+    });
+  })(req, res, next);
+});
+
+router.post('/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    console.log('📝 Registration attempt for:', username);
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+    
+    // Проверка существования пользователя
+    const existingUser = await storage.getUserByUsername(username);
+    if (existingUser) {
+      console.log('❌ User already exists:', username);
+      return res.status(400).json({ error: 'User already exists' });
+    }
+    
+    // Хеширование пароля
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Создание пользователя
+    const user = await storage.createUser({
+      username,
+      password: hashedPassword,
+      role: 'user'
+    });
+    
+    console.log('✅ User registered:', username);
+    res.status(201).json({
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+router.post('/logout', (req, res) => {
+  const username = req.user?.username || 'Unknown';
+  req.logout((err) => {
+    if (err) {
+      console.error('❌ Logout error:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    console.log('✅ User logged out:', username);
+    res.json({ message: 'Logged out successfully' });
+  });
+});
+
+router.get('/user', (req, res) => {
+  console.log('👤 User info requested');
+  if (req.isAuthenticated()) {
+    res.json({
+      user: {
+        id: req.user.id,
+        username: req.user.username,
+        role: req.user.role
+      }
+    });
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
+  }
+});
+
+// ИСПРАВЛЕННЫЙ ENDPOINT ДЛЯ СОЗДАНИЯ ЗАЯВОК
+router.post('/applications', requireAuth, async (req, res) => {
+  try {
+    console.log('📝 Creating application for user:', req.user.username);
+    console.log('📋 RAW request body:', req.body);
+    
+    // ИЗВЛЕКАЕМ ДАННЫЕ ИЗ ПРАВИЛЬНЫХ ПОЛЕЙ
+    const { name, price, category, server, maxSpeed, acceleration, drive, isPremium } = req.body;
+    
+    // ПАРСИМ name НА brand И model
+    const nameParts = name ? name.split(' ') : [];
+    const brand = nameParts[0] || '';
+    const model = nameParts.slice(1).join(' ') || '';
+    
+    // СОЗДАЕМ ОПИСАНИЕ ИЗ ДОСТУПНЫХ ДАННЫХ
+    const descriptionParts = [];
+    if (category) descriptionParts.push(`Категория: ${category}`);
+    if (server) descriptionParts.push(`Сервер: ${server}`);
+    if (maxSpeed) descriptionParts.push(`Макс. скорость: ${maxSpeed} км/ч`);
+    if (acceleration) descriptionParts.push(`Разгон: ${acceleration}с`);
+    if (drive) descriptionParts.push(`Привод: ${drive}`);
+    if (isPremium) descriptionParts.push('Премиум автомобиль');
+    
+    const description = descriptionParts.join(', ') || 'Без описания';
+    
+    // ГЕНЕРИРУЕМ ГОД (или используем текущий)
+    const year = new Date().getFullYear();
+    
+    console.log('📋 Processed data:', {
+      brand,
+      model,
+      year,
+      price,
+      description
+    });
+    
+    // ПРОВЕРЯЕМ ОБЯЗАТЕЛЬНЫЕ ПОЛЯ
+    if (!brand || !model || !price) {
+      console.log('❌ Missing required fields:', {
+        brand: !!brand,
+        model: !!model,
+        price: !!price
+      });
+      return res.status(400).json({
+        error: 'Отсутствуют обязательные поля',
+        required: ['name (для brand/model)', 'price'],
+        received: { brand, model, price }
+      });
+    }
+    
+    const applicationData = {
+      brand,
+      model,
+      year,
+      price: parseFloat(price),
+      description,
+      createdBy: req.user.id
+    };
+    
+    console.log('📝 Creating application with data:', applicationData);
+    
+    const application = await storage.createApplication(applicationData);
+    
+    console.log('✅ Application created successfully:', application.id);
+    res.status(201).json(application);
+    
+  } catch (error) {
+    console.error('❌ Error creating application:', error);
+    res.status(500).json({ 
+      error: 'Ошибка создания заявки',
+      details: error.message 
+    });
+  }
+});
+
+// Получение заявок на модерацию (только для модераторов и админов)
+router.get('/applications/pending', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    console.log('📋 Fetching pending applications for:', req.user.username);
+    const applications = await storage.getApplications();
+    const pendingApplications = applications.filter(app => app.status === 'pending');
+    
+    console.log('📦 Found pending applications:', pendingApplications.length);
+    res.json(pendingApplications);
+  } catch (error) {
+    console.error('❌ Error fetching pending applications:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// Получение заявок пользователя
+router.get('/my-applications', requireAuth, async (req, res) => {
+  try {
+    console.log('📋 Fetching applications for user:', req.user.username);
+    const applications = await storage.getUserApplications(req.user.id);
+    
+    console.log('📦 Found user applications:', applications.length);
+    res.json(applications);
+  } catch (error) {
+    console.error('❌ Error fetching user applications:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// Обновление статуса заявки (только для модераторов и админов)
+router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    console.log('🔄 Updating application status:', id, 'to:', status, 'by:', req.user.username);
+    
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    
+    const application = await storage.updateApplicationStatus(id, status);
+    
+    // Если заявка одобрена, создаем объявление
+    if (status === 'approved') {
+      console.log('✅ Creating car listing from approved application');
+      await storage.createCarListing({
+        brand: application.brand,
+        model: application.model,
+        year: application.year,
+        price: application.price,
+        description: application.description,
+        ownerId: application.createdBy,
+        applicationId: application.id
+      });
+    }
+    
+    res.json(application);
+  } catch (error) {
+    console.error('❌ Error updating application status:', error);
+    res.status(500).json({ error: 'Failed to update application status' });
+  }
+});
+
+// Получение объявлений автомобилей
+router.get('/cars', requireAuth, async (req, res) => {
+  try {
+    console.log('🚗 Fetching car listings...');
+    const cars = await storage.getCarListings();
+    
+    console.log('🚗 Found cars:', cars.length);
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error fetching cars:', error);
+    res.status(500).json({ error: 'Failed to fetch cars' });
+  }
+});
+
+// Получение конкретного объявления
+router.get('/cars/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🚗 Fetching car:', id);
+    
+    const car = await storage.getCarListingById(id);
+    if (!car) {
+      return res.status(404).json({ error: 'Car not found' });
+    }
+    
+    res.json(car);
+  } catch (error) {
+    console.error('❌ Error fetching car:', error);
+    res.status(500).json({ error: 'Failed to fetch car' });
+  }
+});
+
+// Сообщения
+router.post('/messages', requireAuth, async (req, res) => {
+  try {
+    const { receiverId, content, carId } = req.body;
+    console.log('💬 Creating message from:', req.user.username, 'to user:', receiverId);
+    
+    const message = await storage.createMessage({
+      senderId: req.user.id,
+      receiverId,
+      content,
+      carId
+    });
+    
+    res.status(201).json(message);
+  } catch (error) {
+    console.error('❌ Error creating message:', error);
+    res.status(500).json({ error: 'Failed to create message' });
+  }
+});
+
+router.get('/messages', requireAuth, async (req, res) => {
+  try {
+    console.log('💬 Fetching messages for user:', req.user.username);
+    const messages = await storage.getUserMessages(req.user.id);
+    res.json(messages);
+  } catch (error) {
+    console.error('❌ Error fetching messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+router.patch('/messages/:id/read', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('📖 Marking message as read:', id);
+    
+    await storage.markMessageAsRead(id, req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error marking message as read:', error);
+    res.status(500).json({ error: 'Failed to mark message as read' });
+  }
+});
+
+router.get('/messages/unread-count', requireAuth, async (req, res) => {
+  try {
+    console.log('📬 Fetching unread count for user:', req.user.username);
+    const count = await storage.getUnreadMessageCount(req.user.id);
+    console.log('📋 User', req.user.username, 'has', count, 'unread messages');
+    res.json({ count });
+  } catch (error) {
+    console.error('❌ Error fetching unread count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
+// Избранное
+router.get('/favorites', requireAuth, async (req, res) => {
+  try {
+    console.log('⭐ Fetching favorites for user:', req.user.username);
+    const favorites = await storage.getUserFavorites(req.user.id);
+    console.log('📋 User', req.user.username, 'has', favorites.length, 'favorites');
+    res.json(favorites);
+  } catch (error) {
+    console.error('❌ Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
+  }
+});
+
+router.post('/favorites/:carId', requireAuth, async (req, res) => {
+  try {
+    const { carId } = req.params;
+    console.log('⭐ Adding to favorites:', carId, 'for user:', req.user.username);
+    
+    await storage.addToFavorites(req.user.id, carId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error adding to favorites:', error);
+    res.status(500).json({ error: 'Failed to add to favorites' });
+  }
+});
+
+router.delete('/favorites/:carId', requireAuth, async (req, res) => {
+  try {
+    const { carId } = req.params;
+    console.log('💔 Removing from favorites:', carId, 'for user:', req.user.username);
+    
+    await storage.removeFromFavorites(req.user.id, carId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error removing from favorites:', error);
+    res.status(500).json({ error: 'Failed to remove from favorites' });
+  }
+});
+
+// Админские функции
+router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('👥 Admin fetching all users');
+    const users = await storage.getAllUsers();
+    res.json(users);
+  } catch (error) {
+    console.error('❌ Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.patch('/admin/users/:id/role', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    
+    console.log('🔄 Admin updating user role:', id, 'to:', role);
+    
+    if (!['user', 'moderator', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    
+    const user = await storage.updateUserRole(id, role);
+    res.json(user);
+  } catch (error) {
+    console.error('❌ Error updating user role:', error);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+// Статистика
+router.get('/stats/pending-applications', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    const count = await storage.getPendingApplicationsCount();
+    res.json({ count });
+  } catch (error) {
+    console.error('❌ Error fetching pending applications count:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+module.exports = router;
