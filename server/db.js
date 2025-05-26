@@ -45,13 +45,9 @@ async function initializeTables() {
       )
     `);
 
-    // ПРИНУДИТЕЛЬНО ПЕРЕСОЗДАЕМ ТАБЛИЦУ car_applications
-    console.log("🔄 Recreating car_applications table...");
-    
-    await client.query(`DROP TABLE IF EXISTS car_applications CASCADE`);
-    
+    // ✅ НЕ ПЕРЕСОЗДАЕМ! ТОЛЬКО СОЗДАЕМ ЕСЛИ НЕ СУЩЕСТВУЕТ
     await client.query(`
-      CREATE TABLE car_applications (
+      CREATE TABLE IF NOT EXISTS car_applications (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         price INTEGER NOT NULL,
@@ -75,28 +71,32 @@ async function initializeTables() {
       )
     `);
 
-    // ПРИНУДИТЕЛЬНО ПЕРЕСОЗДАЕМ ТАБЛИЦУ car_listings
-    console.log("🔄 Recreating car_listings table...");
-    
-    await client.query(`DROP TABLE IF EXISTS car_listings CASCADE`);
-    
+    // ✅ НЕ ПЕРЕСОЗДАЕМ! ТОЛЬКО СОЗДАЕМ ЕСЛИ НЕ СУЩЕСТВУЕТ
     await client.query(`
-      CREATE TABLE car_listings (
+      CREATE TABLE IF NOT EXISTS car_listings (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         price INTEGER NOT NULL,
         description TEXT,
+        category VARCHAR(100),
+        server VARCHAR(100),
+        "maxSpeed" INTEGER,
+        acceleration VARCHAR(50),
+        drive VARCHAR(50),
+        "isPremium" BOOLEAN DEFAULT FALSE,
+        phone VARCHAR(50),
+        telegram VARCHAR(100),
+        discord VARCHAR(100),
+        "imageUrl" TEXT,
         owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         application_id INTEGER REFERENCES car_applications(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // ПЕРЕСОЗДАЕМ ТАБЛИЦУ СООБЩЕНИЙ
-    await client.query(`DROP TABLE IF EXISTS messages CASCADE`);
-    
+    // ✅ НЕ ПЕРЕСОЗДАЕМ! ТОЛЬКО СОЗДАЕМ ЕСЛИ НЕ СУЩЕСТВУЕТ
     await client.query(`
-      CREATE TABLE messages (
+      CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
         "senderId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
         "receiverId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -107,11 +107,9 @@ async function initializeTables() {
       )
     `);
 
-    // ПЕРЕСОЗДАЕМ ТАБЛИЦУ ИЗБРАННОГО
-    await client.query(`DROP TABLE IF EXISTS favorites CASCADE`);
-    
+    // ✅ НЕ ПЕРЕСОЗДАЕМ! ТОЛЬКО СОЗДАЕМ ЕСЛИ НЕ СУЩЕСТВУЕТ
     await client.query(`
-      CREATE TABLE favorites (
+      CREATE TABLE IF NOT EXISTS favorites (
         id SERIAL PRIMARY KEY,
         "userId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
         "carId" INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
@@ -120,7 +118,7 @@ async function initializeTables() {
       )
     `);
 
-    console.log("✅ Database tables recreated successfully");
+    console.log("✅ Database tables initialized successfully (preserved existing data)");
     
     // СОЗДАЕМ АДМИНА ЕСЛИ НЕТ
     await createDefaultAdmin();
