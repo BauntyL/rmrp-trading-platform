@@ -163,7 +163,7 @@ async function updateApplicationStatus(id, status) {
   }
 }
 
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
+// ПОЛНАЯ ФУНКЦИЯ СОЗДАНИЯ ОБЪЯВЛЕНИЯ С КОНТАКТАМИ
 async function createCarListing(carData) {
   try {
     const client = getClient();
@@ -178,21 +178,25 @@ async function createCarListing(carData) {
       maxSpeed,
       acceleration,
       drive,
-      isPremium = false
+      isPremium = false,
+      phone,
+      telegram,
+      discord
     } = carData;
     
-    console.log('🚗 Creating car listing with ALL fields:', carData);
+    console.log('🚗 Creating car listing with ALL fields including contacts:', carData);
     
     const result = await client.query(
       `INSERT INTO car_listings (
         name, price, description, owner_id, application_id, created_at,
-        category, server, "maxSpeed", acceleration, drive, "isPremium"
-      ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11) 
+        category, server, "maxSpeed", acceleration, drive, "isPremium",
+        phone, telegram, discord
+      ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11, $12, $13, $14) 
       RETURNING *`,
-      [name, price, description, ownerId, applicationId, category, server, maxSpeed, acceleration, drive, isPremium]
+      [name, price, description, ownerId, applicationId, category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord]
     );
     
-    console.log(`✅ Car listing created with all fields:`, result.rows[0]);
+    console.log(`✅ Car listing created with all fields and contacts:`, result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating car listing:', error);
@@ -241,7 +245,7 @@ async function getCarListingById(id) {
   }
 }
 
-// НОВАЯ ФУНКЦИЯ УДАЛЕНИЯ
+// ФУНКЦИЯ УДАЛЕНИЯ
 async function deleteCarListing(carId) {
   try {
     const client = getClient();
@@ -272,7 +276,7 @@ async function deleteCarListing(carId) {
   }
 }
 
-// НОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ АВТО ПОЛЬЗОВАТЕЛЯ
+// ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ АВТО ПОЛЬЗОВАТЕЛЯ
 async function getUserCarListings(userId) {
   try {
     const client = getClient();
@@ -302,8 +306,8 @@ async function createMessage(messageData) {
     const { senderId, receiverId, content, carId } = messageData;
     
     const result = await client.query(
-      `INSERT INTO messages ("senderId", "receiverId", content, "carId") 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO messages ("senderId", "receiverId", content, "carId", "createdAt") 
+       VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
       [senderId, receiverId, content, carId]
     );
     
@@ -401,7 +405,7 @@ async function addToFavorites(userId, carId) {
     const client = getClient();
     
     await client.query(
-      'INSERT INTO favorites ("userId", "carId") VALUES ($1, $2) ON CONFLICT ("userId", "carId") DO NOTHING',
+      'INSERT INTO favorites ("userId", "carId", "createdAt") VALUES ($1, $2, NOW()) ON CONFLICT ("userId", "carId") DO NOTHING',
       [userId, carId]
     );
     
@@ -476,8 +480,8 @@ module.exports = {
   createCarListing,
   getCarListings,
   getCarListingById,
-  deleteCarListing,        // ← ДОБАВЛЕНО!
-  getUserCarListings,      // ← ДОБАВЛЕНО!
+  deleteCarListing,
+  getUserCarListings,
   
   // Messages
   createMessage,
