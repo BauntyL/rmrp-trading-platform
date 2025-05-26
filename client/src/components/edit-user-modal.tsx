@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 
 interface EditUserModalProps {
   user: any;
@@ -20,23 +20,21 @@ interface EditUserModalProps {
 export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState({
-    username: user?.username || "",
-    email: user?.email || "",
-  });
+  const [username, setUsername] = useState(user?.username || "");
+  const [email, setEmail] = useState(user?.email || "");
 
-  const editUserMutation = useMutation({
+  const updateUserMutation = useMutation({
     mutationFn: async (data: any) => {
       // В реальном проекте здесь будет запрос к API
       return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      onOpenChange(false);
       toast({
         title: "Пользователь обновлен",
         description: "Данные пользователя успешно обновлены",
       });
+      onOpenChange(false);
     },
     onError: (error: any) => {
       toast({
@@ -49,38 +47,45 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    editUserMutation.mutate({
+    updateUserMutation.mutate({
       id: user.id,
-      ...formData,
+      username,
+      email,
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-800 border-slate-700 text-white">
+      <DialogContent className="bg-slate-800 border-slate-700">
         <DialogHeader>
-          <DialogTitle>Редактировать пользователя</DialogTitle>
+          <DialogTitle className="text-white">
+            Редактировать пользователя
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="username">Имя пользователя</Label>
+            <Label htmlFor="username" className="text-white">
+              Имя пользователя
+            </Label>
             <Input
               id="username"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="bg-slate-700 border-slate-600 text-white"
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-white">
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="bg-slate-700 border-slate-600 text-white"
               required
             />
@@ -97,10 +102,10 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
             </Button>
             <Button
               type="submit"
-              disabled={editUserMutation.isPending}
+              disabled={updateUserMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {editUserMutation.isPending ? "Сохранение..." : "Сохранить"}
+              {updateUserMutation.isPending ? "Сохранение..." : "Сохранить"}
             </Button>
           </div>
         </form>
