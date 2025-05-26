@@ -1,308 +1,269 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Search, Trash2, Eye } from "lucide-react";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
-import { deletedMessagesStore } from "@/lib/deleted-messages";
-
-interface MessageModerationData {
-  id: number;
-  carId: number;
-  buyerId: number;
-  sellerId: number;
-  senderId: number;
-  recipientId: number;
-  content: string;
-  isRead: boolean;
-  createdAt: string;
-  carName?: string;
-  buyerName?: string;
-  sellerName?: string;
-  senderName?: string;
-  recipientName?: string;
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  MessageSquare, 
+  User, 
+  Car, 
+  Clock, 
+  Search, 
+  Filter,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
+} from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function MessageModerationPanel() {
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMessage, setSelectedMessage] = useState<MessageModerationData | null>(null);
-  const [deletedMessages, setDeletedMessages] = useState<Set<number>>(new Set());
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [selectedDialog, setSelectedDialog] = useState<any>(null);
 
-  // Используем существующий API для получения всех сообщений
-  const { data: allMessages = [], isLoading } = useQuery<MessageModerationData[]>({
-    queryKey: ["/api/messages"],
-    refetchInterval: 10000, // Автообновление каждые 10 секунд
-    refetchOnWindowFocus: true,
-  });
-
-  const deleteMessageMutation = useMutation({
-    mutationFn: async (messageId: number) => {
-      console.log(`🗑️ Удаляем сообщение ID: ${messageId}`);
-      
-      // Добавляем сообщение в глобальное хранилище удаленных сообщений
-      deletedMessagesStore.add(messageId);
-      
-      // Также добавляем в локальное состояние для немедленного обновления интерфейса
-      setDeletedMessages(prev => new Set(prev).add(messageId));
-      
-      // Симулируем API запрос
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return { success: true, messageId };
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Успешно",
-        description: `Сообщение #${data.messageId} удалено модератором`,
+  const { data: dialogs = [], isLoading } = useQuery({
+    queryKey: ["/api/messages/moderation"],
+    queryFn: async () => {
+      const response = await fetch('/api/messages/moderation', {
+        credentials: 'include',
       });
-      setSelectedMessage(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch moderation data');
+      }
+      
+      return response.json();
     },
   });
 
-  const filteredMessages = allMessages
-    .filter(message => !deletedMessages.has(message.id)) // Исключаем удаленные сообщения
-    .filter(message =>
-      message.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.carName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.senderName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      message.recipientName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  const { data: messages = [] } = useQuery({
+    queryKey: ["/api/messages/dialog", selectedDialog?.id],
+    queryFn: async () => {
+      if (!selectedDialog?.id) return [];
+      
+      const response = await fetch(`/api/messages/dialog/${selectedDialog.id}`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages');
+      }
+      
+      return response.json();
+    },
+    enabled: !!selectedDialog?.id,
+  });
 
-  // Группировка сообщений по диалогам
-  const dialogues = filteredMessages.reduce((acc: Record<string, MessageModerationData[]>, message) => {
-    const dialogueKey = `${message.carId}-${Math.min(message.buyerId, message.sellerId)}-${Math.max(message.buyerId, message.sellerId)}`;
-    if (!acc[dialogueKey]) {
-      acc[dialogueKey] = [];
+  const filteredDialogs = dialogs.filter((dialog: any) => {
+    const matchesSearch = searchTerm === "" || 
+      dialog.carName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dialog.buyerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dialog.sellerName?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterStatus === "all" || dialog.status === filterStatus;
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500">Активен</Badge>;
+      case 'flagged':
+        return <Badge className="bg-yellow-500">Отмечен</Badge>;
+      case 'blocked':
+        return <Badge className="bg-red-500">Заблокирован</Badge>;
+      default:
+        return <Badge variant="outline">Неизвестно</Badge>;
     }
-    acc[dialogueKey].push(message);
-    return acc;
-  }, {});
-
-  // Сортировка диалогов по последнему сообщению
-  const sortedDialogues = Object.entries(dialogues)
-    .map(([key, messages]) => ({
-      key,
-      messages: messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-      lastMessage: messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-    }))
-    .sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
-
-  const handleDeleteMessage = (messageId: number) => {
-    deleteMessageMutation.mutate(messageId);
   };
 
-  console.log("📊 Данные модерации:", { 
-    allMessages, 
-    allMessagesLength: allMessages?.length,
-    filteredMessages, 
-    sortedDialogues,
-    isLoading 
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400">Загрузка сообщений...</div>
-      </div>
-    );
-  }
-
-  if (!allMessages || allMessages.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Модерация сообщений</h2>
-          <p className="text-slate-400">Контроль всех диалогов пользователей</p>
-        </div>
-        
-        <div className="text-center py-12">
-          <div className="text-slate-400 text-lg mb-2">Сообщений не найдено</div>
-          <p className="text-slate-500">Пока что пользователи не отправляли сообщений</p>
-        </div>
-      </div>
-    );
-  }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ru-RU');
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Модерация сообщений</h2>
-          <p className="text-slate-400">Просмотр и модерация диалогов пользователей</p>
+      <div>
+        <h1 className="text-3xl font-bold text-white mb-2">Модерация сообщений</h1>
+        <p className="text-slate-400">Просмотр и управление диалогами пользователей</p>
+      </div>
+
+      <div className="flex space-x-4">
+        {/* Фильтры */}
+        <div className="flex space-x-2 flex-1">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Поиск по автомобилю или пользователю..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-slate-700 border-slate-600 text-white"
+            />
+          </div>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-48 bg-slate-700 border-slate-600 text-white">
+              <SelectValue placeholder="Статус" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-700 border-slate-600">
+              <SelectItem value="all">Все статусы</SelectItem>
+              <SelectItem value="active">Активные</SelectItem>
+              <SelectItem value="flagged">Отмеченные</SelectItem>
+              <SelectItem value="blocked">Заблокированные</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-          Всего диалогов: {sortedDialogues.length}
-        </Badge>
       </div>
 
-      {/* Поиск */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-        <Input
-          placeholder="Поиск по содержимому, автомобилю или пользователям..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 bg-slate-800 border-slate-700 text-white"
-        />
-      </div>
-
-      {sortedDialogues.length === 0 ? (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
+        {/* Список диалогов */}
         <Card className="bg-slate-800 border-slate-700">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-400">
-              {searchTerm ? "Сообщения не найдены" : "Пока нет сообщений для модерации"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {sortedDialogues.map(({ key, messages, lastMessage }) => (
-            <Card key={key} className="bg-slate-800 border-slate-700 hover:border-slate-600 transition-colors">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-white">
-                      {lastMessage.carName || "Неизвестный автомобиль"}
-                    </h3>
-                    <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <span>{lastMessage.buyerName || "Покупатель"}</span>
-                      <span>↔</span>
-                      <span>{lastMessage.sellerName || "Продавец"}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                      {messages.length} сообщений
-                    </Badge>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {format(new Date(lastMessage.createdAt), "dd MMM yyyy HH:mm", { locale: ru })}
-                    </p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {/* Показываем последние 3 сообщения */}
-                  {messages.slice(0, 3).map((message) => (
-                    <div
-                      key={message.id}
-                      className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-white">
-                            {message.senderName || "Пользователь"}
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            {format(new Date(message.createdAt), "dd MMM HH:mm", { locale: ru })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-300 truncate">
-                          {message.content}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedMessage(message)}
-                          className="text-slate-400 hover:text-white"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteMessage(message.id)}
-                          disabled={deleteMessageMutation.isPending}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-white">
+              <MessageSquare className="h-5 w-5" />
+              <span>Диалоги ({filteredDialogs.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[500px]">
+              {isLoading ? (
+                <div className="p-4 space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-20 bg-slate-700 rounded-lg"></div>
                     </div>
                   ))}
-                  
-                  {messages.length > 3 && (
-                    <p className="text-center text-sm text-slate-400">
-                      ... и еще {messages.length - 3} сообщений
-                    </p>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              ) : filteredDialogs.length === 0 ? (
+                <div className="p-4 text-center text-slate-400">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Диалоги не найдены</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredDialogs.map((dialog: any) => (
+                    <button
+                      key={dialog.id}
+                      onClick={() => setSelectedDialog(dialog)}
+                      className={`w-full p-4 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
+                        selectedDialog?.id === dialog.id ? 'bg-slate-700' : ''
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-2">
+                          <Car className="h-4 w-4 text-blue-400" />
+                          <span className="text-white font-medium text-sm">
+                            {dialog.carName || 'Неизвестный автомобиль'}
+                          </span>
+                        </div>
+                        {getStatusBadge(dialog.status)}
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2 text-xs text-slate-400">
+                          <User className="h-3 w-3" />
+                          <span>Покупатель: {dialog.buyerName}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-slate-400">
+                          <User className="h-3 w-3" />
+                          <span>Продавец: {dialog.sellerName}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatDate(dialog.lastMessage)}</span>
+                        </div>
+                      </div>
+                      
+                      {dialog.messageCount && (
+                        <div className="mt-2 text-xs text-slate-500">
+                          Сообщений: {dialog.messageCount}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
 
-      {/* Модальное окно для просмотра сообщения */}
-      {selectedMessage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="bg-slate-800 border-slate-700 max-w-lg w-full">
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-white">Детали сообщения</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-400">Отправитель:</label>
-                <p className="text-white">{selectedMessage.senderName || "Неизвестный"}</p>
+        {/* Просмотр сообщений */}
+        <Card className="bg-slate-800 border-slate-700">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-white">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="h-5 w-5" />
+                <span>Сообщения</span>
               </div>
-              <div>
-                <label className="text-sm font-medium text-slate-400">Получатель:</label>
-                <p className="text-white">{selectedMessage.recipientName || "Неизвестный"}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-400">Автомобиль:</label>
-                <p className="text-white">{selectedMessage.carName || "Неизвестный"}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-400">Время отправки:</label>
-                <p className="text-white">
-                  {format(new Date(selectedMessage.createdAt), "dd MMMM yyyy, HH:mm", { locale: ru })}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-400">Содержимое:</label>
-                <div className="p-3 bg-slate-700 rounded-lg">
-                  <p className="text-white whitespace-pre-wrap">{selectedMessage.content}</p>
+              {selectedDialog && (
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-yellow-600 border-yellow-600 text-white hover:bg-yellow-700"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Отметить
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-red-600 border-red-600 text-white hover:bg-red-700"
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Заблокировать
+                  </Button>
                 </div>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {!selectedDialog ? (
+              <div className="p-8 text-center text-slate-400">
+                <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p>Выберите диалог для просмотра сообщений</p>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="destructive"
-                  onClick={() => handleDeleteMessage(selectedMessage.id)}
-                  disabled={deleteMessageMutation.isPending}
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Удалить сообщение
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedMessage(null)}
-                  className="flex-1"
-                >
-                  Закрыть
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            ) : (
+              <ScrollArea className="h-[500px]">
+                <div className="p-4 space-y-4">
+                  {messages.map((message: any) => (
+                    <div
+                      key={message.id}
+                      className={`p-3 rounded-lg ${
+                        message.senderId === selectedDialog.buyerId
+                          ? 'bg-blue-600/20 ml-4'
+                          : 'bg-slate-700 mr-4'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-2">
+                          <User className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm font-medium text-white">
+                            {message.senderName}
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          {formatDate(message.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-slate-300 text-sm">{message.content}</p>
+                      
+                      {message.isBlocked && (
+                        <Badge className="mt-2 bg-red-500">Заблокировано</Badge>
+                      )}
+                      {message.isFlagged && (
+                        <Badge className="mt-2 bg-yellow-500">Отмечено</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
