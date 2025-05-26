@@ -32,28 +32,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
     isError,
-  } = useQuery<SelectUser | undefined, Error>({
+  } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/user"],
     queryFn: async () => {
-      const response = await fetch('/api/user', {
-        credentials: 'include', // ВАЖНО: для сессий
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      try {
+        const response = await fetch('/api/user', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          return null; // Пользователь не авторизован
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.log('👤 User not authenticated');
+            return null;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
-      const data = await response.json();
-      console.log('👤 Received user data from API:', data);
-      
-      // ИСПРАВЛЯЕМ: извлекаем user из ответа
-      return data.user || data; // Возвращаем data.user если есть, иначе сам data
+        const data = await response.json();
+        console.log('👤 Received user data from API:', data);
+        
+        // ИСПРАВЛЯЕМ: правильно извлекаем user из ответа
+        const userData = data.user || data;
+        
+        if (userData && userData.id) {
+          console.log('✅ Valid user data:', userData);
+          return userData;
+        } else {
+          console.log('❌ Invalid user data structure:', data);
+          return null;
+        }
+      } catch (error) {
+        console.error('❌ Error fetching user:', error);
+        if (error instanceof Error && error.message.includes('401')) {
+          return null;
+        }
+        throw error;
+      }
     },
     retry: (failureCount, error) => {
       // Не повторяем запросы при ошибках 401 (неавторизован)
@@ -62,13 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return failureCount < 2;
     },
-    staleTime: 0, // Всегда считаем данные устаревшими
-    gcTime: 0, // Не кэшируем данные пользователя
+    staleTime: 30000, // Кешируем на 30 секунд
+    gcTime: 60000, // Храним в кеше 1 минуту
   });
 
   // Проверяем, нужно ли показать модальное окно с условиями
   useEffect(() => {
-    if (user) {
+    if (user && user.id) {
       const termsAcceptedKey = `terms-accepted-${user.id}`;
       const hasAcceptedTerms = localStorage.getItem(termsAcceptedKey);
       
@@ -79,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const acceptTerms = () => {
-    if (user) {
+    if (user && user.id) {
       const termsAcceptedKey = `terms-accepted-${user.id}`;
       localStorage.setItem(termsAcceptedKey, 'true');
       setShowTermsModal(false);
@@ -88,32 +105,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // ВАЖНО: для сессий
-        body: JSON.stringify(credentials),
-      });
-      
-      // Проверяем статус ответа
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Ошибка авторизации");
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(credentials),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Ошибка авторизации");
+        }
+        
+        const data = await response.json();
+        console.log('✅ Login response:', data);
+        
+        // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
+        const userData = data.user || data;
+        
+        if (!userData || !userData.id) {
+          throw new Error("Неверная структура данных пользователя");
+        }
+        
+        return userData;
+      } catch (error) {
+        console.error('❌ Login error:', error);
+        throw error;
       }
-      
-      const data = await response.json();
-      console.log('✅ Login response:', data);
-      
-      // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
-      return data.user || data;
     },
     onSuccess: (userData: SelectUser) => {
-      console.log('✅ Setting user data:', userData);
+      console.log('✅ Setting user data after login:', userData);
+      
+      // Устанавливаем данные пользователя в кеш
       queryClient.setQueryData(["/api/user"], userData);
       
-      // ПРИНУДИТЕЛЬНО ПЕРЕЗАГРУЖАЕМ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ
+      // Принудительно обновляем запрос пользователя
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       
       toast({
@@ -122,6 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error('❌ Login mutation error:', error);
+      
       // Полностью очищаем данные пользователя при неудачном входе
       queryClient.setQueryData(["/api/user"], null);
       queryClient.removeQueries({ queryKey: ["/api/user"] });
@@ -136,27 +167,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      const response = await fetch('/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // ВАЖНО: для сессий
-        body: JSON.stringify(credentials),
-      });
-      
-      // Проверяем статус ответа для регистрации
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Ошибка регистрации");
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(credentials),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Ошибка регистрации");
+        }
+        
+        const data = await response.json();
+        
+        // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
+        const userData = data.user || data;
+        
+        if (!userData || !userData.id) {
+          throw new Error("Неверная структура данных пользователя");
+        }
+        
+        return userData;
+      } catch (error) {
+        console.error('❌ Registration error:', error);
+        throw error;
       }
-      
-      const data = await response.json();
-      
-      // ИСПРАВЛЯЕМ: возвращаем именно user из ответа
-      return data.user || data;
     },
     onSuccess: (userData: SelectUser) => {
+      console.log('✅ Setting user data after registration:', userData);
       queryClient.setQueryData(["/api/user"], userData);
       toast({
         title: "Успешная регистрация",
@@ -186,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.clear(); // Очищаем весь кеш при выходе
       toast({
         title: "Вы вышли из системы",
         description: "До свидания!",
@@ -200,7 +243,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  console.log('🔍 Current user state:', user);
+  console.log('🔍 Current auth state:', { 
+    user: user, 
+    isLoading, 
+    error: error?.message,
+    hasUser: !!user,
+    userId: user?.id 
+  });
 
   return (
     <AuthContext.Provider
