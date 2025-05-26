@@ -21,7 +21,6 @@ export function MessageModerationPanel() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedDialog, setSelectedDialog] = useState<any>(null);
 
-  // Мок данные для примера
   const mockDialogs = [
     {
       id: 1,
@@ -68,18 +67,14 @@ export function MessageModerationPanel() {
     }
   ];
 
-  const { data: dialogs = mockDialogs, isLoading } = useQuery({
+  const { data: dialogs = mockDialogs } = useQuery({
     queryKey: ["/api/messages/moderation"],
-    queryFn: async () => {
-      return mockDialogs;
-    },
+    queryFn: async () => mockDialogs,
   });
 
   const { data: messages = mockMessages } = useQuery({
     queryKey: ["/api/messages/dialog", selectedDialog?.id],
-    queryFn: async () => {
-      return selectedDialog ? mockMessages : [];
-    },
+    queryFn: async () => selectedDialog ? mockMessages : [],
     enabled: !!selectedDialog?.id,
   });
 
@@ -144,7 +139,6 @@ export function MessageModerationPanel() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
-        {/* Список диалогов */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -154,68 +148,52 @@ export function MessageModerationPanel() {
           </CardHeader>
           <CardContent className="p-0">
             <ScrollArea className="h-[500px]">
-              {isLoading ? (
-                <div className="p-4 space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-20 bg-slate-700 rounded-lg"></div>
+              <div className="space-y-1">
+                {filteredDialogs.map((dialog: any) => (
+                  <button
+                    key={dialog.id}
+                    onClick={() => setSelectedDialog(dialog)}
+                    className={`w-full p-4 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
+                      selectedDialog?.id === dialog.id ? 'bg-slate-700' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center space-x-2">
+                        <Car className="h-4 w-4 text-blue-400" />
+                        <span className="text-white font-medium text-sm">
+                          {dialog.carName || 'Неизвестный автомобиль'}
+                        </span>
+                      </div>
+                      {getStatusBadge(dialog.status)}
                     </div>
-                  ))}
-                </div>
-              ) : filteredDialogs.length === 0 ? (
-                <div className="p-4 text-center text-slate-400">
-                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Диалоги не найдены</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {filteredDialogs.map((dialog: any) => (
-                    <button
-                      key={dialog.id}
-                      onClick={() => setSelectedDialog(dialog)}
-                      className={`w-full p-4 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
-                        selectedDialog?.id === dialog.id ? 'bg-slate-700' : ''
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center space-x-2">
-                          <Car className="h-4 w-4 text-blue-400" />
-                          <span className="text-white font-medium text-sm">
-                            {dialog.carName || 'Неизвестный автомобиль'}
-                          </span>
-                        </div>
-                        {getStatusBadge(dialog.status)}
+                    
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2 text-xs text-slate-400">
+                        <User className="h-3 w-3" />
+                        <span>Покупатель: {dialog.buyerName}</span>
                       </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2 text-xs text-slate-400">
-                          <User className="h-3 w-3" />
-                          <span>Покупатель: {dialog.buyerName}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-slate-400">
-                          <User className="h-3 w-3" />
-                          <span>Продавец: {dialog.sellerName}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-slate-400">
-                          <Clock className="h-3 w-3" />
-                          <span>{formatDate(dialog.lastMessage)}</span>
-                        </div>
+                      <div className="flex items-center space-x-2 text-xs text-slate-400">
+                        <User className="h-3 w-3" />
+                        <span>Продавец: {dialog.sellerName}</span>
                       </div>
-                      
-                      {dialog.messageCount && (
-                        <div className="mt-2 text-xs text-slate-500">
-                          Сообщений: {dialog.messageCount}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+                      <div className="flex items-center space-x-2 text-xs text-slate-400">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDate(dialog.lastMessage)}</span>
+                      </div>
+                    </div>
+                    
+                    {dialog.messageCount && (
+                      <div className="mt-2 text-xs text-slate-500">
+                        Сообщений: {dialog.messageCount}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </ScrollArea>
           </CardContent>
         </Card>
 
-        {/* Просмотр сообщений */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
@@ -275,13 +253,6 @@ export function MessageModerationPanel() {
                         </span>
                       </div>
                       <p className="text-slate-300 text-sm">{message.content}</p>
-                      
-                      {message.isBlocked && (
-                        <Badge className="mt-2 bg-red-500">Заблокировано</Badge>
-                      )}
-                      {message.isFlagged && (
-                        <Badge className="mt-2 bg-yellow-500">Отмечено</Badge>
-                      )}
                     </div>
                   ))}
                 </div>
