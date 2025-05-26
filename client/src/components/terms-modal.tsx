@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, Shield, Users, Ban, Eye } from "lucide-react";
+import { FileText, Check } from "lucide-react";
 
 interface TermsModalProps {
   open: boolean;
@@ -10,107 +16,85 @@ interface TermsModalProps {
 }
 
 export function TermsModal({ open, onAccept }: TermsModalProps) {
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={() => {}} modal={true}>
-      <DialogContent 
-        className="max-w-2xl max-h-[90vh] bg-slate-800 border-slate-700"
-      >
-        <DialogHeader className="text-center pb-4">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-amber-500/20 rounded-full">
-              <AlertTriangle className="h-8 w-8 text-amber-500" />
-            </div>
-          </div>
-          <DialogTitle className="text-2xl font-bold text-white">
-            Внимание! Важная информация перед началом торговли
+    <Dialog open={open} onOpenChange={() => {}} modal>
+      <DialogContent className="sm:max-w-[600px] bg-slate-800 border-slate-700 max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <FileText className="h-5 w-5" />
+            Пользовательское соглашение
           </DialogTitle>
+          <DialogDescription className="text-slate-300">
+            Пожалуйста, ознакомьтесь с условиями использования нашего сервиса
+          </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6 text-slate-300 leading-relaxed">
-            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-              <p className="text-center text-blue-200 font-medium">
-                Вы находитесь на <span className="text-blue-400 font-bold">игровой торговой площадке</span>, 
-                предназначенной исключительно для виртуальных сделок внутри игры и обмена между игроками. 
-                <span className="text-red-400 font-bold"> Настоящая торговая деятельность запрещена.</span>
+        <ScrollArea className="max-h-96 pr-4">
+          <div className="space-y-4 text-sm text-slate-300">
+            <div>
+              <h3 className="font-semibold text-white mb-2">1. Общие положения</h3>
+              <p>
+                Добро пожаловать в АвтоКаталог! Используя наш сервис, вы соглашаетесь 
+                соблюдать следующие правила и условия.
               </p>
             </div>
 
             <div>
-              <h3 className="text-white font-semibold mb-3 text-lg">
-                Просьба ознакомиться с правилами платформы и помнить следующее:
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-green-500/20 rounded-full flex-shrink-0 mt-0.5">
-                    <Users className="h-4 w-4 text-green-400" />
-                  </div>
-                  <p>
-                    Все сделки происходят на <span className="text-green-400 font-medium">добровольной основе</span> между пользователями 
-                    и администрация площадки ответственности за убытки или конфликты сторон не несет.
-                  </p>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-blue-500/20 rounded-full flex-shrink-0 mt-0.5">
-                    <Shield className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <p>
-                    Покупка игровых предметов и валюты возможна только <span className="text-blue-400 font-medium">внутриигровыми средствами</span> — 
-                    реальные деньги использовать нельзя.
-                  </p>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-purple-500/20 rounded-full flex-shrink-0 mt-0.5">
-                    <Users className="h-4 w-4 text-purple-400" />
-                  </div>
-                  <p>
-                    Обмен товарами должен осуществляться согласно <span className="text-purple-400 font-medium">правилам самой игры</span> и 
-                    этическим нормам сообщества игроков.
-                  </p>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-yellow-500/20 rounded-full flex-shrink-0 mt-0.5">
-                    <Eye className="h-4 w-4 text-yellow-400" />
-                  </div>
-                  <p>
-                    Администрация регулярно проверяет активность пользователей и 
-                    <span className="text-yellow-400 font-medium"> блокирует аккаунты нарушителей.</span>
-                  </p>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-red-500/20 rounded-full flex-shrink-0 mt-0.5">
-                    <Ban className="h-4 w-4 text-red-400" />
-                  </div>
-                  <p>
-                    Любые <span className="text-red-400 font-medium">мошеннические схемы, взлом аккаунтов</span> и 
-                    использование чит-программ караются <span className="text-red-400 font-bold">баном аккаунта навсегда.</span>
-                  </p>
-                </div>
-              </div>
+              <h3 className="font-semibold text-white mb-2">2. Правила размещения объявлений</h3>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Размещайте только достоверную информацию об автомобилях</li>
+                <li>Используйте качественные фотографии</li>
+                <li>Указывайте корректную цену и контактные данные</li>
+                <li>Не размещайте дубликаты объявлений</li>
+              </ul>
             </div>
 
-            <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mt-6">
-              <p className="text-slate-200 text-center font-medium">
-                Используя сайт, вы подтверждаете согласие с этими условиями и берёте ответственность 
-                за собственные действия во время торговли.
+            <div>
+              <h3 className="font-semibold text-white mb-2">3. Правила общения</h3>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Соблюдайте вежливость в переписке</li>
+                <li>Не используйте нецензурную лексику</li>
+                <li>Запрещены спам и навязчивая реклама</li>
+                <li>Не обманывайте покупателей</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-white mb-2">4. Ответственность</h3>
+              <p>
+                Администрация не несет ответственности за качество товаров и услуг, 
+                предлагаемых пользователями. Все сделки совершаются на свой страх и риск.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-white mb-2">5. Модерация</h3>
+              <p>
+                Все объявления проходят предварительную модерацию. Администрация оставляет 
+                за собой право удалять объявления, нарушающие правила сервиса.
+              </p>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+              <p className="text-amber-800 dark:text-amber-200 text-sm">
+                <strong>Важно:</strong> Нарушение правил может привести к блокировке аккаунта. 
+                Будьте внимательны и соблюдайте правила сообщества.
               </p>
             </div>
           </div>
         </ScrollArea>
 
-        <div className="pt-6 border-t border-slate-700">
+        <DialogFooter>
           <Button 
             onClick={onAccept}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 text-lg"
+            className="w-full gap-2 bg-primary hover:bg-primary/90"
           >
-            Принимаю условия и продолжаю
+            <Check className="h-4 w-4" />
+            Принимаю условия соглашения
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
