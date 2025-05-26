@@ -18,14 +18,14 @@ import {
   Send
 } from "lucide-react";
 
-import { CarCard } from "@/components/car-card";
-import { AddCarModal } from "@/components/add-car-modal";
-import { MessagesPanel } from "@/components/messages-panel";
-import { UnreadMessagesCounter } from "@/components/unread-messages-counter";
-import { SecurityPanel } from "@/components/security-panel";
-import { MessageModerationPanel } from "@/components/message-moderation-panel";
-import { UserManagementPanel } from "@/components/user-management-panel";
-import { useAuth } from "@/hooks/use-auth";
+import { CarCard } from "@/components/car-card.tsx";
+import { AddCarModal } from "@/components/add-car-modal.tsx";
+import { MessagesPanel } from "@/components/messages-panel.tsx";
+import { UnreadMessagesCounter } from "@/components/unread-messages-counter.tsx";
+import { SecurityPanel } from "@/components/security-panel.tsx";
+import { MessageModerationPanel } from "@/components/message-moderation-panel.tsx";
+import { UserManagementPanel } from "@/components/user-management-panel.tsx";
+import { useAuth } from "@/hooks/use-auth.tsx";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
