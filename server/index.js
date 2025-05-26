@@ -1,25 +1,31 @@
 const express = require('express');
 const path = require('path');
 const session = require('express-session');
-const passport = require('passport');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ПРОВЕРЯЕМ И ИНИЦИАЛИЗИРУЕМ БД
+// ПРЯМАЯ ИНИЦИАЛИЗАЦИЯ БД
 try {
   const db = require('./db');
-  if (db && db.initializeDatabase) {
+  console.log('🔄 Initializing database...');
+  
+  // ВЫЗЫВАЕМ initDb НАПРЯМУЮ
+  if (db.initDb) {
+    db.initDb();
+    console.log('✅ Database initialized successfully');
+  } else if (db.initializeDatabase) {
     db.initializeDatabase().then(() => {
-      console.log('✅ Database initialized successfully');
+      console.log('✅ Database initialized successfully (async)');
     }).catch(err => {
       console.error('❌ Database initialization failed:', err);
     });
   } else {
-    console.log('⚠️ Database initialization function not found, continuing...');
+    console.log('⚠️ No database initialization function found');
   }
+  
 } catch (err) {
-  console.log('⚠️ Database module not found, continuing...');
+  console.error('❌ Failed to initialize database:', err);
 }
 
 // Middleware
@@ -36,22 +42,6 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
-
-// ПРОВЕРЯЕМ И ИНИЦИАЛИЗИРУЕМ AUTH
-try {
-  const auth = require('./auth');
-  if (auth && auth.initializeAuth) {
-    auth.initializeAuth();
-    console.log('✅ Auth initialized successfully');
-  } else {
-    console.log('⚠️ Auth initialization function not found, continuing...');
-  }
-} catch (err) {
-  console.log('⚠️ Auth module not found, continuing...');
-}
-
-app.use(passport.initialize());
-app.use(passport.session());
 
 // Статические файлы
 console.log('📁 Setting up static files middleware...');
@@ -92,7 +82,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API available at http://localhost:${PORT}/api/`);
+  console.log(`🔗 API available at http://localhost:10000/api/`);
   console.log(`📊 Ready to serve requests`);
 });
 
