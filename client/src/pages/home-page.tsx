@@ -10,7 +10,9 @@ import { AddCarModal } from "@/components/add-car-modal";
 import { MessagesPanel } from "@/components/messages-panel";
 import { UnreadMessagesCounter } from "@/components/unread-messages-counter";
 import { useAuth } from "@/hooks/use-auth";
-import { Car } from "@shared/schema";
+
+// ИСПРАВЛЯЕМ: убираем импорт Car из схемы, используем any для простоты
+type CarType = any;
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
@@ -46,19 +48,19 @@ export default function HomePage() {
     );
   }
 
-  const { data: cars = [], isLoading: carsLoading } = useQuery<Car[]>({
+  const { data: cars = [], isLoading: carsLoading } = useQuery<CarType[]>({
     queryKey: ["/api/cars"],
     enabled: isValidUser, // Загружаем только если пользователь валидный
   });
 
   // ИСПРАВЛЯЕМ: безопасное получение автомобилей пользователя
-  const { data: userCars = [], isLoading: userCarsLoading } = useQuery<Car[]>({
+  const { data: userCars = [], isLoading: userCarsLoading } = useQuery<CarType[]>({
     queryKey: ["/api/cars/my"],
     enabled: isValidUser, // Загружаем только если пользователь валидный
   });
 
   // ИСПРАВЛЯЕМ: безопасное получение избранного
-  const { data: favoriteCars = [], isLoading: favoritesLoading } = useQuery<Car[]>({
+  const { data: favoriteCars = [], isLoading: favoritesLoading } = useQuery<CarType[]>({
     queryKey: ["/api/favorites"],
     enabled: isValidUser, // Загружаем только если пользователь валидный
   });
@@ -193,7 +195,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {approvedCars.map((car) => (
+                {approvedCars.map((car: any) => (
                   <CarCard key={car.id} car={car} />
                 ))}
               </div>
@@ -245,7 +247,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {userCars.map((car) => (
+                {userCars.map((car: any) => (
                   <CarCard key={car.id} car={car} showEditButton={true} />
                 ))}
               </div>
@@ -279,7 +281,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {favoriteCars.map((car) => (
+                {favoriteCars.map((car: any) => (
                   <CarCard key={car.id} car={car} />
                 ))}
               </div>
@@ -321,7 +323,7 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pendingCars.map((car) => (
+                  {pendingCars.map((car: any) => (
                     <CarCard key={car.id} car={car} showModerationActions={true} />
                   ))}
                 </div>
