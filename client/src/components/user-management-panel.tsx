@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Users, 
   Search, 
-  Edit, 
   Ban,
   UserCheck,
   Crown,
@@ -19,12 +17,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function UserManagementPanel() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
 
-  // Мок данные для примера
   const mockUsers = [
     {
       id: 1,
@@ -58,51 +53,9 @@ export function UserManagementPanel() {
     }
   ];
 
-  const { data: users = mockUsers, isLoading } = useQuery({
+  const { data: users = mockUsers } = useQuery({
     queryKey: ["/api/users"],
-    queryFn: async () => {
-      return mockUsers;
-    },
-  });
-
-  const banUserMutation = useMutation({
-    mutationFn: async ({ userId, duration }: { userId: number; duration: string }) => {
-      return { success: true };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({
-        title: "Пользователь заблокирован",
-        description: "Пользователь успешно заблокирован",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка блокировки",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const changeRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: number; role: string }) => {
-      return { success: true };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({
-        title: "Роль изменена",
-        description: "Роль пользователя успешно изменена",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка изменения роли",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    queryFn: async () => mockUsers,
   });
 
   const filteredUsers = users.filter((user: any) => {
@@ -138,20 +91,6 @@ export function UserManagementPanel() {
     return <Badge variant="outline">Офлайн</Badge>;
   };
 
-  const handleBanUser = (user: any, duration: string) => {
-    const durationText = duration === 'permanent' ? 'навсегда' : `на ${duration}`;
-    
-    if (window.confirm(`Заблокировать пользователя ${user.username} ${durationText}?`)) {
-      banUserMutation.mutate({ userId: user.id, duration });
-    }
-  };
-
-  const handleRoleChange = (user: any, newRole: string) => {
-    if (window.confirm(`Изменить роль пользователя ${user.username} на ${newRole}?`)) {
-      changeRoleMutation.mutate({ userId: user.id, role: newRole });
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('ru-RU');
   };
@@ -163,7 +102,6 @@ export function UserManagementPanel() {
         <p className="text-slate-400">Управление ролями и статусами пользователей</p>
       </div>
 
-      {/* Фильтры */}
       <div className="flex space-x-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -187,7 +125,6 @@ export function UserManagementPanel() {
         </Select>
       </div>
 
-      {/* Статистика */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="p-4">
@@ -244,7 +181,6 @@ export function UserManagementPanel() {
         </Card>
       </div>
 
-      {/* Список пользователей */}
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-white">
@@ -253,90 +189,52 @@ export function UserManagementPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[600px]">
-            {isLoading ? (
-              <div className="p-4 space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="h-16 bg-slate-700 rounded-lg"></div>
-                  </div>
-                ))}
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="p-4 text-center text-slate-400">
-                <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Пользователи не найдены</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {filteredUsers.map((user: any) => (
-                  <div
-                    key={user.id}
-                    className="p-4 border-b border-slate-700 hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                          <span className="text-white font-semibold text-sm">
-                            {user.username?.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-white font-medium">{user.username}</span>
-                            {getRoleBadge(user.role)}
-                            {getStatusBadge(user)}
-                          </div>
-                          <p className="text-sm text-slate-400">{user.email}</p>
-                          <p className="text-xs text-slate-500">
-                            Регистрация: {formatDate(user.createdAt)}
-                          </p>
-                        </div>
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-1">
+              {filteredUsers.map((user: any) => (
+                <div
+                  key={user.id}
+                  className="p-4 border-b border-slate-700 hover:bg-slate-700/50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                        <span className="text-white font-semibold text-sm">
+                          {user.username?.charAt(0).toUpperCase()}
+                        </span>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Select
-                          value={user.role}
-                          onValueChange={(newRole) => handleRoleChange(user, newRole)}
-                        >
-                          <SelectTrigger className="w-32 bg-slate-700 border-slate-600 text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-700 border-slate-600">
-                            <SelectItem value="user">Пользователь</SelectItem>
-                            <SelectItem value="moderator">Модератор</SelectItem>
-                            <SelectItem value="admin">Администратор</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        
-                        <Select
-                          onValueChange={(duration) => handleBanUser(user, duration)}
-                        >
-                          <SelectTrigger className="w-24 bg-red-600 border-red-600 text-white hover:bg-red-700">
-                            <Ban className="h-4 w-4" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-700 border-slate-600">
-                            <SelectItem value="1h">1 час</SelectItem>
-                            <SelectItem value="1d">1 день</SelectItem>
-                            <SelectItem value="7d">7 дней</SelectItem>
-                            <SelectItem value="30d">30 дней</SelectItem>
-                            <SelectItem value="permanent">Навсегда</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-white font-medium">{user.username}</span>
+                          {getRoleBadge(user.role)}
+                          {getStatusBadge(user)}
+                        </div>
+                        <p className="text-slate-400 text-sm">{user.email}</p>
+                        <p className="text-slate-500 text-xs">
+                          Последний вход: {formatDate(user.lastLogin)}
+                        </p>
                       </div>
                     </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                      >
+                        Редактировать
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-red-600 border-red-600 text-white hover:bg-red-700"
+                      >
+                        Заблокировать
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>
