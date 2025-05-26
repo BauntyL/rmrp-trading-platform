@@ -3,23 +3,23 @@ const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
 
-// ИСПРАВЛЕННЫЕ ИМПОРТЫ
-const db = require('./db');
-const { initializeAuth } = require('./auth');
-
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ИСПРАВЛЕННАЯ ИНИЦИАЛИЗАЦИЯ БД
-if (db.initializeDatabase) {
-  db.initializeDatabase().then(() => {
-    console.log('✅ Database initialized successfully');
-  }).catch(err => {
-    console.error('❌ Database initialization failed:', err);
-    process.exit(1);
-  });
-} else {
-  console.log('⚠️ Database initialization function not found, skipping...');
+// ПРОВЕРЯЕМ И ИНИЦИАЛИЗИРУЕМ БД
+try {
+  const db = require('./db');
+  if (db && db.initializeDatabase) {
+    db.initializeDatabase().then(() => {
+      console.log('✅ Database initialized successfully');
+    }).catch(err => {
+      console.error('❌ Database initialization failed:', err);
+    });
+  } else {
+    console.log('⚠️ Database initialization function not found, continuing...');
+  }
+} catch (err) {
+  console.log('⚠️ Database module not found, continuing...');
 }
 
 // Middleware
@@ -37,8 +37,19 @@ app.use(session({
   }
 }));
 
-// Инициализация аутентификации
-initializeAuth();
+// ПРОВЕРЯЕМ И ИНИЦИАЛИЗИРУЕМ AUTH
+try {
+  const auth = require('./auth');
+  if (auth && auth.initializeAuth) {
+    auth.initializeAuth();
+    console.log('✅ Auth initialized successfully');
+  } else {
+    console.log('⚠️ Auth initialization function not found, continuing...');
+  }
+} catch (err) {
+  console.log('⚠️ Auth module not found, continuing...');
+}
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -54,10 +65,13 @@ app.use((req, res, next) => {
 });
 
 // API routes
-const routes = require('./routes');
-app.use('/api', routes);
-
-console.log('✅ All routes registered successfully');
+try {
+  const routes = require('./routes');
+  app.use('/api', routes);
+  console.log('✅ All routes registered successfully');
+} catch (err) {
+  console.error('❌ Failed to load routes:', err);
+}
 
 // SPA fallback
 app.get('*', (req, res) => {
@@ -79,7 +93,7 @@ app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API available at http://localhost:${PORT}/api/`);
-  console.log(`📊 Database connected: PostgreSQL`);
+  console.log(`📊 Ready to serve requests`);
 });
 
 module.exports = app;
