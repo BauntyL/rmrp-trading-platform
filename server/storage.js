@@ -66,13 +66,17 @@ async function createApplication(applicationData) {
     const client = getClient();
     const { brand, model, year, price, description, createdBy } = applicationData;
     
+    console.log('📝 Creating application with data:', {
+      brand, model, year, price, description, createdBy
+    });
+    
     const result = await client.query(
       `INSERT INTO car_applications (brand, model, year, price, description, "createdBy") 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [brand, model, year, price, description, createdBy]
     );
     
-    console.log(`✅ Application created: ${brand} ${model}`);
+    console.log(`✅ Application created:`, result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating application:', error);
@@ -117,7 +121,7 @@ async function updateApplicationStatus(id, status) {
     const client = getClient();
     const result = await client.query(
       `UPDATE car_applications 
-       SET status = $1, "updatedAt" = CURRENT_TIMESTAMP 
+       SET status = $1 
        WHERE id = $2 RETURNING *`,
       [status, id]
     );
