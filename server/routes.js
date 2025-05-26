@@ -34,7 +34,7 @@ function requireRole(roles) {
   };
 }
 
-// АУТЕНТИФИКАЦИЯ БЕЗ PASSPORT
+// ИСПРАВЛЕННАЯ АУТЕНТИФИКАЦИЯ БЕЗ PASSPORT
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -67,17 +67,26 @@ router.post('/login', async (req, res) => {
       role: user.role
     };
     
-    const responseData = {
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role
+    // ПРИНУДИТЕЛЬНО СОХРАНЯЕМ СЕССИЮ
+    req.session.save((err) => {
+      if (err) {
+        console.error('❌ Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
       }
-    };
-    
-    console.log('✅ Login successful for:', user.username);
-    console.log('📤 Sending response:', responseData);
-    res.json(responseData);
+      
+      const responseData = {
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      };
+      
+      console.log('✅ Login successful for:', user.username);
+      console.log('📤 Sending response:', responseData);
+      console.log('🔍 Session after login:', req.session);
+      res.json(responseData);
+    });
     
   } catch (error) {
     console.error('❌ Login error:', error);
