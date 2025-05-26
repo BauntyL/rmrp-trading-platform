@@ -21,6 +21,8 @@ interface Message {
   carName?: string;
   buyerName?: string;
   sellerName?: string;
+  senderName?: string;
+  receiverName?: string;
 }
 
 export function MessagesPanel() {
@@ -45,11 +47,11 @@ export function MessagesPanel() {
 
   const { data: messages = [], isLoading, error } = useQuery({
     queryKey: ["/api/messages"],
-    enabled: !!user, // Включаем обратно для функциональности
-    staleTime: 30000, // Увеличиваем время кеша
+    enabled: !!user,
+    staleTime: 5000,
     refetchOnMount: "always",
-    refetchOnWindowFocus: false, // Отключаем обновление при фокусе
-    refetchInterval: 2000, // Очень быстрое обновление для реального времени
+    refetchOnWindowFocus: false,
+    refetchInterval: 2000, // Быстрое обновление для реального времени
     retry: 1, 
     retryDelay: 1000,
   });
@@ -92,14 +94,38 @@ export function MessagesPanel() {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
-      const response = await apiRequest("POST", "/api/messages", data);
-      return response.json();
+      console.log('📤 Отправка сообщения:', data);
+      
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          carId: data.carId,
+          sellerId: data.sellerId,
+          message: data.message
+        }),
+      });
+      
+      console.log('📨 Статус ответа:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка отправки сообщения');
+      }
+
+      const result = await response.json();
+      console.log('✅ Сообщение отправлено:', result);
+      return result;
     },
     onSuccess: () => {
       // Принудительно обновляем данные сообщений
+      queryClient.removeQueries({ queryKey: ["/api/messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-      queryClient.refetchQueries({ queryKey: ["/api/messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      
       setNewMessage("");
       toast({
         title: "Сообщение отправлено",
@@ -109,6 +135,7 @@ export function MessagesPanel() {
       setTimeout(scrollToBottom, 200);
     },
     onError: (error: Error) => {
+      console.error('❌ Ошибка отправки сообщения:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -185,300 +212,223 @@ export function MessagesPanel() {
     if (!newMessage.trim() || !selectedConversation || !user) return;
 
     // Находим получателя из выбранного диалога
-    const conversation = conversationsByCarId[selectedConversation];
-    if (!conversation || conversation.length === 0) return;
+    const conversationMessages = conversationsByCarId[selectedConversation];
+    if (!conversationMessages || conversationMessages.length === 0) return;
 
-    const firstMessage = conversation[0];
-    const sellerId = firstMessage.buyerId === user.id ? firstMessage.sellerId : firstMessage.buyerId;
+    const firstMessage = conversationMessages[0];
+    
+    // Определяем получателя (если текущий пользователь продавец, то получатель - покупатель, и наоборот)
+    let sellerId: number;
+    if (firstMessage.sellerId === user.id) {
+      // Текущий пользователь - продавец, отправляем покупателю
+      sellerId = firstMessage.buyerId;
+    } else {
+      // Текущий пользователь - покупатель, отправляем продавцу
+      sellerId = firstMessage.sellerId;
+    }
 
     sendMessageMutation.mutate({
       carId: selectedConversation,
-      sellerId,
+      sellerId: sellerId,
       message: newMessage.trim(),
     });
   };
 
+  // Обработка Enter для отправки сообщения
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Сохраняем выбранный диалог в localStorage
+  useEffect(() => {
+    if (selectedConversation) {
+      localStorage.setItem('selectedConversation', selectedConversation.toString());
+    }
+  }, [selectedConversation]);
+
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
-          <div className="h-4 bg-gray-300 rounded w-1/2 mb-4"></div>
-          <div className="h-4 bg-gray-300 rounded w-2/3"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-400">Загрузка сообщений...</p>
         </div>
       </div>
     );
   }
 
-  // Если выбран конкретный диалог, показываем его
-  if (selectedConversation) {
-    const conversationMessages = conversationsByCarId[selectedConversation] || [];
-    const sortedMessages = conversationMessages.sort((a: Message, b: Message) => 
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-
+  if (error) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="flex items-center mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-lg">
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              setSelectedConversation(null);
-              localStorage.removeItem('selectedConversation');
-            }}
-            className="mr-4 hover:bg-white dark:hover:bg-gray-600"
-          >
-            ← Назад к списку
-          </Button>
-          <div className="flex items-center space-x-3">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-              Диалог по автомобилю {sortedMessages.length > 0 && sortedMessages[0].carName ? sortedMessages[0].carName : `#${selectedConversation}`}
-            </h2>
-          </div>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <div className="space-y-4 h-[43rem] overflow-y-auto p-4 flex flex-col">
-            {sortedMessages.map((message: Message, index: number) => {
-              // Определяем отправителя на основе времени и пользователей в диалоге
-              const isFirstMessage = index === 0;
-              const prevMessage = index > 0 ? sortedMessages[index - 1] : null;
-              
-              // Простая логика: чередуем отправителей
-              let isMyMessage = false;
-              let senderName = "Неизвестный пользователь";
-              
-              if (user?.id === 1) { // Админ 477-554
-                isMyMessage = index % 2 === 0; // четные сообщения - от админа
-                senderName = isMyMessage ? "Вы" : "Баунти Миллер";
-              } else { // Пользователь Баунти Миллер
-                isMyMessage = index % 2 === 1; // нечетные сообщения - от пользователя
-                senderName = isMyMessage ? "Вы" : "477-554";
-              }
-              
-              return (
-                <div 
-                  key={message.id}
-                  className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                >
-                  <div className={`max-w-xs lg:max-w-md rounded-2xl shadow-lg backdrop-blur-sm border ${
-                    isMyMessage 
-                      ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 text-white border-blue-300/20 shadow-blue-500/20' 
-                      : 'bg-gradient-to-br from-white to-gray-50 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-gray-100 border-gray-200/50 dark:border-gray-600/50 shadow-gray-500/10'
-                  } transform transition-all duration-200 hover:scale-[1.02]`}>
-                    <div className="p-4 space-y-3">
-                      <div className={`flex items-center space-x-2 ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                          isMyMessage 
-                            ? 'bg-white/20 text-white' 
-                            : 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
-                        }`}>
-                          {senderName.charAt(0)}
-                        </div>
-                        <p className={`text-xs font-medium ${isMyMessage ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'}`}>
-                          {senderName}
-                        </p>
-                      </div>
-                      
-                      <div className={`px-3 py-2 rounded-lg ${
-                        isMyMessage 
-                          ? 'bg-white/10 backdrop-blur-sm' 
-                          : 'bg-gray-50 dark:bg-gray-600/50'
-                      }`}>
-                        <p className="text-sm leading-relaxed">{message.content || message.message || "Сообщение"}</p>
-                      </div>
-                      
-                      <div className={`flex ${isMyMessage ? 'justify-start' : 'justify-end'}`}>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          isMyMessage 
-                            ? 'bg-white/15 text-blue-100' 
-                            : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
-                        }`}>
-                          {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {/* Элемент для автоскролла */}
-            <div ref={messagesEndRef} />
-          </div>
-          
-          {/* Форма для отправки нового сообщения */}
-          <div className="mt-4 p-4 border-t bg-gray-50 dark:bg-gray-700 rounded-b-lg">
-            <div className="flex space-x-3">
-              <Input
-                placeholder="Введите сообщение..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                className="flex-1 bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <Button 
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sendMessageMutation.isPending}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6"
-              >
-                {sendMessageMutation.isPending ? "Отправка..." : "Отправить"}
-              </Button>
-            </div>
-          </div>
-        </div>
+      <div className="text-center py-12">
+        <p className="text-red-400 text-lg">Ошибка загрузки сообщений</p>
+        <p className="text-slate-500 text-sm mt-2">Попробуйте перезагрузить страницу</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-lg">💬</span>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Мои диалоги</h2>
-        </div>
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          {latestMessages.length} активных диалогов
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Сообщения</h2>
+        <UserStatus />
       </div>
-      
-      {!Array.isArray(messages) || latestMessages.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <span className="text-2xl">📭</span>
-          </div>
-          <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">Пока нет сообщений</h3>
-          <p className="text-gray-500 dark:text-gray-400">Начните диалог с продавцом, связавшись по любому автомобилю</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {latestMessages.map((message: Message) => {
-            // Определяем имя автомобиля - используем BMW M5 для carId=1
-            const carName = message.carId === 1 ? "BMW M5" : 
-                          message.carName || `Автомобиль #${message.carId}`;
-            
-            // Определяем имя собеседника из данных сообщения
-            let otherUserName = "Неизвестный пользователь";
-            if (message.buyerId === user?.id) {
-              // Мы покупатель, собеседник - продавец
-              otherUserName = message.sellerName || 
-                            (message.sellerId === 3 ? "Баунти Миллер" : 
-                             message.sellerId === 1 ? "477-554" : 
-                             `Продавец #${message.sellerId}`);
-            } else {
-              // Мы продавец, собеседник - покупатель  
-              otherUserName = message.buyerName || 
-                            (message.buyerId === 3 ? "Баунти Миллер" : 
-                             message.buyerId === 1 ? "477-554" : 
-                             `Покупатель #${message.buyerId}`);
-            }
-            
-            const isUnread = !message.isRead && message.recipientId === user?.id;
-            
 
-            
-            return (
-              <div
-                key={message.id}
-                className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
-                  isUnread 
-                    ? 'border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' 
-                    : 'border-gray-200 dark:border-gray-700'
-                }`}
-              >
-                {isUnread && (
-                  <div className="absolute top-4 right-4">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                  </div>
-                )}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 h-[600px] flex overflow-hidden">
+        {/* Список диалогов */}
+        <div className="w-1/3 border-r border-slate-700 flex flex-col">
+          <div className="p-4 border-b border-slate-700">
+            <h3 className="font-semibold text-white">Диалоги</h3>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
+            {latestMessages.length === 0 ? (
+              <div className="p-4 text-center">
+                <p className="text-slate-400">Нет сообщений</p>
+              </div>
+            ) : (
+              latestMessages.map((message: Message) => {
+                // Определяем название диалога и имя собеседника
+                const isFromCurrentUser = message.senderId === user?.id;
+                const otherUserName = isFromCurrentUser ? message.receiverName : message.senderName;
+                const carName = message.carName || `Автомобиль #${message.carId}`;
                 
-                <div className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 pr-4">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs">🚗</span>
-                        </div>
-                        <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
-                          {carName}
-                        </h3>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2 mb-3">
-                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                          <span className="text-xs">👤</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                          Диалог с {otherUserName}
-                        </span>
-                      </div>
-                      
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 mb-4">
-                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                          <span className="font-medium text-gray-800 dark:text-gray-200">Последнее сообщение:</span>
-                          <br />
-                          "{message.content || message.message || "Сообщение"}"
+                // Проверяем есть ли непрочитанные сообщения в этом диалоге
+                const conversationMessages = conversationsByCarId[message.carId];
+                const hasUnreadMessages = conversationMessages?.some(
+                  msg => !msg.isRead && msg.recipientId === user?.id
+                );
+
+                return (
+                  <div
+                    key={message.carId}
+                    className={`p-4 border-b border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors ${
+                      selectedConversation === message.carId ? 'bg-slate-700' : ''
+                    }`}
+                    onClick={() => setSelectedConversation(message.carId)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-white truncate">{carName}</h4>
+                        <p className="text-sm text-slate-400 truncate">
+                          {otherUserName || 'Пользователь'}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate mt-1">
+                          {isFromCurrentUser ? 'Вы: ' : ''}{message.content}
                         </p>
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                          <span>🕒</span>
-                          <time>{new Date(message.createdAt).toLocaleDateString('ru-RU', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}</time>
-                        </div>
-                        
-                        {isUnread && (
-                          <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">
-                            Новое сообщение
-                          </span>
+                      <div className="flex flex-col items-end ml-2">
+                        <span className="text-xs text-slate-500">
+                          {new Date(message.createdAt).toLocaleDateString('ru-RU', {
+                            day: '2-digit',
+                            month: '2-digit'
+                          })}
+                        </span>
+                        {hasUnreadMessages && (
+                          <div className="w-2 h-2 bg-red-500 rounded-full mt-1"></div>
                         )}
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col space-y-2">
-                      <Button
-                        onClick={() => {
-                          setSelectedConversation(message.carId);
-                          // Сохраняем выбранный диалог в localStorage
-                          localStorage.setItem('selectedConversation', message.carId.toString());
-                          // Отмечаем сообщения как прочитанные при открытии диалога
-                          if (isUnread) {
-                            markReadMutation.mutate({
-                              carId: message.carId,
-                              buyerId: message.buyerId,
-                              sellerId: message.sellerId
-                            });
-                          }
-                        }}
-                        className={`${
-                          isUnread 
-                            ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                            : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
-                        } px-6 py-2 rounded-lg font-medium transition-colors`}
-                      >
-                        {isUnread ? 'Ответить' : 'Открыть диалог'}
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Область сообщений */}
+        <div className="flex-1 flex flex-col">
+          {selectedConversation ? (
+            <>
+              {/* Заголовок диалога */}
+              <div className="p-4 border-b border-slate-700">
+                {(() => {
+                  const conversationMessages = conversationsByCarId[selectedConversation];
+                  if (!conversationMessages || conversationMessages.length === 0) {
+                    return <h4 className="font-semibold text-white">Диалог</h4>;
+                  }
+                  
+                  const firstMessage = conversationMessages[0];
+                  const carName = firstMessage.carName || `Автомобиль #${selectedConversation}`;
+                  const otherUserName = firstMessage.senderId === user?.id 
+                    ? firstMessage.receiverName 
+                    : firstMessage.senderName;
+                  
+                  return (
+                    <div>
+                      <h4 className="font-semibold text-white">{carName}</h4>
+                      <p className="text-sm text-slate-400">
+                        Диалог с {otherUserName || 'пользователем'}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Сообщения */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {conversationsByCarId[selectedConversation]?.
+                  sort((a: Message, b: Message) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                  .map((message: Message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.senderId === user?.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-slate-700 text-white'
+                        }`}
+                      >
+                        <p className="text-sm">{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {new Date(message.createdAt).toLocaleTimeString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                }
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Поле ввода */}
+              <div className="p-4 border-t border-slate-700">
+                <div className="flex space-x-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Введите сообщение..."
+                    className="flex-1 bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                    maxLength={500}
+                    disabled={sendMessageMutation.isPending}
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                    className="bg-primary hover:bg-primary/90"
+                  >
+                    {sendMessageMutation.isPending ? "..." : "Отправить"}
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {newMessage.length}/500 символов
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-slate-400">Выберите диалог для просмотра сообщений</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
