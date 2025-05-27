@@ -6,6 +6,10 @@ const bcrypt = require('bcrypt');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ ДЛЯ STORAGE
+let storage = null;
+let dbInitialized = false;
+
 // РУЧНОЙ CORS (без пакета cors)
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -20,23 +24,6 @@ app.use((req, res, next) => {
     next();
   }
 });
-
-// ИСПРАВЛЕННАЯ ИНИЦИАЛИЗАЦИЯ БД
-let storage;
-async function initializeDatabase() {
-  try {
-    console.log('🔄 Initializing database...');
-    storage = require('./storage-fixed');
-    await storage.initializeDatabase();
-    console.log('✅ Database initialized successfully');
-  } catch (err) {
-    console.error('❌ Failed to initialize database:', err);
-    // НЕ останавливаем сервер, просто логируем ошибку
-  }
-}
-
-// Запускаем инициализацию БД
-initializeDatabase();
 
 // Middleware
 app.use(express.json());
@@ -55,6 +42,45 @@ app.use(session({
   },
   name: 'connect.sid'
 }));
+
+// MIDDLEWARE ДЛЯ ПРОВЕРКИ ИНИЦИАЛИЗАЦИИ БД
+function requireDatabase(req, res, next) {
+  if (!dbInitialized || !storage) {
+    console.log('❌ База данных не инициализирована');
+    return res.status(500).json({ 
+      error: 'Database not initialized',
+      message: 'Сервер еще загружается, попробуйте через несколько секунд'
+    });
+  }
+  next();
+}
+
+// ИСПРАВЛЕННАЯ ИНИЦИАЛИЗАЦИЯ БД
+async function initializeDatabase() {
+  try {
+    console.log('🔄 Initializing database...');
+    
+    // Импортируем storage
+    storage = require('./storage-fixed');
+    
+    // Инициализируем базу данных
+    await storage.initializeDatabase();
+    
+    dbInitialized = true;
+    console.log('✅ Database initialized successfully');
+    
+  } catch (err) {
+    console.error('❌ Failed to initialize database:', err);
+    dbInitialized = false;
+    storage = null;
+    
+    // Повторная попытка через 5 секунд
+    setTimeout(initializeDatabase, 5000);
+  }
+}
+
+// Запускаем инициализацию БД
+initializeDatabase();
 
 // MIDDLEWARE ДЛЯ ОТЛАДКИ СЕССИЙ
 app.use((req, res, next) => {
@@ -75,10 +101,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ API ENDPOINTS НАПРЯМУЮ В server/index.js
+// ✅ СТАТУС СЕРВЕРА (БЕЗ ПРОВЕРКИ БД)
+app.get('/api/status', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    dbInitialized,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ API ENDPOINTS С ПРОВЕРКОЙ БД
 
 // Получение текущего пользователя
-app.get('/api/user', (req, res) => {
+app.get('/api/user', requireDatabase, (req, res) => {
   try {
     console.log('🔍 GET /api/user - Session:', req.session);
     
@@ -100,7 +135,7 @@ app.get('/api/user', (req, res) => {
 });
 
 // Регистрация
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', requireDatabase, async (req, res) => {
   try {
     console.log('📝 POST /api/register - Body:', req.body);
     
@@ -136,7 +171,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Авторизация
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', requireDatabase, async (req, res) => {
   try {
     console.log('🔐 POST /api/login - Body:', req.body);
     
@@ -179,8 +214,8 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-// ✅ НОВЫЙ ENDPOINT ДЛЯ ОТПРАВКИ СООБЩЕНИЙ
-app.post('/api/messages', async (req, res) => {
+// ✅ ENDPOINT ДЛЯ ОТПРАВКИ СООБЩЕНИЙ
+app.post('/api/messages', requireDatabase, async (req, res) => {
   try {
     console.log('📤 POST /api/messages - получен запрос:', req.body);
     console.log('👤 Session userId:', req.session?.userId);
@@ -210,24 +245,18 @@ app.post('/api/messages', async (req, res) => {
     }
 
     // Создаем сообщение
-    const newMessage = {
-      id: Date.now(), // Временный ID
+    const newMessage = storage.createMessage({
       senderId: req.session.userId,
       receiverId: sellerId,
       carId: carId,
-      content: message,
-      isRead: false,
-      createdAt: new Date().toISOString()
-    };
+      content: message
+    });
 
-    // Сохраняем в storage
-    const savedMessage = storage.createMessage(newMessage);
-
-    console.log('✅ Сообщение создано:', savedMessage);
+    console.log('✅ Сообщение создано:', newMessage);
     
     res.json({ 
       success: true, 
-      message: savedMessage,
+      message: newMessage,
       msg: 'Сообщение отправлено' 
     });
 
@@ -238,7 +267,7 @@ app.post('/api/messages', async (req, res) => {
 });
 
 // Получение автомобилей
-app.get('/api/cars', (req, res) => {
+app.get('/api/cars', requireDatabase, (req, res) => {
   try {
     const cars = storage.getAllCars();
     res.json(cars);
@@ -249,7 +278,7 @@ app.get('/api/cars', (req, res) => {
 });
 
 // Создание автомобиля
-app.post('/api/cars', (req, res) => {
+app.post('/api/cars', requireDatabase, (req, res) => {
   try {
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -271,7 +300,7 @@ app.post('/api/cars', (req, res) => {
 });
 
 // Обновление автомобиля
-app.put('/api/cars/:id', (req, res) => {
+app.put('/api/cars/:id', requireDatabase, (req, res) => {
   try {
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -292,7 +321,7 @@ app.put('/api/cars/:id', (req, res) => {
 });
 
 // Удаление автомобиля
-app.delete('/api/cars/:id', (req, res) => {
+app.delete('/api/cars/:id', requireDatabase, (req, res) => {
   try {
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -313,7 +342,7 @@ app.delete('/api/cars/:id', (req, res) => {
 });
 
 // Избранное
-app.get('/api/favorites', (req, res) => {
+app.get('/api/favorites', requireDatabase, (req, res) => {
   try {
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -327,7 +356,7 @@ app.get('/api/favorites', (req, res) => {
   }
 });
 
-app.post('/api/favorites/:carId', (req, res) => {
+app.post('/api/favorites/:carId', requireDatabase, (req, res) => {
   try {
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -342,7 +371,7 @@ app.post('/api/favorites/:carId', (req, res) => {
   }
 });
 
-app.delete('/api/favorites/:carId', (req, res) => {
+app.delete('/api/favorites/:carId', requireDatabase, (req, res) => {
   try {
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -356,15 +385,6 @@ app.delete('/api/favorites/:carId', (req, res) => {
     res.status(500).json({ error: 'Failed to remove from favorites' });
   }
 });
-
-// Старые API routes (если есть routes.js)
-try {
-  const routes = require('./routes');
-  app.use('/api-old', routes);
-  console.log('✅ Old routes registered successfully');
-} catch (err) {
-  console.log('⚠️ No routes.js file found, using inline routes');
-}
 
 // SPA fallback
 app.get('*', (req, res) => {
