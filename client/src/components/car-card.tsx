@@ -1,23 +1,22 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { 
-  Heart, 
-  MessageCircle, 
+  Eye, 
   Edit, 
   Trash2, 
   Check, 
   X, 
-  Phone,
-  Eye
+  Copy, 
+  MessageCircle, 
+  Heart 
 } from "lucide-react";
-import { ContactSellerModal } from "@/components/contact-seller-modal";
-import { EditCarModal } from "@/components/edit-car-modal";
 import { CarDetailsModal } from "@/components/car-details-modal";
+import { ContactSellerModal } from "@/components/contact-seller-modal";
 
 // Константы для отображения
 const SERVER_NAMES = {
@@ -36,29 +35,39 @@ const CATEGORY_NAMES = {
   motorcycle: 'Мотоцикл'
 };
 
-const DRIVE_TYPE_NAMES = {
-  front: 'Передний',
-  rear: 'Задний',
-  all: 'Полный'
-};
-
 interface CarCardProps {
   car: any;
   showEditButton?: boolean;
   showModerationActions?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onModerate?: (action: 'approve' | 'reject') => void;
 }
 
-export function CarCard({ car, showEditButton = false, showModerationActions = false }: CarCardProps) {
-  const { user } = useAuth();
+export default function CarCard({ 
+  car, 
+  showEditButton = false, 
+  showModerationActions = false,
+  onEdit, 
+  onDelete, 
+  onModerate 
+}: CarCardProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  // Проверка, является ли автомобиль избранным
-  const { data: favorites = [] } = useQueryClient().getQueryData(["/api/favorites"]) || { data: [] };
+  // Получаем избранное пользователя
+  const { data: favorites = [] } = useQuery({
+    queryKey: ["/api/favorites"],
+    enabled: !!user,
+  });
+
+  // Проверяем, находится ли автомобиль в избранном
   const isFavorite = Array.isArray(favorites) && favorites.some((fav: any) => fav.id === car.id);
+  const isOwner = user?.id === car.userId;
 
   // Мутация для добавления/удаления из избранного
   const toggleFavoriteMutation = useMutation({
@@ -94,77 +103,9 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
     },
   });
 
-  // Мутация для удаления автомобиля
-  const deleteCarMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/cars/${car.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка удаления');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cars/my"] });
-      toast({
-        title: "Автомобиль удален",
-        description: "Объявление успешно удалено",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка удаления",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Мутация для модерации
-  const moderateCarMutation = useMutation({
-    mutationFn: async (action: 'approve' | 'reject') => {
-      const response = await fetch(`/api/cars/${car.id}/moderate`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка модерации');
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, action) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/applications/pending"] });
-      toast({
-        title: action === 'approve' ? "Объявление одобрено" : "Объявление отклонено",
-        description: action === 'approve' 
-          ? "Объявление опубликовано в каталоге" 
-          : "Объявление отклонено и удалено",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка модерации",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Функции-обработчики
-  const handleFavoriteClick = () => {
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Предотвращаем открытие модала деталей
+    
     if (!user) {
       toast({
         title: "Требуется авторизация",
@@ -173,38 +114,19 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
       });
       return;
     }
+    
     toggleFavoriteMutation.mutate();
   };
 
-  const handleDeleteClick = () => {
-    if (window.confirm('Вы уверены, что хотите удалить это объявление?')) {
-      deleteCarMutation.mutate();
-    }
-  };
-
-  const handleModeration = (action: 'approve' | 'reject') => {
-    const confirmMessage = action === 'approve' 
-      ? 'Одобрить это объявление?' 
-      : 'Отклонить это объявление?';
+  const copyPhoneNumber = (e: React.MouseEvent) => {
+    e.stopPropagation();
     
-    if (window.confirm(confirmMessage)) {
-      moderateCarMutation.mutate(action);
-    }
-  };
-
-  // Функция для копирования номера телефона
-  const copyPhoneNumber = () => {
-    if (car.contactInfo) {
-      // Пытаемся извлечь номер телефона из контактной информации
-      let phoneNumber = car.contactInfo;
-      
-      // Если это форматированная строка, извлекаем телефон
-      const phoneMatch = car.contactInfo.match(/📞\s*([^|]*)/);
-      if (phoneMatch) {
-        phoneNumber = phoneMatch[1].trim();
-      }
-      
-      navigator.clipboard.writeText(phoneNumber).then(() => {
+    // Извлекаем номер телефона из contactInfo
+    const phoneMatch = car.contactInfo?.match(/📞\s*([^|]*)/);
+    const phone = phoneMatch ? phoneMatch[1].trim() : car.contactInfo;
+    
+    if (phone) {
+      navigator.clipboard.writeText(phone).then(() => {
         toast({
           title: "Номер скопирован!",
           description: "Номер телефона скопирован в буфер обмена",
@@ -216,237 +138,218 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
           variant: "destructive",
         });
       });
-    } else {
-      toast({
-        title: "Номер не указан",
-        description: "У этого объявления нет номера телефона",
-        variant: "destructive",
-      });
     }
   };
 
-  const canEdit = user && (user.id === car.userId || user.role === 'admin');
-  const canDelete = user && (user.id === car.userId || user.role === 'admin');
-  const isOwner = user?.id === car.userId;
+  const handleContactClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setContactModalOpen(true);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) {
+      const confirmed = window.confirm('Вы уверены, что хотите удалить это объявление?');
+      if (confirmed) {
+        onDelete();
+      }
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) onEdit();
+  };
+
+  const handleModerateClick = (e: React.MouseEvent, action: 'approve' | 'reject') => {
+    e.stopPropagation();
+    if (onModerate) onModerate(action);
+  };
 
   return (
     <>
-      <Card className="bg-slate-800 border-slate-700 overflow-hidden group hover:shadow-xl transition-all duration-300">
-        <div className="relative">
-          {/* Изображение */}
-          <div className="aspect-video bg-slate-700 overflow-hidden">
-            <img
-              src={car.imageUrl || 'https://via.placeholder.com/400x300?text=Нет+фото'}
-              alt={car.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = 'https://via.placeholder.com/400x300?text=Нет+фото';
-              }}
-            />
-          </div>
-
-          {/* Статус */}
-          {car.status === 'pending' && (
-            <Badge className="absolute top-3 left-3 bg-yellow-500 text-black">
-              На модерации
-            </Badge>
-          )}
-
-          {/* Кнопка избранного */}
-          {!isOwner && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleFavoriteClick}
-              disabled={toggleFavoriteMutation.isPending}
-              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 border-0"
-            >
-              <Heart 
-                className={`h-4 w-4 ${
-                  isFavorite ? 'fill-red-500 text-red-500' : 'text-white'
-                }`} 
+      <Card 
+        className="bg-slate-800 border-slate-700 hover:border-slate-600 transition-all duration-200 cursor-pointer group overflow-hidden"
+        onClick={() => setDetailsOpen(true)}
+      >
+        <CardContent className="p-0">
+          {/* Изображение с кнопкой избранного */}
+          <div className="relative">
+            <div className="aspect-video bg-slate-700 overflow-hidden">
+              <img
+                src={car.imageUrl || 'https://via.placeholder.com/400x225?text=Нет+фото'}
+                alt={car.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://via.placeholder.com/400x225?text=Нет+фото';
+                }}
               />
-            </Button>
-          )}
-        </div>
-
-        <CardContent className="p-4">
-          {/* Название */}
-          <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2">
-            {car.name}
-          </h3>
-
-          {/* Основная информация */}
-          <div className="space-y-2 text-sm text-slate-300">
-            <div className="flex justify-between">
-              <span>Цена:</span>
-              <span className="text-green-400 font-semibold">
+            </div>
+            
+            {/* Кнопка избранного в правом верхнем углу */}
+            {!isOwner && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleFavoriteClick}
+                disabled={toggleFavoriteMutation.isPending}
+                className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 border-0 backdrop-blur-sm"
+              >
+                <Heart 
+                  className={`h-4 w-4 ${
+                    isFavorite ? 'fill-red-500 text-red-500' : 'text-white'
+                  }`} 
+                />
+              </Button>
+            )}
+            
+            {/* Статус */}
+            {car.status === 'pending' && (
+              <Badge className="absolute top-3 left-3 bg-yellow-500 text-black">
+                На модерации
+              </Badge>
+            )}
+            
+            {car.status === 'rejected' && (
+              <Badge className="absolute top-3 left-3 bg-red-500 text-white">
+                Отклонено
+              </Badge>
+            )}
+          </div>
+          
+          {/* Информация об автомобиле */}
+          <div className="p-6 space-y-4">
+            {/* Заголовок и цена */}
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors line-clamp-1">
+                {car.name}
+              </h3>
+              <p className="text-2xl font-bold text-emerald-400">
                 {car.price ? `${car.price.toLocaleString('ru-RU')} ₽` : 'Цена не указана'}
-              </span>
+              </p>
             </div>
             
-            <div className="flex justify-between">
-              <span>Сервер:</span>
-              <span className="text-white">{SERVER_NAMES[car.server] || car.server || 'Не указано'}</span>
+            {/* Характеристики */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-slate-400">Сервер:</span>
+                <p className="text-white font-medium">
+                  {SERVER_NAMES[car.server] || car.server || 'Не указано'}
+                </p>
+              </div>
+              <div>
+                <span className="text-slate-400">Категория:</span>
+                <p className="text-white font-medium">
+                  {CATEGORY_NAMES[car.category] || car.category || 'Не указано'}
+                </p>
+              </div>
             </div>
             
-            <div className="flex justify-between">
-              <span>Категория:</span>
-              <span className="text-white">{CATEGORY_NAMES[car.category] || car.category || 'Не указано'}</span>
-            </div>
+            {/* Описание */}
+            {car.description && (
+              <p className="text-slate-300 text-sm line-clamp-2">
+                {car.description}
+              </p>
+            )}
             
-            <div className="flex justify-between">
-              <span>Привод:</span>
-              <span className="text-white">{DRIVE_TYPE_NAMES[car.driveType] || car.driveType || 'Не указано'}</span>
+            {/* Кнопки действий */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {/* Кнопка детали */}
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Детали
+              </Button>
+              
+              {/* Кнопки для не владельца */}
+              {!isOwner && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={copyPhoneNumber}
+                    className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleContactClick}
+                    className="bg-blue-600 border-blue-500 text-white hover:bg-blue-700"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              
+              {/* Кнопки для владельца */}
+              {showEditButton && isOwner && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleEditClick}
+                    className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleDeleteClick}
+                    className="bg-red-600 border-red-500 text-white hover:bg-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              
+              {/* Кнопки модерации */}
+              {showModerationActions && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={(e) => handleModerateClick(e, 'approve')}
+                    className="bg-green-600 border-green-500 text-white hover:bg-green-700"
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={(e) => handleModerateClick(e, 'reject')}
+                    className="bg-red-600 border-red-500 text-white hover:bg-red-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
-
-        <CardFooter className="p-4 pt-0 space-y-3">
-          {/* Основные кнопки - показываем только если НЕТ кнопок модерации */}
-          {!showModerationActions && (
-            <div className="flex space-x-2 w-full">
-              <Button 
-                onClick={() => setDetailsModalOpen(true)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-sm"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Подробнее
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyPhoneNumber}
-                disabled={!car.contactInfo}
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                title="Скопировать номер телефона"
-              >
-                <Phone className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setContactModalOpen(true)}
-                disabled={isOwner}
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                title="Написать сообщение"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* Кнопки модерации - показываем ВМЕСТО основных кнопок */}
-          {showModerationActions && (user?.role === 'moderator' || user?.role === 'admin') && (
-            <div className="space-y-2 w-full">
-              {/* Кнопка "Подробнее" для модераторов */}
-              <div className="flex space-x-2 w-full">
-                <Button 
-                  onClick={() => setDetailsModalOpen(true)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-sm"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Подробнее
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyPhoneNumber}
-                  disabled={!car.contactInfo}
-                  className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                  title="Скопировать номер"
-                >
-                  <Phone className="h-4 w-4" />
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setContactModalOpen(true)}
-                  className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                  title="Написать сообщение"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {/* Кнопки модерации на отдельной строке */}
-              <div className="flex space-x-2 w-full">
-                <Button
-                  onClick={() => handleModeration('approve')}
-                  disabled={moderateCarMutation.isPending}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-sm"
-                >
-                  <Check className="h-4 w-4 mr-2" />
-                  Одобрить
-                </Button>
-                
-                <Button
-                  onClick={() => handleModeration('reject')}
-                  disabled={moderateCarMutation.isPending}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-sm"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Отклонить
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Кнопки для владельца - показываем только в режиме редактирования */}
-          {showEditButton && canEdit && !showModerationActions && (
-            <div className="flex space-x-2 w-full">
-              <Button
-                variant="outline"
-                onClick={() => setEditModalOpen(true)}
-                className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600 text-sm"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Редактировать
-              </Button>
-              
-              {canDelete && (
-                <Button
-                  variant="outline"
-                  onClick={handleDeleteClick}
-                  disabled={deleteCarMutation.isPending}
-                  className="bg-red-600 border-red-600 text-white hover:bg-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          )}
-        </CardFooter>
       </Card>
 
       {/* Модалы */}
       <CarDetailsModal
         car={car}
-        open={detailsModalOpen}
-        onOpenChange={setDetailsModalOpen}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
       />
-      
+
       <ContactSellerModal
         car={car}
         open={contactModalOpen}
         onOpenChange={setContactModalOpen}
       />
-      
-      {editModalOpen && (
-        <EditCarModal
-          car={car}
-          open={editModalOpen}
-          onOpenChange={setEditModalOpen}
-        />
-      )}
     </>
   );
 }
-
-// Добавляем экспорт по умолчанию
-export default CarCard;
