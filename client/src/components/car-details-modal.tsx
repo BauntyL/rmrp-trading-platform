@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { Phone, MessageCircle, Copy, Heart } from "lucide-react";
 import { ContactSellerModal } from "@/components/contact-seller-modal";
 
@@ -37,7 +39,60 @@ interface CarDetailsModalProps {
 
 export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [contactModalOpen, setContactModalOpen] = useState(false);
+
+  // Проверяем, находится ли автомобиль в избранном
+  const { data: favorites = [] } = queryClient.getQueryData(["/api/favorites"]) || [];
+  const isFavorite = Array.isArray(favorites) && favorites.some((fav: any) => fav.id === car?.id);
+  const isOwner = user?.id === car?.userId;
+
+  // Мутация для добавления/удаления из избранного
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async () => {
+      const method = isFavorite ? 'DELETE' : 'POST';
+      const response = await fetch(`/api/favorites/${car.id}`, {
+        method,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка при работе с избранным');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      toast({
+        title: isFavorite ? "Удалено из избранного" : "Добавлено в избранное",
+        description: isFavorite 
+          ? "Автомобиль удален из избранного" 
+          : "Автомобиль добавлен в избранное",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFavoriteClick = () => {
+    if (!user) {
+      toast({
+        title: "Требуется авторизация",
+        description: "Войдите в систему для добавления в избранное",
+        variant: "destructive",
+      });
+      return;
+    }
+    toggleFavoriteMutation.mutate();
+  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -93,7 +148,26 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl bg-slate-800 border-slate-700 text-white max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-white">{car.name}</DialogTitle>
+            <div className="flex items-start justify-between">
+              <DialogTitle className="text-2xl text-white pr-12">{car.name}</DialogTitle>
+              
+              {/* Кнопка избранного в заголовке */}
+              {!isOwner && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleFavoriteClick}
+                  disabled={toggleFavoriteMutation.isPending}
+                  className="h-10 w-10 rounded-full bg-slate-700/50 hover:bg-slate-600 border-0 flex-shrink-0"
+                >
+                  <Heart 
+                    className={`h-5 w-5 ${
+                      isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-300'
+                    }`} 
+                  />
+                </Button>
+              )}
+            </div>
           </DialogHeader>
           
           <div className="space-y-6">
@@ -248,15 +322,35 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
                     </div>
                   )}
                   
-                  {/* Кнопка сообщения */}
-                  <div className="pt-4">
-                    <Button 
-                      onClick={() => setContactModalOpen(true)}
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                    >
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Написать сообщение
-                    </Button>
+                  {/* Кнопки действий */}
+                  <div className="pt-4 space-y-3">
+                    {/* Кнопка сообщения */}
+                    {!isOwner && (
+                      <Button 
+                        onClick={() => setContactModalOpen(true)}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Написать сообщение
+                      </Button>
+                    )}
+                    
+                    {/* Кнопка избранного (дополнительная) */}
+                    {!isOwner && (
+                      <Button 
+                        onClick={handleFavoriteClick}
+                        disabled={toggleFavoriteMutation.isPending}
+                        variant="outline"
+                        className={`w-full border-slate-600 hover:bg-slate-600 ${
+                          isFavorite 
+                            ? 'bg-red-600/20 border-red-500 text-red-400 hover:bg-red-600/30' 
+                            : 'bg-slate-700 text-white'
+                        }`}
+                      >
+                        <Heart className={`h-4 w-4 mr-2 ${isFavorite ? 'fill-current' : ''}`} />
+                        {isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
