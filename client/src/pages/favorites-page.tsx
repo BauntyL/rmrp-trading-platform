@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import CarCard from "@/components/car-card";
 import { Heart } from "lucide-react";
 
-export function FavoritesPage() {
+function FavoritesPage() {
   const { user } = useAuth();
 
   const { data: favorites = [], isLoading } = useQuery({
@@ -78,3 +78,5 @@ export function FavoritesPage() {
     </div>
   );
 }
+
+export default FavoritesPage;
