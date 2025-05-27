@@ -20,27 +20,21 @@ app.use((req, res, next) => {
   }
 });
 
-// ПРЯМАЯ ИНИЦИАЛИЗАЦИЯ БД
-try {
-  const db = require('./db');
-  console.log('🔄 Initializing database...');
-  
-  if (db.initDb) {
-    db.initDb();
+// ИСПРАВЛЕННАЯ ИНИЦИАЛИЗАЦИЯ БД
+async function initializeDatabase() {
+  try {
+    console.log('🔄 Initializing database...');
+    const storage = require('./storage-fixed');
+    await storage.initializeDatabase();
     console.log('✅ Database initialized successfully');
-  } else if (db.initializeDatabase) {
-    db.initializeDatabase().then(() => {
-      console.log('✅ Database initialized successfully (async)');
-    }).catch(err => {
-      console.error('❌ Database initialization failed:', err);
-    });
-  } else {
-    console.log('⚠️ No database initialization function found');
+  } catch (err) {
+    console.error('❌ Failed to initialize database:', err);
+    // НЕ останавливаем сервер, просто логируем ошибку
   }
-  
-} catch (err) {
-  console.error('❌ Failed to initialize database:', err);
 }
+
+// Запускаем инициализацию БД
+initializeDatabase();
 
 // Middleware
 app.use(express.json());
