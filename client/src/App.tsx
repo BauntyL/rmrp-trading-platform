@@ -16,8 +16,8 @@ function Router() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
@@ -29,7 +29,7 @@ function Router() {
   return (
     <>
       <Switch>
-        <Route path="/auth" component={HomePage} />
+        <Route path="/auth" component={AuthPage} />
         <Route path="/" component={HomePage} />
         <Route component={NotFound} />
       </Switch>
@@ -44,8 +44,10 @@ function App() {
       <AuthProvider>
         <ThemeProvider>
           <TooltipProvider>
-            <Router />
-            <Toaster />
+            <div className="min-h-screen bg-slate-900">
+              <Router />
+              <Toaster />
+            </div>
           </TooltipProvider>
         </ThemeProvider>
       </AuthProvider>
