@@ -1,948 +1,664 @@
-const { Client } = require('pg');
+const Database = require('better-sqlite3');
+const path = require('path');
 
-// === ИНИЦИАЛИЗАЦИЯ БД ===
+// Глобальные переменные для хранения данных
+let db;
+let users = [];
+let cars = [];
+let favorites = [];
+let messages = [];
+
+// Инициализация базы данных
 async function initializeDatabase() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
   try {
-    await client.connect();
-    console.log('🗄️ Connected to PostgreSQL database');
+    console.log('🔄 Инициализация базы данных...');
+    
+    // Создаем подключение к SQLite
+    const dbPath = path.join(__dirname, 'database.sqlite');
+    db = new Database(dbPath);
+    
+    console.log('📁 База данных создана по пути:', dbPath);
+    
+    // Включаем WAL режим для лучшей производительности
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+    
+    // Принудительно пересоздаем таблицы
+    await recreateTables();
+    
+    // Создаем админа по умолчанию
+    await createDefaultAdmin();
+    
+    // Создаем тестовые данные
+    await createTestData();
+    
+    console.log('✅ База данных инициализирована успешно');
+    
+  } catch (error) {
+    console.error('❌ Ошибка инициализации БД:', error);
+    throw error;
+  }
+}
 
-    // Создание таблицы пользователей
-    await client.query(`
+// Пересоздание таблиц
+async function recreateTables() {
+  try {
+    console.log('🔄 Пересоздание таблиц...');
+    
+    // Удаляем существующие таблицы
+    const tables = ['messages', 'favorites', 'cars', 'users'];
+    
+    for (const table of tables) {
+      try {
+        db.exec(`DROP TABLE IF EXISTS ${table};`);
+        console.log(`🗑️ Таблица ${table} удалена`);
+      } catch (error) {
+        console.log(`⚠️ Не удалось удалить таблицу ${table}:`, error.message);
+      }
+    }
+
+    // Создаем таблицы заново
+    db.exec(`
       CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        role VARCHAR(50) DEFAULT 'user',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
-    // ✅ ПРИНУДИТЕЛЬНОЕ ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ ЗАЯВОК
-    try {
-      console.log('🔄 Recreating applications table...');
-      await client.query('DROP TABLE IF EXISTS applications CASCADE');
-      console.log('🗑️ Old applications table dropped');
-      
-      await client.query(`
-        CREATE TABLE applications (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          price INTEGER NOT NULL,
-          description TEXT,
-          category VARCHAR(100),
-          server VARCHAR(100),
-          "maxSpeed" INTEGER,
-          acceleration VARCHAR(50),
-          drive VARCHAR(50),
-          "isPremium" BOOLEAN DEFAULT false,
-          phone VARCHAR(50),
-          telegram VARCHAR(100),
-          discord VARCHAR(100),
-          "imageUrl" TEXT,
-          status VARCHAR(50) DEFAULT 'pending',
-          "createdBy" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      console.log('✅ Applications table recreated with VARCHAR acceleration');
-    } catch (error) {
-      console.error('❌ Error recreating applications table:', error);
-    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cars (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        server TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        maxSpeed INTEGER DEFAULT 0,
+        acceleration TEXT DEFAULT 'Не указано',
+        drive TEXT DEFAULT 'Не указано',
+        phone TEXT,
+        telegram TEXT,
+        discord TEXT,
+        imageUrl TEXT,
+        description TEXT,
+        isPremium BOOLEAN DEFAULT FALSE,
+        status TEXT DEFAULT 'approved',
+        createdBy INTEGER,
+        owner_id INTEGER,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (createdBy) REFERENCES users(id),
+        FOREIGN KEY (owner_id) REFERENCES users(id)
+      );
+    `);
 
-    // ✅ ПРИНУДИТЕЛЬНОЕ ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ АВТОМОБИЛЕЙ
-    try {
-      console.log('🔄 Recreating car_listings table...');
-      await client.query('DROP TABLE IF EXISTS car_listings CASCADE');
-      console.log('🗑️ Old car_listings table dropped');
-      
-      await client.query(`
-        CREATE TABLE car_listings (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          price INTEGER NOT NULL,
-          description TEXT,
-          category VARCHAR(100),
-          server VARCHAR(100),
-          "maxSpeed" INTEGER,
-          acceleration VARCHAR(50),
-          drive VARCHAR(50),
-          "isPremium" BOOLEAN DEFAULT false,
-          phone VARCHAR(50),
-          telegram VARCHAR(100),
-          discord VARCHAR(100),
-          "imageUrl" TEXT,
-          owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      console.log('✅ Car_listings table recreated with VARCHAR acceleration');
-    } catch (error) {
-      console.error('❌ Error recreating car_listings table:', error);
-    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        carId INTEGER NOT NULL,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (carId) REFERENCES cars(id) ON DELETE CASCADE,
+        UNIQUE(userId, carId)
+      );
+    `);
 
-    // Создание таблицы сообщений
-    await client.query(`
+    db.exec(`
       CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        "senderId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "receiverId" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        "carId" INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        senderId INTEGER NOT NULL,
+        receiverId INTEGER NOT NULL,
+        carId INTEGER,
         content TEXT NOT NULL,
-        "isRead" BOOLEAN DEFAULT false,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+        isRead BOOLEAN DEFAULT FALSE,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (senderId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (receiverId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (carId) REFERENCES cars(id) ON DELETE SET NULL
+      );
     `);
 
-    // ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ ИЗБРАННОГО
-    try {
-      await client.query('DROP TABLE IF EXISTS favorites CASCADE');
-      console.log('🗑️ Old favorites table dropped');
+    console.log('✅ Все таблицы созданы успешно');
+    
+  } catch (error) {
+    console.error('❌ Ошибка создания таблиц:', error);
+    throw error;
+  }
+}
+
+// Создание администратора по умолчанию
+async function createDefaultAdmin() {
+  try {
+    // Проверяем есть ли админ
+    const adminExists = db.prepare(`
+      SELECT id FROM users WHERE role = 'admin' LIMIT 1
+    `).get();
+
+    if (!adminExists) {
+      console.log('👤 Создание администратора...');
       
-      await client.query(`
-        CREATE TABLE favorites (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          car_id INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(user_id, car_id)
-        )
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      
+      const insertUser = db.prepare(`
+        INSERT INTO users (username, password, role, email, createdAt)
+        VALUES (?, ?, ?, ?, ?)
       `);
-      console.log('✅ New favorites table created');
-    } catch (error) {
-      console.error('❌ Error recreating favorites table:', error);
+      
+      const result = insertUser.run(
+        'admin', 
+        hashedPassword, 
+        'admin', 
+        'admin@rmrp.com', 
+        new Date().toISOString()
+      );
+      
+      console.log('✅ Администратор создан: admin/admin123 (ID:', result.lastInsertRowid, ')');
+    } else {
+      console.log('👤 Администратор уже существует');
     }
 
-    // Создание индексов для оптимизации
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages("receiverId");
-      CREATE INDEX IF NOT EXISTS idx_messages_car ON messages("carId");
-      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages("createdAt");
-      CREATE INDEX IF NOT EXISTS idx_car_listings_owner ON car_listings(owner_id);
-      CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+  } catch (error) {
+    console.error('❌ Ошибка создания админа:', error);
+  }
+}
+
+// Создание тестовых данных
+async function createTestData() {
+  try {
+    console.log('🔄 Создание тестовых данных...');
+    
+    // Создаем тестового пользователя
+    const bcrypt = require('bcrypt');
+    const testPassword = await bcrypt.hash('test123', 10);
+    
+    const insertUser = db.prepare(`
+      INSERT OR IGNORE INTO users (username, password, role, email, createdAt)
+      VALUES (?, ?, ?, ?, ?)
     `);
-
-    console.log('✅ Database tables initialized successfully');
-  } catch (error) {
-    console.error('❌ Database initialization error:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-// === ПОЛЬЗОВАТЕЛИ ===
-async function createUser(userData) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
     
-    const query = `
-      INSERT INTO users (username, password, role)
-      VALUES ($1, $2, $3)
-      RETURNING id, username, role, created_at
-    `;
+    const testUser = insertUser.run(
+      'testuser', 
+      testPassword, 
+      'user', 
+      'test@rmrp.com', 
+      new Date().toISOString()
+    );
     
-    const result = await client.query(query, [
-      userData.username,
-      userData.password,
-      userData.role || 'user'
-    ]);
+    if (testUser.changes > 0) {
+      console.log('👤 Тестовый пользователь создан: testuser/test123');
+    }
     
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error creating user:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getUserByUsername(username) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
+    // Создаем тестовые автомобили
+    const insertCar = db.prepare(`
+      INSERT OR IGNORE INTO cars (
+        name, category, server, price, maxSpeed, acceleration, drive, 
+        phone, telegram, discord, imageUrl, description, isPremium, 
+        status, createdBy, owner_id, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
     
-    const query = 'SELECT * FROM users WHERE username = $1';
-    const result = await client.query(query, [username]);
-    
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error getting user by username:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getUserById(id) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = 'SELECT * FROM users WHERE id = $1';
-    const result = await client.query(query, [id]);
-    
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error getting user by ID:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getAllUsers() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT id, username, role, created_at
-      FROM users
-      ORDER BY created_at DESC
-    `;
-    
-    const result = await client.query(query);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting all users:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-// === ЗАЯВКИ ===
-async function createApplication(applicationData) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    console.log('📝 Creating application with data:', applicationData);
-    
-    const query = `
-      INSERT INTO applications (
-        name, price, description, category, server, "maxSpeed", 
-        acceleration, drive, "isPremium", phone, telegram, discord, 
-        "imageUrl", "createdBy", status
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING *
-    `;
-    
-    const values = [
-      applicationData.name,
-      applicationData.price,
-      applicationData.description,
-      applicationData.category,
-      applicationData.server,
-      applicationData.maxSpeed || 0,
-      applicationData.acceleration || 'Не указано',
-      applicationData.drive || 'Не указано',
-      applicationData.isPremium || false,
-      applicationData.phone || '',
-      applicationData.telegram || '',
-      applicationData.discord || '',
-      applicationData.imageUrl || 'https://via.placeholder.com/400x300?text=Нет+фото',
-      applicationData.createdBy,
-      applicationData.status || 'pending'
+    const testCars = [
+      {
+        name: 'BMW M5 Competition',
+        category: 'Спорт',
+        server: 'Арбат',
+        price: 15000000,
+        maxSpeed: 305,
+        acceleration: '3.3 сек',
+        drive: 'AWD',
+        phone: '+7 (999) 123-45-67',
+        telegram: '@bmw_seller',
+        discord: 'bmw_lover#1234',
+        imageUrl: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&h=600&fit=crop',
+        description: 'Идеальное состояние, полная комплектация, один владелец',
+        isPremium: true,
+        status: 'approved',
+        createdBy: 1,
+        owner_id: 1
+      },
+      {
+        name: 'Mercedes-AMG GT 63S',
+        category: 'Купе',
+        server: 'Рублевка',
+        price: 18000000,
+        maxSpeed: 315,
+        acceleration: '3.2 сек',
+        drive: 'AWD',
+        phone: '+7 (999) 765-43-21',
+        telegram: '@merc_dealer',
+        discord: 'merc_fan#5678',
+        imageUrl: 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800&h=600&fit=crop',
+        description: 'Эксклюзивная версия с карбоновым пакетом',
+        isPremium: true,
+        status: 'approved',
+        createdBy: 1,
+        owner_id: 1
+      },
+      {
+        name: 'Audi RS6 Avant',
+        category: 'Универсал',
+        server: 'Тверской',
+        price: 12000000,
+        maxSpeed: 280,
+        acceleration: '3.6 сек',
+        drive: 'AWD',
+        phone: '+7 (999) 111-22-33',
+        telegram: '@audi_rs',
+        discord: 'quattro_lover#9999',
+        imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=800&h=600&fit=crop',
+        description: 'Семейный спорткар с невероятной практичностью',
+        isPremium: false,
+        status: 'approved',
+        createdBy: 1,
+        owner_id: 1
+      },
+      {
+        name: 'Porsche 911 Turbo S',
+        category: 'Спорт',
+        server: 'Патрики',
+        price: 22000000,
+        maxSpeed: 330,
+        acceleration: '2.7 сек',
+        drive: 'AWD',
+        phone: '+7 (999) 888-77-66',
+        telegram: '@porsche_pro',
+        discord: 'turbo_master#1111',
+        imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&h=600&fit=crop',
+        description: 'Легенда автоспорта в идеальном состоянии',
+        isPremium: true,
+        status: 'approved',
+        createdBy: 1,
+        owner_id: 1
+      },
+      {
+        name: 'Lamborghini Huracán EVO',
+        category: 'Суперкар',
+        server: 'Арбат',
+        price: 25000000,
+        maxSpeed: 325,
+        acceleration: '2.9 сек',
+        drive: 'AWD',
+        phone: '+7 (999) 222-33-44',
+        telegram: '@lambo_king',
+        discord: 'bull_rider#2222',
+        imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&h=600&fit=crop',
+        description: 'Итальянская страсть в каждой детали',
+        isPremium: true,
+        status: 'approved',
+        createdBy: 1,
+        owner_id: 1
+      }
     ];
     
-    console.log('📋 Executing query with values:', values);
-    
-    const result = await client.query(query, values);
-    
-    console.log('✅ Application created successfully:', result.rows[0]);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error creating application:', error);
-    console.error('❌ Query values were:', [
-      applicationData.name,
-      applicationData.price,
-      applicationData.description,
-      applicationData.category,
-      applicationData.server,
-      applicationData.maxSpeed || 0,
-      applicationData.acceleration || 'Не указано',
-      applicationData.drive || 'Не указано',
-      applicationData.isPremium || false,
-      applicationData.phone || '',
-      applicationData.telegram || '',
-      applicationData.discord || '',
-      applicationData.imageUrl || 'https://via.placeholder.com/400x300?text=Нет+фото',
-      applicationData.createdBy,
-      applicationData.status || 'pending'
-    ]);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getApplications() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT a.*, u.username as creator_name
-      FROM applications a
-      LEFT JOIN users u ON a."createdBy" = u.id
-      ORDER BY a.created_at DESC
-    `;
-    
-    const result = await client.query(query);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting applications:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getUserApplications(userId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT * FROM applications
-      WHERE "createdBy" = $1
-      ORDER BY created_at DESC
-    `;
-    
-    const result = await client.query(query, [userId]);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting user applications:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function updateApplicationStatus(id, status) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      UPDATE applications
-      SET status = $1
-      WHERE id = $2
-      RETURNING *
-    `;
-    
-    const result = await client.query(query, [status, id]);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error updating application status:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getPendingApplicationsCount() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT COUNT(*) as count
-      FROM applications
-      WHERE status = 'pending'
-    `;
-    
-    const result = await client.query(query);
-    return parseInt(result.rows[0].count) || 0;
-  } catch (error) {
-    console.error('❌ Error getting pending applications count:', error);
-    return 0;
-  } finally {
-    await client.end();
-  }
-}
-
-// === АВТОМОБИЛИ ===
-async function createCarListing(carData) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      INSERT INTO car_listings (
-        name, price, description, category, server, "maxSpeed", 
-        acceleration, drive, "isPremium", phone, telegram, discord, 
-        "imageUrl", owner_id, application_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING *
-    `;
-    
-    const values = [
-      carData.name,
-      carData.price,
-      carData.description,
-      carData.category,
-      carData.server,
-      carData.maxSpeed,
-      carData.acceleration,
-      carData.drive,
-      carData.isPremium || false,
-      carData.phone,
-      carData.telegram,
-      carData.discord,
-      carData.imageUrl,
-      carData.owner_id,
-      carData.application_id || null
-    ];
-    
-    const result = await client.query(query, values);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error creating car listing:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getCarListings() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT c.*, u.username as owner_name
-      FROM car_listings c
-      LEFT JOIN users u ON c.owner_id = u.id
-      ORDER BY c.created_at DESC
-    `;
-    
-    const result = await client.query(query);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting car listings:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getCarListingById(id) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT c.*, u.username as owner_name
-      FROM car_listings c
-      LEFT JOIN users u ON c.owner_id = u.id
-      WHERE c.id = $1
-    `;
-    
-    const result = await client.query(query, [id]);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error getting car listing by ID:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getUserCarListings(userId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT c.*, u.username as owner_name
-      FROM car_listings c
-      LEFT JOIN users u ON c.owner_id = u.id
-      WHERE c.owner_id = $1
-      ORDER BY c.created_at DESC
-    `;
-    
-    const result = await client.query(query, [userId]);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting user car listings:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function updateCarListing(id, carData) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      UPDATE car_listings
-      SET name = $1, price = $2, description = $3, category = $4, 
-          server = $5, "maxSpeed" = $6, acceleration = $7, drive = $8, 
-          "isPremium" = $9, phone = $10, telegram = $11, discord = $12, 
-          "imageUrl" = $13
-      WHERE id = $14
-      RETURNING *
-    `;
-    
-    const values = [
-      carData.name,
-      carData.price,
-      carData.description,
-      carData.category,
-      carData.server,
-      carData.maxSpeed,
-      carData.acceleration,
-      carData.drive,
-      carData.isPremium,
-      carData.phone,
-      carData.telegram,
-      carData.discord,
-      carData.imageUrl,
-      id
-    ];
-    
-    const result = await client.query(query, values);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error updating car listing:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function deleteCarListing(id) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    // Начинаем транзакцию
-    await client.query('BEGIN');
-    
-    // Удаляем связанные сообщения
-    await client.query('DELETE FROM messages WHERE "carId" = $1', [id]);
-    
-    // Удаляем из избранного
-    await client.query('DELETE FROM favorites WHERE car_id = $1', [id]);
-    
-    // Удаляем автомобиль
-    const result = await client.query('DELETE FROM car_listings WHERE id = $1 RETURNING *', [id]);
-    
-    // Подтверждаем транзакцию
-    await client.query('COMMIT');
-    
-    return result.rows[0];
-  } catch (error) {
-    // Откатываем транзакцию при ошибке
-    await client.query('ROLLBACK');
-    console.error('❌ Error deleting car listing:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-// === СООБЩЕНИЯ ===
-async function createMessage(messageData) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      INSERT INTO messages ("senderId", "receiverId", "carId", content, "isRead")
-      VALUES ($1, $2, $3, $4, false)
-      RETURNING *
-    `;
-    
-    const values = [
-      messageData.senderId,
-      messageData.receiverId,
-      messageData.carId,
-      messageData.content
-    ];
-    
-    const result = await client.query(query, values);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error creating message:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getMessages(userId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT 
-        m.*,
-        cl.name as car_name,
-        sender.username as sender_name,
-        receiver.username as receiver_name
-      FROM messages m
-      LEFT JOIN car_listings cl ON m."carId" = cl.id
-      LEFT JOIN users sender ON m."senderId" = sender.id
-      LEFT JOIN users receiver ON m."receiverId" = receiver.id
-      WHERE m."senderId" = $1 OR m."receiverId" = $1
-      ORDER BY m."createdAt" DESC
-    `;
-    
-    const result = await client.query(query, [userId]);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting messages:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getAllMessages() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      SELECT 
-        m.*,
-        cl.name as car_name,
-        sender.username as sender_name,
-        receiver.username as receiver_name
-      FROM messages m
-      LEFT JOIN car_listings cl ON m."carId" = cl.id
-      LEFT JOIN users sender ON m."senderId" = sender.id
-      LEFT JOIN users receiver ON m."receiverId" = receiver.id
-      ORDER BY m."createdAt" DESC
-    `;
-    
-    const result = await client.query(query);
-    return result.rows;
-  } catch (error) {
-    console.error('❌ Error getting all messages:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function markMessageAsRead(messageId, userId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = `
-      UPDATE messages
-      SET "isRead" = true
-      WHERE id = $1 AND "receiverId" = $2
-      RETURNING *
-    `;
-    
-    const result = await client.query(query, [messageId, userId]);
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error marking message as read:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function deleteMessage(messageId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await client.connect();
-    
-    const query = 'DELETE FROM messages WHERE id = $1 RETURNING *';
-    const result = await client.query(query, [messageId]);
-    
-    return result.rows[0];
-  } catch (error) {
-    console.error('❌ Error deleting message:', error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-async function getUnreadMessageCount(userId) {
-  try {
-    console.log('📊 Getting unread message count for user:', userId);
-    
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    let createdCars = 0;
+    testCars.forEach(car => {
+      const result = insertCar.run(
+        car.name, car.category, car.server, car.price, car.maxSpeed,
+        car.acceleration, car.drive, car.phone, car.telegram, car.discord,
+        car.imageUrl, car.description, car.isPremium, car.status,
+        car.createdBy, car.owner_id, new Date().toISOString()
+      );
+      
+      if (result.changes > 0) {
+        createdCars++;
+      }
     });
     
-    await client.connect();
+    console.log(`🚗 Создано ${createdCars} тестовых автомобилей`);
     
-    const query = `
-      SELECT COUNT(*) as count
-      FROM messages m
-      WHERE m."receiverId" = $1 
-        AND (m."isRead" = false OR m."isRead" IS NULL)
-    `;
-    
-    const result = await client.query(query, [userId]);
-    await client.end();
-    
-    const count = parseInt(result.rows[0].count) || 0;
-    console.log(`✅ Unread message count for user ${userId}: ${count}`);
-    
-    return count;
   } catch (error) {
-    console.error('❌ Error getting unread message count:', error);
-    return 0;
+    console.error('❌ Ошибка создания тестовых данных:', error);
   }
 }
 
-async function getUnmoderatedMessagesCount() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
+// ===== ФУНКЦИИ ДЛЯ РАБОТЫ С ПОЛЬЗОВАТЕЛЯМИ =====
 
+function getUserById(id) {
   try {
-    await client.connect();
-    
-    // Исправленный запрос без regex
-    const query = `
-      SELECT COUNT(*) as count
-      FROM messages
-      WHERE content ILIKE '%http%' 
-         OR content ILIKE '%www.%'
-         OR content ILIKE '%.com%'
-         OR content ILIKE '%.ru%'
-         OR content ILIKE '%@%'
-         OR content ILIKE '%telegram%'
-         OR content ILIKE '%discord%'
-         OR content ILIKE '%whatsapp%'
-         OR content ILIKE '%продам%'
-         OR content ILIKE '%куплю%'
-         OR content ILIKE '%обмен%'
-    `;
-    
-    const result = await client.query(query);
-    return parseInt(result.rows[0].count) || 0;
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    const user = stmt.get(id);
+    console.log('🔍 getUserById:', id, user ? 'найден' : 'не найден');
+    return user;
   } catch (error) {
-    console.error('❌ Error getting unmoderated messages count:', error);
-    return 0;
-  } finally {
-    await client.end();
+    console.error('❌ Ошибка getUserById:', error);
+    return null;
   }
 }
 
-// === ИЗБРАННОЕ ===
-async function addToFavorites(userId, carId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
+function getUserByUsername(username) {
   try {
-    await client.connect();
-    
-    const query = `
-      INSERT INTO favorites (user_id, car_id)
-      VALUES ($1, $2)
-      ON CONFLICT (user_id, car_id) DO NOTHING
-      RETURNING *
-    `;
-    
-    const result = await client.query(query, [userId, carId]);
-    return result.rows[0];
+    const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+    const user = stmt.get(username);
+    console.log('🔍 getUserByUsername:', username, user ? 'найден' : 'не найден');
+    return user;
   } catch (error) {
-    console.error('❌ Error adding to favorites:', error);
+    console.error('❌ Ошибка getUserByUsername:', error);
+    return null;
+  }
+}
+
+function createUser(userData) {
+  try {
+    console.log('👤 Создание пользователя:', userData);
+    
+    const stmt = db.prepare(`
+      INSERT INTO users (username, password, email, role, createdAt)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      userData.username,
+      userData.password,
+      userData.email || null,
+      userData.role || 'user',
+      new Date().toISOString()
+    );
+    
+    const newUser = getUserById(result.lastInsertRowid);
+    console.log('✅ Пользователь создан:', newUser);
+    return newUser;
+    
+  } catch (error) {
+    console.error('❌ Ошибка createUser:', error);
     throw error;
-  } finally {
-    await client.end();
   }
 }
 
-async function removeFromFavorites(userId, carId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
+// ===== ФУНКЦИИ ДЛЯ РАБОТЫ С АВТОМОБИЛЯМИ =====
 
+function getAllCars() {
   try {
-    await client.connect();
-    
-    const query = `
-      DELETE FROM favorites
-      WHERE user_id = $1 AND car_id = $2
-      RETURNING *
-    `;
-    
-    const result = await client.query(query, [userId, carId]);
-    return result.rows[0];
+    const stmt = db.prepare(`
+      SELECT c.*, u.username as ownerName 
+      FROM cars c 
+      LEFT JOIN users u ON c.createdBy = u.id 
+      ORDER BY c.createdAt DESC
+    `);
+    const cars = stmt.all();
+    console.log(`🚗 Получено ${cars.length} автомобилей`);
+    return cars;
   } catch (error) {
-    console.error('❌ Error removing from favorites:', error);
-    throw error;
-  } finally {
-    await client.end();
+    console.error('❌ Ошибка getAllCars:', error);
+    return [];
   }
 }
 
-async function getUserFavorites(userId) {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
+function getCarById(id) {
   try {
-    await client.connect();
+    const stmt = db.prepare(`
+      SELECT c.*, u.username as ownerName 
+      FROM cars c 
+      LEFT JOIN users u ON c.createdBy = u.id 
+      WHERE c.id = ?
+    `);
+    const car = stmt.get(id);
+    console.log('🔍 getCarById:', id, car ? 'найден' : 'не найден');
+    return car;
+  } catch (error) {
+    console.error('❌ Ошибка getCarById:', error);
+    return null;
+  }
+}
+
+function createCar(carData) {
+  try {
+    console.log('🚗 Создание автомобиля:', carData);
     
-    const query = `
-      SELECT c.*, u.username as owner_name, f.created_at as favorited_at
+    const stmt = db.prepare(`
+      INSERT INTO cars (
+        name, category, server, price, maxSpeed, acceleration, drive,
+        phone, telegram, discord, imageUrl, description, isPremium,
+        status, createdBy, owner_id, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      carData.name,
+      carData.category,
+      carData.server,
+      carData.price,
+      carData.maxSpeed || 0,
+      carData.acceleration || 'Не указано',
+      carData.drive || 'Не указано',
+      carData.phone || null,
+      carData.telegram || null,
+      carData.discord || null,
+      carData.imageUrl || null,
+      carData.description || null,
+      carData.isPremium || false,
+      carData.status || 'approved',
+      carData.createdBy,
+      carData.owner_id || carData.createdBy,
+      new Date().toISOString()
+    );
+    
+    const newCar = getCarById(result.lastInsertRowid);
+    console.log('✅ Автомобиль создан:', newCar);
+    return newCar;
+    
+  } catch (error) {
+    console.error('❌ Ошибка createCar:', error);
+    throw error;
+  }
+}
+
+function updateCar(id, carData) {
+  try {
+    console.log('🔄 Обновление автомобиля:', id, carData);
+    
+    const stmt = db.prepare(`
+      UPDATE cars SET
+        name = ?, category = ?, server = ?, price = ?, maxSpeed = ?,
+        acceleration = ?, drive = ?, phone = ?, telegram = ?, discord = ?,
+        imageUrl = ?, description = ?, isPremium = ?, updatedAt = ?
+      WHERE id = ?
+    `);
+    
+    const result = stmt.run(
+      carData.name,
+      carData.category,
+      carData.server,
+      carData.price,
+      carData.maxSpeed || 0,
+      carData.acceleration || 'Не указано',
+      carData.drive || 'Не указано',
+      carData.phone || null,
+      carData.telegram || null,
+      carData.discord || null,
+      carData.imageUrl || null,
+      carData.description || null,
+      carData.isPremium || false,
+      new Date().toISOString(),
+      id
+    );
+    
+    if (result.changes > 0) {
+      const updatedCar = getCarById(id);
+      console.log('✅ Автомобиль обновлен:', updatedCar);
+      return updatedCar;
+    }
+    
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Ошибка updateCar:', error);
+    throw error;
+  }
+}
+
+function deleteCar(id) {
+  try {
+    console.log('🗑️ Удаление автомобиля:', id);
+    
+    const stmt = db.prepare('DELETE FROM cars WHERE id = ?');
+    const result = stmt.run(id);
+    
+    const success = result.changes > 0;
+    console.log('✅ Автомобиль удален:', success);
+    return success;
+    
+  } catch (error) {
+    console.error('❌ Ошибка deleteCar:', error);
+    return false;
+  }
+}
+
+// ===== ФУНКЦИИ ДЛЯ РАБОТЫ С ИЗБРАННЫМ =====
+
+function getUserFavorites(userId) {
+  try {
+    const stmt = db.prepare(`
+      SELECT c.*, f.createdAt as addedToFavoritesAt
       FROM favorites f
-      JOIN car_listings c ON f.car_id = c.id
-      LEFT JOIN users u ON c.owner_id = u.id
-      WHERE f.user_id = $1
-      ORDER BY f.created_at DESC
-    `;
-    
-    const result = await client.query(query, [userId]);
-    return result.rows;
+      JOIN cars c ON f.carId = c.id
+      WHERE f.userId = ?
+      ORDER BY f.createdAt DESC
+    `);
+    const favorites = stmt.all(userId);
+    console.log(`❤️ Получено ${favorites.length} избранных для пользователя ${userId}`);
+    return favorites;
   } catch (error) {
-    console.error('❌ Error getting user favorites:', error);
-    throw error;
-  } finally {
-    await client.end();
+    console.error('❌ Ошибка getUserFavorites:', error);
+    return [];
   }
 }
+
+function addToFavorites(userId, carId) {
+  try {
+    console.log('❤️ Добавление в избранное:', userId, carId);
+    
+    const stmt = db.prepare(`
+      INSERT OR IGNORE INTO favorites (userId, carId, createdAt)
+      VALUES (?, ?, ?)
+    `);
+    
+    const result = stmt.run(userId, carId, new Date().toISOString());
+    
+    if (result.changes > 0) {
+      console.log('✅ Добавлено в избранное');
+      return { userId, carId, success: true };
+    } else {
+      console.log('⚠️ Уже в избранном');
+      return { userId, carId, success: false, message: 'Already in favorites' };
+    }
+    
+  } catch (error) {
+    console.error('❌ Ошибка addToFavorites:', error);
+    throw error;
+  }
+}
+
+function removeFromFavorites(userId, carId) {
+  try {
+    console.log('💔 Удаление из избранного:', userId, carId);
+    
+    const stmt = db.prepare('DELETE FROM favorites WHERE userId = ? AND carId = ?');
+    const result = stmt.run(userId, carId);
+    
+    const success = result.changes > 0;
+    console.log('✅ Удалено из избранного:', success);
+    return success;
+    
+  } catch (error) {
+    console.error('❌ Ошибка removeFromFavorites:', error);
+    return false;
+  }
+}
+
+// ===== ФУНКЦИИ ДЛЯ РАБОТЫ С СООБЩЕНИЯМИ =====
+
+function createMessage(messageData) {
+  try {
+    console.log('💬 Создание сообщения:', messageData);
+    
+    const stmt = db.prepare(`
+      INSERT INTO messages (senderId, receiverId, carId, content, isRead, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      messageData.senderId,
+      messageData.receiverId,
+      messageData.carId || null,
+      messageData.content,
+      false,
+      new Date().toISOString()
+    );
+    
+    const newMessage = {
+      id: result.lastInsertRowid,
+      senderId: messageData.senderId,
+      receiverId: messageData.receiverId,
+      carId: messageData.carId || null,
+      content: messageData.content,
+      isRead: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    console.log('✅ Сообщение создано:', newMessage);
+    return newMessage;
+    
+  } catch (error) {
+    console.error('❌ Ошибка createMessage:', error);
+    throw error;
+  }
+}
+
+function getUserMessages(userId) {
+  try {
+    const stmt = db.prepare(`
+      SELECT m.*, 
+             sender.username as senderName,
+             receiver.username as receiverName,
+             c.name as carName
+      FROM messages m
+      LEFT JOIN users sender ON m.senderId = sender.id
+      LEFT JOIN users receiver ON m.receiverId = receiver.id
+      LEFT JOIN cars c ON m.carId = c.id
+      WHERE m.senderId = ? OR m.receiverId = ?
+      ORDER BY m.createdAt DESC
+    `);
+    
+    const messages = stmt.all(userId, userId);
+    console.log(`💬 Получено ${messages.length} сообщений для пользователя ${userId}`);
+    return messages;
+    
+  } catch (error) {
+    console.error('❌ Ошибка getUserMessages:', error);
+    return [];
+  }
+}
+
+// ===== ЭКСПОРТ ВСЕХ ФУНКЦИЙ =====
 
 module.exports = {
   // Инициализация
   initializeDatabase,
   
   // Пользователи
-  createUser,
-  getUserByUsername,
   getUserById,
-  getAllUsers,
-  
-  // Заявки
-  createApplication,
-  getApplications,
-  getUserApplications,
-  updateApplicationStatus,
-  getPendingApplicationsCount,
+  getUserByUsername,
+  createUser,
   
   // Автомобили
-  createCarListing,
-  getCarListings,
-  getCarListingById,
-  getUserCarListings,
-  updateCarListing,
-  deleteCarListing,
+  getAllCars,
+  getCarById,
+  createCar,
+  updateCar,
+  deleteCar,
+  
+  // Избранное
+  getUserFavorites,
+  addToFavorites,
+  removeFromFavorites,
   
   // Сообщения
   createMessage,
-  getMessages,
-  getAllMessages,
-  markMessageAsRead,
-  deleteMessage,
-  getUnreadMessageCount,
-  getUnmoderatedMessagesCount,
-  
-  // Избранное
-  addToFavorites,
-  removeFromFavorites,
-  getUserFavorites,
+  getUserMessages,
 };
