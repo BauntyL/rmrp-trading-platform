@@ -29,6 +29,7 @@ export default function HomePage() {
   const [addCarModalOpen, setAddCarModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedServer, setSelectedServer] = useState("all");
   const [selectedSort, setSelectedSort] = useState("all");
 
   // Основные запросы данных
@@ -52,15 +53,13 @@ export default function HomePage() {
     refetchInterval: 10000,
   });
 
-  // Фильтрация данных
-  const approvedCars = cars.filter((car: any) => car.status === 'approved');
-  const pendingCars = cars.filter((car: any) => car.status === 'pending');
-  
-  const filteredCars = approvedCars.filter((car: any) => {
+  // Фильтрация данных для каталога
+  const filteredCars = cars.filter((car: any) => {
     const matchesSearch = car.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          car.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || car.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesServer = selectedServer === "all" || car.server === selectedServer;
+    return matchesSearch && matchesCategory && matchesServer;
   });
 
   // Сортировка
@@ -112,11 +111,26 @@ export default function HomePage() {
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
                   <SelectItem value="all">Все категории</SelectItem>
-                  <SelectItem value="sedan">Седан</SelectItem>
-                  <SelectItem value="suv">Внедорожник</SelectItem>
-                  <SelectItem value="hatchback">Хэтчбек</SelectItem>
-                  <SelectItem value="coupe">Купе</SelectItem>
-                  <SelectItem value="wagon">Универсал</SelectItem>
+                  <SelectItem value="Спорткары">Спорткары</SelectItem>
+                  <SelectItem value="Суперкары">Суперкары</SelectItem>
+                  <SelectItem value="Гиперкары">Гиперкары</SelectItem>
+                  <SelectItem value="Электрокары">Электрокары</SelectItem>
+                  <SelectItem value="Классика">Классика</SelectItem>
+                  <SelectItem value="Другое">Другое</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedServer} onValueChange={setSelectedServer}>
+                <SelectTrigger className="w-48 bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Сервер" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="all">Все серверы</SelectItem>
+                  <SelectItem value="Arizona RP">Arizona RP</SelectItem>
+                  <SelectItem value="Radmir RP">Radmir RP</SelectItem>
+                  <SelectItem value="Advance RP">Advance RP</SelectItem>
+                  <SelectItem value="Trinity RP">Trinity RP</SelectItem>
+                  <SelectItem value="Amazing RP">Amazing RP</SelectItem>
+                  <SelectItem value="Другой">Другой</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedSort} onValueChange={setSelectedSort}>
@@ -154,7 +168,7 @@ export default function HomePage() {
                   Автомобили не найдены
                 </h3>
                 <p className="text-slate-500">
-                  {searchTerm || selectedCategory !== "all" 
+                  {searchTerm || selectedCategory !== "all" || selectedServer !== "all"
                     ? "Попробуйте изменить критерии поиска"
                     : "Станьте первым, кто добавит автомобиль в каталог!"
                   }
@@ -324,55 +338,10 @@ export default function HomePage() {
         return <MessagesPanel />;
 
       case "security":
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl font-bold text-white mb-4">Безопасность</h1>
-            <p className="text-slate-400">Раздел в разработке</p>
-          </div>
-        );
+        return <SecurityPanel />;
 
       case "moderation":
-        return (
-          <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-white">
-              Заявки на модерацию
-              {pendingCars.length > 0 && (
-                <Badge className="ml-2 bg-red-500">
-                  {pendingCars.length}
-                </Badge>
-              )}
-            </h2>
-
-            {carsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-slate-800 rounded-lg p-6 animate-pulse">
-                    <div className="w-full h-48 bg-slate-700 rounded-lg mb-4"></div>
-                    <div className="h-6 bg-slate-700 rounded mb-2"></div>
-                    <div className="h-4 bg-slate-700 rounded mb-4 w-2/3"></div>
-                    <div className="h-8 bg-slate-700 rounded"></div>
-                  </div>
-                ))}
-              </div>
-            ) : pendingCars.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-slate-400 mb-2">
-                  Нет заявок на модерацию
-                </h3>
-                <p className="text-slate-500">
-                  Все объявления рассмотрены
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {pendingCars.map((car: any) => (
-                  <CarCard key={car.id} car={car} showModerationButtons={true} />
-                ))}
-              </div>
-            )}
-          </div>
-        );
+        return <ModerationPanel />;
 
       case "message-moderation":
         return <MessageModerationPanel />;
@@ -402,7 +371,7 @@ export default function HomePage() {
 
       <AddCarModal 
         open={addCarModalOpen} 
-        onClose={() => setAddCarModalOpen(false)} 
+        onOpenChange={setAddCarModalOpen}
       />
     </div>
   );
