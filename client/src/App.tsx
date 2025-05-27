@@ -7,9 +7,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { TermsModal } from "@/components/terms-modal";
 
-import { HomePage } from "@/pages/home-page";
-import { AuthPage } from "@/pages/auth-page";
-import { NotFound } from "@/pages/not-found";
+import HomePage from "@/pages/home-page";
+import AuthPage from "@/pages/auth-page";
+import NotFound from "@/pages/not-found";
 
 function Router() {
   const { user, isLoading, showTermsModal, acceptTerms } = useAuth();
