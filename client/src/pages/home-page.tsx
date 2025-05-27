@@ -10,7 +10,7 @@ import {
   Heart, 
   Users,
   Shield,
-  Settings
+  Lock
 } from "lucide-react";
 
 import { Sidebar } from "@/components/sidebar";
@@ -19,7 +19,6 @@ import { AddCarModal } from "@/components/add-car-modal";
 import { MessagesPanel } from "@/components/messages-panel";
 import { ModerationPanel } from "@/components/moderation-panel";
 import { UserManagementPanel } from "@/components/user-management-panel";
-import { SecurityPanel } from "@/components/security-panel";
 import { MessageModerationPanel } from "@/components/message-moderation-panel";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -309,7 +308,7 @@ export default function HomePage() {
                         </h3>
                         <p className="text-slate-400 mb-2">{application.description}</p>
                         <p className="text-emerald-400 font-semibold">
-                          {application.price ? `$${application.price.toLocaleString()}` : 'Цена не указана'}
+                          {application.price ? `${application.price.toLocaleString()} ₽` : 'Цена не указана'}
                         </p>
                       </div>
                       <Badge 
@@ -338,7 +337,35 @@ export default function HomePage() {
         return <MessagesPanel />;
 
       case "security":
-        return <SecurityPanel />;
+        return (
+          <div className="space-y-6">
+            <h1 className="text-3xl font-bold text-white mb-6">Безопасность</h1>
+            
+            <div className="bg-slate-800 rounded-lg p-6">
+              <div className="flex items-center mb-4">
+                <Lock className="h-6 w-6 text-emerald-400 mr-3" />
+                <h2 className="text-xl font-semibold text-white">Настройки безопасности</h2>
+              </div>
+              
+              <div className="space-y-4 text-slate-400">
+                <p>• Ваш аккаунт защищен паролем</p>
+                <p>• Все действия в системе логируются</p>
+                <p>• При подозрительной активности администраторы получают уведомления</p>
+                <p>• Ваши личные данные не передаются третьим лицам</p>
+              </div>
+              
+              <div className="mt-6 p-4 bg-slate-700 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Советы по безопасности:</h3>
+                <ul className="text-sm text-slate-400 space-y-1">
+                  <li>• Не передавайте данные своего аккаунта третьим лицам</li>
+                  <li>• При встрече с покупателями выбирайте публичные места</li>
+                  <li>• Проверяйте документы на автомобили перед покупкой</li>
+                  <li>• Сообщайте о подозрительных пользователях администрации</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
 
       case "moderation":
         return <ModerationPanel />;
