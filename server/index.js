@@ -7,48 +7,161 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ПРОСТОЕ ХРАНИЛИЩЕ В ПАМЯТИ
-let users = [
-  {
-    id: 1,
-    username: 'admin',
-    password: '$2b$10$8YcWYI3oHpPG5Q8wXqx8yebBPCWYRYLcm1oKGtPqg9xLMBZoF2ksi', // admin123
-    role: 'admin',
-    email: 'admin@rmrp.com'
-  },
-  {
-    id: 2,
-    username: 'testuser',
-    password: '$2b$10$8YcWYI3oHpPG5Q8wXqx8yebBPCWYRYLcm1oKGtPqg9xLMBZoF2ksi', // test123
-    role: 'user',
-    email: 'test@rmrp.com'
-  }
-];
-
-let cars = [
-  {
-    id: 1,
-    name: 'BMW M5 Competition',
-    category: 'Спорт',
-    server: 'Арбат',
-    price: 15000000,
-    maxSpeed: 305,
-    acceleration: '3.3 сек',
-    drive: 'AWD',
-    phone: '+7 (999) 123-45-67',
-    telegram: '@bmw_seller',
-    discord: 'bmw_lover#1234',
-    imageUrl: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&h=600&fit=crop',
-    description: 'Идеальное состояние, полная комплектация, один владелец',
-    isPremium: true,
-    status: 'approved',
-    createdBy: 1,
-    owner_id: 1,
-    createdAt: new Date().toISOString()
-  }
-];
-
+let users = [];
+let cars = [];
 let favorites = [];
 let messages = [];
+
+// ✅ ИНИЦИАЛИЗАЦИЯ ПОЛЬЗОВАТЕЛЕЙ ПОСЛЕ ЗАПУСКА СЕРВЕРА
+async function initializeUsers() {
+  try {
+    console.log('👤 Создание пользователей...');
+    
+    // Создаем вашего пользователя
+    const yourPassword = await bcrypt.hash('Lqlcpyvb555!999#81', 10);
+    users.push({
+      id: 1,
+      username: 'Баунти Миллер',
+      password: yourPassword,
+      role: 'admin',
+      email: 'bounty@rmrp.com'
+    });
+    
+    // Создаем админа (запасной)
+    const adminPassword = await bcrypt.hash('admin123', 10);
+    users.push({
+      id: 2,
+      username: 'admin',
+      password: adminPassword,
+      role: 'admin',
+      email: 'admin@rmrp.com'
+    });
+    
+    // Создаем тестового пользователя
+    const testPassword = await bcrypt.hash('test123', 10);
+    users.push({
+      id: 3,
+      username: 'testuser',
+      password: testPassword,
+      role: 'user',
+      email: 'test@rmrp.com'
+    });
+    
+    console.log('✅ Пользователи созданы:', users.map(u => u.username));
+    
+  } catch (error) {
+    console.error('❌ Ошибка создания пользователей:', error);
+  }
+}
+
+// ✅ ИНИЦИАЛИЗАЦИЯ ТЕСТОВЫХ АВТОМОБИЛЕЙ
+async function initializeCars() {
+  const testCars = [
+    {
+      id: 1,
+      name: 'BMW M5 Competition',
+      category: 'Спорт',
+      server: 'Арбат',
+      price: 15000000,
+      maxSpeed: 305,
+      acceleration: '3.3 сек',
+      drive: 'AWD',
+      phone: '+7 (999) 123-45-67',
+      telegram: '@bmw_seller',
+      discord: 'bmw_lover#1234',
+      imageUrl: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&h=600&fit=crop',
+      description: 'Идеальное состояние, полная комплектация, один владелец',
+      isPremium: true,
+      status: 'approved',
+      createdBy: 1,
+      owner_id: 1,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 2,
+      name: 'Mercedes-AMG GT 63S',
+      category: 'Купе',
+      server: 'Рублевка',
+      price: 18000000,
+      maxSpeed: 315,
+      acceleration: '3.2 сек',
+      drive: 'AWD',
+      phone: '+7 (999) 765-43-21',
+      telegram: '@merc_dealer',
+      discord: 'merc_fan#5678',
+      imageUrl: 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800&h=600&fit=crop',
+      description: 'Эксклюзивная версия с карбоновым пакетом',
+      isPremium: true,
+      status: 'approved',
+      createdBy: 1,
+      owner_id: 1,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 3,
+      name: 'Audi RS6 Avant',
+      category: 'Универсал',
+      server: 'Тверской',
+      price: 12000000,
+      maxSpeed: 280,
+      acceleration: '3.6 сек',
+      drive: 'AWD',
+      phone: '+7 (999) 111-22-33',
+      telegram: '@audi_rs',
+      discord: 'quattro_lover#9999',
+      imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=800&h=600&fit=crop',
+      description: 'Семейный спорткар с невероятной практичностью',
+      isPremium: false,
+      status: 'approved',
+      createdBy: 1,
+      owner_id: 1,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 4,
+      name: 'Porsche 911 Turbo S',
+      category: 'Спорт',
+      server: 'Патрики',
+      price: 22000000,
+      maxSpeed: 330,
+      acceleration: '2.7 сек',
+      drive: 'AWD',
+      phone: '+7 (999) 888-77-66',
+      telegram: '@porsche_pro',
+      discord: 'turbo_master#1111',
+      imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&h=600&fit=crop',
+      description: 'Легенда автоспорта в идеальном состоянии',
+      isPremium: true,
+      status: 'approved',
+      createdBy: 1,
+      owner_id: 1,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 5,
+      name: 'Lamborghini Huracán EVO',
+      category: 'Суперкар',
+      server: 'Арбат',
+      price: 25000000,
+      maxSpeed: 325,
+      acceleration: '2.9 сек',
+      drive: 'AWD',
+      phone: '+7 (999) 222-33-44',
+      telegram: '@lambo_king',
+      discord: 'bull_rider#2222',
+      imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&h=600&fit=crop',
+      description: 'Итальянская страсть в каждой детали',
+      isPremium: true,
+      status: 'approved',
+      createdBy: 1,
+      owner_id: 1,
+      createdAt: new Date().toISOString()
+    }
+  ];
+  
+  cars.push(...testCars);
+  console.log(`🚗 Создано ${testCars.length} тестовых автомобилей`);
+}
 
 // CORS
 app.use((req, res, next) => {
@@ -383,10 +496,17 @@ app.get('*', (req, res) => {
 });
 
 // Запуск сервера
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🔗 Try: http://localhost:${PORT}/api/status`);
-  console.log(`👤 Login: admin/admin123 или testuser/test123`);
+  
+  // ✅ ИНИЦИАЛИЗИРУЕМ ДАННЫЕ ПОСЛЕ ЗАПУСКА
+  await initializeUsers();
+  await initializeCars();
+  
+  console.log(`👤 Ваш логин: "Баунти Миллер" / "Lqlcpyvb555!999#81"`);
+  console.log(`👤 Запасной: admin/admin123 или testuser/test123`);
+  console.log(`🎉 Сервер готов к работе!`);
 });
 
 module.exports = app;
