@@ -6,78 +6,81 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   PlusCircle, 
-  MessageSquare, 
-  LogOut, 
-  User, 
-  Heart, 
   Car, 
-  Settings, 
+  Heart, 
   Users,
-  Search,
   Shield,
-  Send
+  Settings
 } from "lucide-react";
 
-import { CarCard } from "@/components/car-card.tsx";
-import { AddCarModal } from "@/components/add-car-modal.tsx";
-import { MessagesPanel } from "@/components/messages-panel.tsx";
-import { UnreadMessagesCounter } from "@/components/unread-messages-counter.tsx";
-// import { SecurityPanel } from "@/components/security-panel.tsx";
-// import { MessageModerationPanel } from "@/components/message-moderation-panel.tsx";
-// import { UserManagementPanel } from "@/components/user-management-panel.tsx";
-import { useAuth } from "@/hooks/use-auth.tsx";
+import { Sidebar } from "@/components/sidebar";
+import { CarCard } from "@/components/car-card";
+import { AddCarModal } from "@/components/add-car-modal";
+import { MessagesPanel } from "@/components/messages-panel";
+import { ModerationPanel } from "@/components/moderation-panel";
+import { UserManagementPanel } from "@/components/user-management-panel";
+import { SecurityPanel } from "@/components/security-panel";
+import { MessageModerationPanel } from "@/components/message-moderation-panel";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function HomePage() {
-  const { user, logoutMutation } = useAuth();
+  const { user } = useAuth();
+  const [activeSection, setActiveSection] = useState("catalog");
   const [addCarModalOpen, setAddCarModalOpen] = useState(false);
-  const [activeView, setActiveView] = useState("catalog");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSort, setSelectedSort] = useState("all");
 
+  // Основные запросы данных
   const { data: cars = [], isLoading: carsLoading } = useQuery({
     queryKey: ["/api/cars"],
+    refetchInterval: 30000,
   });
 
   const { data: userCars = [], isLoading: userCarsLoading } = useQuery({
-    queryKey: ["/api/cars/my"],
+    queryKey: ["/api/my-cars"],
+    refetchInterval: 30000,
   });
 
   const { data: favoriteCars = [], isLoading: favoritesLoading } = useQuery({
     queryKey: ["/api/favorites"],
+    refetchInterval: 30000,
   });
 
+  const { data: applications = [], isLoading: applicationsLoading } = useQuery({
+    queryKey: ["/api/my-applications"],
+    refetchInterval: 10000,
+  });
+
+  // Фильтрация данных
   const approvedCars = cars.filter((car: any) => car.status === 'approved');
   const pendingCars = cars.filter((car: any) => car.status === 'pending');
+  
+  const filteredCars = approvedCars.filter((car: any) => {
+    const matchesSearch = car.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         car.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || car.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  const handleLogout = () => {
-    logoutMutation.mutate();
-  };
+  // Сортировка
+  const sortedCars = [...filteredCars].sort((a, b) => {
+    switch (selectedSort) {
+      case "newest":
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      case "price-low":
+        return (a.price || 0) - (b.price || 0);
+      case "price-high":
+        return (b.price || 0) - (a.price || 0);
+      default:
+        return 0;
+    }
+  });
 
-  const handleTelegramClick = () => {
-    window.open('https://t.me/bauntyprog', '_blank');
-  };
-
-  const isAdmin = user?.role === 'admin';
-  const isModerator = user?.role === 'moderator' || isAdmin;
-
-  const sidebarItems = [
-    { id: 'catalog', label: 'Каталог автомобилей', icon: Car },
-    { id: 'favorites', label: 'Избранное', icon: Heart },
-    { id: 'messages', label: 'Сообщения', icon: MessageSquare, hasCounter: true },
-    { id: 'my-cars', label: 'Мои автомобили', icon: PlusCircle },
-    { id: 'security', label: 'Безопасность', icon: Shield },
-  ];
-
-  const moderationItems = [
-    { id: 'pending-cars', label: 'Заявки на модерацию', icon: Users },
-    { id: 'moderation-history', label: 'Модерация сообщений', icon: MessageSquare },
-    ...(isAdmin ? [{ id: 'user-management', label: 'Управление пользователями', icon: Settings }] : []),
-  ];
-
-  const renderContent = () => {
-    switch (activeView) {
-      case 'catalog':
+  // Рендер основного контента
+  const renderMainContent = () => {
+    switch (activeSection) {
+      case "catalog":
         return (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -85,7 +88,10 @@ export default function HomePage() {
                 <h1 className="text-3xl font-bold text-white mb-2">Каталог автомобилей</h1>
                 <p className="text-slate-400">Найдите автомобиль своей мечты</p>
               </div>
-              <Button onClick={() => setAddCarModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Button 
+                onClick={() => setAddCarModalOpen(true)} 
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Добавить авто
               </Button>
@@ -109,14 +115,16 @@ export default function HomePage() {
                   <SelectItem value="sedan">Седан</SelectItem>
                   <SelectItem value="suv">Внедорожник</SelectItem>
                   <SelectItem value="hatchback">Хэтчбек</SelectItem>
+                  <SelectItem value="coupe">Купе</SelectItem>
+                  <SelectItem value="wagon">Универсал</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+              <Select value={selectedSort} onValueChange={setSelectedSort}>
                 <SelectTrigger className="w-48 bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Сначала" />
+                  <SelectValue placeholder="Сортировка" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="all">Все сначала</SelectItem>
+                  <SelectItem value="all">По умолчанию</SelectItem>
                   <SelectItem value="newest">Сначала новые</SelectItem>
                   <SelectItem value="price-low">Сначала дешевые</SelectItem>
                   <SelectItem value="price-high">Сначала дорогие</SelectItem>
@@ -125,7 +133,7 @@ export default function HomePage() {
             </div>
 
             <div className="text-slate-400 text-sm">
-              Найдено: {approvedCars.length} автомобилей
+              Найдено: {sortedCars.length} автомобилей
             </div>
 
             {carsLoading ? (
@@ -139,19 +147,22 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-            ) : approvedCars.length === 0 ? (
+            ) : sortedCars.length === 0 ? (
               <div className="text-center py-12">
                 <Car className="h-16 w-16 text-slate-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-slate-400 mb-2">
                   Автомобили не найдены
                 </h3>
                 <p className="text-slate-500">
-                  Станьте первым, кто добавит автомобиль в каталог!
+                  {searchTerm || selectedCategory !== "all" 
+                    ? "Попробуйте изменить критерии поиска"
+                    : "Станьте первым, кто добавит автомобиль в каталог!"
+                  }
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {approvedCars.map((car: any) => (
+                {sortedCars.map((car: any) => (
                   <CarCard key={car.id} car={car} />
                 ))}
               </div>
@@ -159,10 +170,7 @@ export default function HomePage() {
           </div>
         );
 
-      case 'messages':
-        return <MessagesPanel />;
-
-      case 'favorites':
+      case "favorites":
         return (
           <div className="space-y-6">
             <h2 className="text-3xl font-bold text-white">Избранные автомобили</h2>
@@ -197,12 +205,15 @@ export default function HomePage() {
           </div>
         );
 
-      case 'my-cars':
+      case "my-cars":
         return (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-3xl font-bold text-white">Мои автомобили</h2>
-              <Button onClick={() => setAddCarModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Button 
+                onClick={() => setAddCarModalOpen(true)} 
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Добавить автомобиль
               </Button>
@@ -239,7 +250,80 @@ export default function HomePage() {
           </div>
         );
 
-      case 'security':
+      case "applications":
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold text-white">Мои заявки</h1>
+              <Button 
+                onClick={() => setAddCarModalOpen(true)} 
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Подать заявку
+              </Button>
+            </div>
+
+            {applicationsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-slate-800 rounded-lg p-6 animate-pulse">
+                    <div className="h-6 bg-slate-700 rounded mb-2 w-1/3"></div>
+                    <div className="h-4 bg-slate-700 rounded mb-4 w-2/3"></div>
+                    <div className="h-8 bg-slate-700 rounded w-24"></div>
+                  </div>
+                ))}
+              </div>
+            ) : applications.length === 0 ? (
+              <div className="text-center py-12">
+                <Shield className="h-16 w-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-400 mb-2">
+                  У вас нет заявок
+                </h3>
+                <p className="text-slate-500">
+                  Подайте заявку на добавление автомобиля
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {applications.map((application: any) => (
+                  <div key={application.id} className="bg-slate-800 rounded-lg p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold text-white mb-2">
+                          {application.name}
+                        </h3>
+                        <p className="text-slate-400 mb-2">{application.description}</p>
+                        <p className="text-emerald-400 font-semibold">
+                          {application.price ? `$${application.price.toLocaleString()}` : 'Цена не указана'}
+                        </p>
+                      </div>
+                      <Badge 
+                        className={`
+                          ${application.status === 'pending' ? 'bg-yellow-500 text-yellow-900' : ''}
+                          ${application.status === 'approved' ? 'bg-green-500 text-green-900' : ''}
+                          ${application.status === 'rejected' ? 'bg-red-500 text-red-900' : ''}
+                        `}
+                      >
+                        {application.status === 'pending' && 'На модерации'}
+                        {application.status === 'approved' && 'Одобрено'}
+                        {application.status === 'rejected' && 'Отклонено'}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      Подано: {new Date(application.createdAt).toLocaleDateString('ru-RU')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case "messages":
+        return <MessagesPanel />;
+
+      case "security":
         return (
           <div className="p-6">
             <h1 className="text-3xl font-bold text-white mb-4">Безопасность</h1>
@@ -247,7 +331,7 @@ export default function HomePage() {
           </div>
         );
 
-      case 'pending-cars':
+      case "moderation":
         return (
           <div className="space-y-6">
             <h2 className="text-3xl font-bold text-white">
@@ -283,169 +367,43 @@ export default function HomePage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {pendingCars.map((car: any) => (
-                  <CarCard key={car.id} car={car} showModerationActions={true} />
+                  <CarCard key={car.id} car={car} showModerationButtons={true} />
                 ))}
               </div>
             )}
           </div>
         );
 
-      case 'moderation-history':
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl font-bold text-white mb-4">Модерация сообщений</h1>
-            <p className="text-slate-400">Раздел в разработке</p>
-          </div>
-        );
+      case "message-moderation":
+        return <MessageModerationPanel />;
 
-      case 'user-management':
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl font-bold text-white mb-4">Управление пользователями</h1>
-            <p className="text-slate-400">Раздел в разработке</p>
-          </div>
-        );
+      case "users":
+        return <UserManagementPanel />;
 
       default:
         return (
           <div className="text-center py-12">
-            <h3 className="text-xl font-semibold text-slate-400 mb-2">
-              Раздел в разработке
-            </h3>
-            <p className="text-slate-500">
-              Этот раздел скоро будет доступен
-            </p>
+            <h2 className="text-2xl font-bold text-white mb-4">Раздел в разработке</h2>
+            <p className="text-slate-400">Этот раздел скоро будет доступен</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex">
-      {/* Sidebar */}
-      <div className="w-64 bg-slate-800 flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Car className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-white font-bold">АвтоКаталог</h1>
-              <p className="text-slate-400 text-sm">v2.0</p>
-            </div>
-          </div>
+    <div className="flex h-screen bg-slate-900">
+      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-8">
+          {renderMainContent()}
         </div>
+      </main>
 
-        {/* User Info */}
-        <div className="p-4 border-b border-slate-700">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-semibold text-sm">
-                {user?.username?.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center space-x-2">
-                <span className="text-white text-sm font-medium">{user?.username}</span>
-                {user?.role === 'admin' && (
-                  <Badge className="bg-orange-500 text-xs px-2 py-0.5">Администратор</Badge>
-                )}
-                {user?.role === 'moderator' && (
-                  <Badge className="bg-green-500 text-xs px-2 py-0.5">Модератор</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveView(item.id)}
-                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                  activeView === item.id 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-sm">{item.label}</span>
-                {item.hasCounter && (
-                  <UnreadMessagesCounter />
-                )}
-              </button>
-            );
-          })}
-
-          {/* Moderation Section */}
-          {isModerator && (
-            <>
-              <div className="pt-4 pb-2">
-                <h3 className="text-slate-500 text-xs uppercase tracking-wider font-semibold px-3">
-                  Модерация
-                </h3>
-              </div>
-              {moderationItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveView(item.id)}
-                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                      activeView === item.id 
-                        ? 'bg-blue-600 text-white' 
-                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-sm">{item.label}</span>
-                    {item.id === 'pending-cars' && pendingCars.length > 0 && (
-                      <Badge className="bg-red-500 text-xs px-2 py-0.5">
-                        {pendingCars.length}
-                      </Badge>
-                    )}
-                  </button>
-                );
-              })}
-            </>
-          )}
-        </nav>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-700 space-y-2">
-          <button 
-            onClick={handleTelegramClick}
-            className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-blue-600 hover:text-white transition-colors text-left group"
-          >
-            <Send className="h-5 w-5 group-hover:text-white" />
-            <span className="text-sm font-medium">Мы в Telegram</span>
-          </button>
-          <button 
-            onClick={handleLogout}
-            disabled={logoutMutation.isPending}
-            className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
-          >
-            <LogOut className="h-5 w-5" />
-            <span className="text-sm">
-              {logoutMutation.isPending ? 'Выход...' : 'Выйти'}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <main className="flex-1 p-6 overflow-auto">
-          {renderContent()}
-        </main>
-      </div>
-
-      <AddCarModal open={addCarModalOpen} onOpenChange={setAddCarModalOpen} />
+      <AddCarModal 
+        open={addCarModalOpen} 
+        onClose={() => setAddCarModalOpen(false)} 
+      />
     </div>
   );
 }
