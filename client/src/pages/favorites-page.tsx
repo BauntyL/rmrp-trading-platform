@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
-import CarCard from "@/components/car-card"; // ✅ Исправили импорт
+import CarCard from "@/components/car-card";
 import { Heart } from "lucide-react";
 
 export function FavoritesPage() {
