@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { TermsModal } from "@/components/terms-modal";
 
 import { HomePage } from "@/pages/home-page";
-import AuthPage from "@/pages/auth-page";  // AuthPage остается default
+import AuthPage from "@/pages/auth-page";
 import { NotFound } from "@/pages/not-found";
 
 function Router() {
