@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import CarCard from "@/components/car-card"; // ✅ Убрали фигурные скобки и .tsx
+import CarCard from "@/components/car-card";
 import { AddCarModal } from "@/components/add-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
 import { FavoritesPage } from "@/pages/favorites-page";
