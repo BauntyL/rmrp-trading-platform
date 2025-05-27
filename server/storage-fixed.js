@@ -770,15 +770,24 @@ async function getUnmoderatedMessagesCount() {
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
   });
-
   try {
     await client.connect();
     
-    // Подсчитываем сообщения с подозрительным содержимым
+    // Исправленный запрос без regex
     const query = `
       SELECT COUNT(*) as count
       FROM messages
-      WHERE content ~* 'http|www\.|\.com|\.ru|@|telegram|discord|whatsapp|\+7\d{10}|\d{3}-\d{3}-\d{4}|продам|куплю|обмен'
+      WHERE content ILIKE '%http%' 
+         OR content ILIKE '%www.%'
+         OR content ILIKE '%.com%'
+         OR content ILIKE '%.ru%'
+         OR content ILIKE '%@%'
+         OR content ILIKE '%telegram%'
+         OR content ILIKE '%discord%'
+         OR content ILIKE '%whatsapp%'
+         OR content ILIKE '%продам%'
+         OR content ILIKE '%куплю%'
+         OR content ILIKE '%обмен%'
     `;
     
     const result = await client.query(query);
@@ -790,7 +799,6 @@ async function getUnmoderatedMessagesCount() {
     await client.end();
   }
 }
-
 // === ИЗБРАННОЕ ===
 async function addToFavorites(userId, carId) {
   const client = new Client({
