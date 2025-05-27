@@ -171,8 +171,8 @@ async function createCarListing(carData) {
       name, 
       price, 
       description, 
-      ownerId, 
-      applicationId,
+      owner_id, 
+      application_id,
       category,
       server,
       maxSpeed,
@@ -194,7 +194,7 @@ async function createCarListing(carData) {
         phone, telegram, discord, "imageUrl"
       ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
       RETURNING *`,
-      [name, price, description, ownerId, applicationId, category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord, imageUrl]
+      [name, price, description, owner_id, application_id, category, server, maxSpeed, acceleration, drive, isPremium, phone, telegram, discord, imageUrl]
     );
     
     console.log(`✅ Car listing created with all fields:`, result.rows[0]);
@@ -447,7 +447,8 @@ async function getPendingApplicationsCount() {
   try {
     const client = getClient();
     const result = await client.query(
-      "SELECT COUNT(*) as count FROM car_applications WHERE status = 'pending'"
+      'SELECT COUNT(*) as count FROM car_applications WHERE status = $1',
+      ['pending']
     );
     return parseInt(result.rows[0].count);
   } catch (error) {
@@ -456,54 +457,88 @@ async function getPendingApplicationsCount() {
   }
 }
 
-async function updateUserRole(userId, role) {
+async function getUnmoderatedMessagesCount() {
   try {
     const client = getClient();
     const result = await client.query(
-      'UPDATE users SET role = $1 WHERE id = $2 RETURNING *',
-      [role, userId]
+      'SELECT COUNT(*) as count FROM messages WHERE "isModerated" = false OR "isModerated" IS NULL'
+    );
+    return parseInt(result.rows[0].count);
+  } catch (error) {
+    console.error('❌ Error getting unmoderated messages count:', error);
+    return 0;
+  }
+}
+
+async function getAllMessages() {
+  try {
+    const client = getClient();
+    
+    const result = await client.query(`
+      SELECT 
+        m.*,
+        s.username as sender_name,
+        r.username as receiver_name,
+        c.name as car_name
+      FROM messages m
+      LEFT JOIN users s ON m."senderId" = s.id
+      LEFT JOIN users r ON m."receiverId" = r.id
+      LEFT JOIN car_listings c ON m."carId" = c.id
+      ORDER BY m."createdAt" DESC
+    `);
+    
+    console.log(`✅ Found all messages: ${result.rows.length}`);
+    return result.rows;
+  } catch (error) {
+    console.error('❌ Error getting all messages:', error);
+    throw error;
+  }
+}
+
+async function deleteMessage(messageId) {
+  try {
+    const client = getClient();
+    
+    const result = await client.query(
+      'DELETE FROM messages WHERE id = $1 RETURNING *',
+      [messageId]
     );
     
-    console.log(`✅ User ${userId} role updated to: ${role}`);
+    if (result.rows.length === 0) {
+      throw new Error('Message not found');
+    }
+    
+    console.log(`✅ Message ${messageId} deleted successfully`);
     return result.rows[0];
   } catch (error) {
-    console.error('❌ Error updating user role:', error);
+    console.error('❌ Error deleting message:', error);
     throw error;
   }
 }
 
 module.exports = {
-  // Users
   getUserByUsername,
   getUserById,
   createUser,
   getAllUsers,
-  updateUserRole,
-  
-  // Applications
   createApplication,
   getApplications,
   getUserApplications,
   updateApplicationStatus,
-  
-  // Car listings
   createCarListing,
   getCarListings,
   getCarListingById,
   deleteCarListing,
   getUserCarListings,
-  
-  // Messages
   createMessage,
   getUserMessages,
   markMessageAsRead,
   getUnreadMessageCount,
-  
-  // Favorites
   getUserFavorites,
   addToFavorites,
   removeFromFavorites,
-  
-  // Stats
-  getPendingApplicationsCount
+  getPendingApplicationsCount,
+  getUnmoderatedMessagesCount,
+  getAllMessages,
+  deleteMessage
 };
