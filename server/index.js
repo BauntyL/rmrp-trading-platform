@@ -11,6 +11,7 @@ let users = [];
 let cars = [];
 let favorites = [];
 let messages = [];
+let applications = []; // ✅ МАССИВ ДЛЯ ЗАЯВОК
 
 // ✅ ИНИЦИАЛИЗАЦИЯ ПОЛЬЗОВАТЕЛЕЙ ПОСЛЕ ЗАПУСКА СЕРВЕРА
 async function initializeUsers() {
@@ -163,6 +164,55 @@ async function initializeCars() {
   console.log(`🚗 Создано ${testCars.length} тестовых автомобилей`);
 }
 
+// ✅ ИНИЦИАЛИЗАЦИЯ ТЕСТОВЫХ ЗАЯВОК
+async function initializeApplications() {
+  const testApplications = [
+    {
+      id: 1,
+      name: 'Ferrari F8 Tributo',
+      category: 'Суперкар',
+      server: 'Рублевка',
+      price: 28000000,
+      maxSpeed: 340,
+      acceleration: '2.9 сек',
+      drive: 'RWD',
+      phone: '+7 (999) 555-77-88',
+      telegram: '@ferrari_master',
+      discord: 'prancing_horse#4444',
+      imageUrl: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800&h=600&fit=crop',
+      description: 'Невероятный итальянский суперкар с атмосферным V8',
+      isPremium: true,
+      status: 'pending',
+      createdBy: 3,
+      owner_id: 3,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 2,
+      name: 'McLaren 720S',
+      category: 'Суперкар',
+      server: 'Арбат',
+      price: 30000000,
+      maxSpeed: 341,
+      acceleration: '2.8 сек',
+      drive: 'RWD',
+      phone: '+7 (999) 666-88-99',
+      telegram: '@mclaren_speed',
+      discord: 'papaya_orange#7777',
+      imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop',
+      description: 'Британская инженерия на пике совершенства',
+      isPremium: true,
+      status: 'pending',
+      createdBy: 3,
+      owner_id: 3,
+      createdAt: new Date().toISOString()
+    }
+  ];
+  
+  applications.push(...testApplications);
+  console.log(`📋 Создано ${testApplications.length} тестовых заявок`);
+}
+
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -210,7 +260,8 @@ app.get('/api/status', (req, res) => {
     status: 'ok', 
     time: new Date().toISOString(),
     usersCount: users.length,
-    carsCount: cars.length
+    carsCount: cars.length,
+    applicationsCount: applications.length
   });
 });
 
@@ -490,6 +541,174 @@ app.post('/api/messages', (req, res) => {
   }
 });
 
+// ✅ ЗАЯВКИ НА МОДЕРАЦИЮ
+
+// Создание заявки
+app.post('/api/applications', (req, res) => {
+  try {
+    console.log('📝 POST /api/applications - Creating application:', req.body);
+    
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const applicationData = {
+      ...req.body,
+      createdBy: req.session.userId,
+      owner_id: req.session.userId,
+      status: 'pending' // Заявки всегда создаются со статусом "на модерации"
+    };
+
+    // Создаем заявку
+    const newApplication = {
+      id: applications.length + 1,
+      ...applicationData,
+      createdAt: new Date().toISOString()
+    };
+
+    applications.push(newApplication);
+    
+    console.log('✅ Application created:', newApplication);
+    res.json(newApplication);
+
+  } catch (error) {
+    console.error('❌ Create application error:', error);
+    res.status(500).json({ error: 'Failed to create application' });
+  }
+});
+
+// Получение заявок на модерацию (для админов)
+app.get('/api/applications/pending', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Проверяем что пользователь админ или модератор
+    const user = users.find(u => u.id === req.session.userId);
+    if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const pendingApplications = applications.filter(app => app.status === 'pending');
+    console.log(`📋 Found ${pendingApplications.length} pending applications`);
+    res.json(pendingApplications);
+
+  } catch (error) {
+    console.error('❌ Get pending applications error:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// Модерация заявки (одобрение/отклонение)
+app.patch('/api/applications/:id/status', (req, res) => {
+  try {
+    console.log('🔄 PATCH /api/applications/:id/status - Moderating application:', req.params.id, req.body);
+    
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Проверяем что пользователь админ или модератор
+    const user = users.find(u => u.id === req.session.userId);
+    if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const applicationId = parseInt(req.params.id);
+    const { status } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Находим заявку
+    const applicationIndex = applications.findIndex(app => app.id === applicationId);
+    if (applicationIndex === -1) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Обновляем статус заявки
+    applications[applicationIndex].status = status;
+    applications[applicationIndex].moderatedBy = req.session.userId;
+    applications[applicationIndex].moderatedAt = new Date().toISOString();
+
+    // Если заявка одобрена - добавляем автомобиль в основной каталог
+    if (status === 'approved') {
+      const approvedApp = applications[applicationIndex];
+      const newCar = {
+        id: cars.length + 1,
+        name: approvedApp.name,
+        category: approvedApp.category,
+        server: approvedApp.server,
+        price: approvedApp.price,
+        maxSpeed: approvedApp.maxSpeed || 0,
+        acceleration: approvedApp.acceleration || 'Не указано',
+        drive: approvedApp.drive || 'Не указано',
+        phone: approvedApp.phone || null,
+        telegram: approvedApp.telegram || null,
+        discord: approvedApp.discord || null,
+        imageUrl: approvedApp.imageUrl || null,
+        description: approvedApp.description || null,
+        isPremium: approvedApp.isPremium || false,
+        status: 'approved',
+        createdBy: approvedApp.createdBy,
+        owner_id: approvedApp.owner_id,
+        createdAt: new Date().toISOString()
+      };
+
+      cars.push(newCar);
+      console.log('✅ Car added to catalog:', newCar);
+    }
+
+    console.log('✅ Application moderated:', applications[applicationIndex]);
+    res.json(applications[applicationIndex]);
+
+  } catch (error) {
+    console.error('❌ Moderate application error:', error);
+    res.status(500).json({ error: 'Failed to moderate application' });
+  }
+});
+
+// Получение всех заявок пользователя
+app.get('/api/my-applications', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const userApplications = applications.filter(app => app.createdBy === req.session.userId);
+    console.log(`📋 Found ${userApplications.length} applications for user ${req.session.userId}`);
+    res.json(userApplications);
+
+  } catch (error) {
+    console.error('❌ Get user applications error:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// Получение всех заявок (для админской панели)
+app.get('/api/applications', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Проверяем что пользователь админ или модератор
+    const user = users.find(u => u.id === req.session.userId);
+    if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    console.log(`📋 Found ${applications.length} total applications`);
+    res.json(applications);
+
+  } catch (error) {
+    console.error('❌ Get applications error:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
 // SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
@@ -503,6 +722,7 @@ app.listen(PORT, async () => {
   // ✅ ИНИЦИАЛИЗИРУЕМ ДАННЫЕ ПОСЛЕ ЗАПУСКА
   await initializeUsers();
   await initializeCars();
+  await initializeApplications();
   
   console.log(`👤 Ваш логин: "Баунти Миллер" / "Lqlcpyvb555!999#81"`);
   console.log(`👤 Запасной: admin/admin123 или testuser/test123`);
