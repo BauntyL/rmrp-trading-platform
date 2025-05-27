@@ -264,6 +264,80 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
   }
 });
 
+// === АВТОМОБИЛИ ===
+router.get('/cars', async (req, res) => {
+  try {
+    console.log('🚗 Fetching all cars');
+    const cars = await storage.getCarListings();
+    
+    console.log(`✅ Found ${cars.length} cars`);
+    res.json(cars);
+  } catch (error) {
+    console.error('❌ Error fetching cars:', error);
+    res.status(500).json({ error: 'Failed to fetch cars' });
+  }
+});
+
+router.get('/my-cars', requireAuth, async (req, res) => {
+  try {
+    console.log('🚗 Fetching cars for user:', req.user.username);
+    
+    const cars = await storage.getUserCarListings(req.user.id);
+    
+    console.log(`✅ Found ${cars.length} cars for user ${req.user.id}`);
+    res.json(cars);
+    
+  } catch (error) {
+    console.error('❌ Error fetching user cars:', error);
+    res.status(500).json({ error: 'Failed to fetch user cars' });
+  }
+});
+
+// Удаление автомобиля
+router.delete('/cars/:id', requireAuth, async (req, res) => {
+  try {
+    const carId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    console.log(`🗑️ Delete car request: ID ${carId} by user ${req.user.username} (${userRole})`);
+
+    if (!carId || isNaN(carId)) {
+      return res.status(400).json({ error: 'Неверный ID автомобиля' });
+    }
+
+    // Получить информацию об автомобиле
+    const car = await storage.getCarListingById(carId);
+    
+    if (!car) {
+      console.log('❌ Car not found:', carId);
+      return res.status(404).json({ error: 'Автомобиль не найден' });
+    }
+
+    // Проверка прав: владелец, админ или модератор
+    const isOwner = car.owner_id === userId;
+    const canDelete = isOwner || userRole === 'admin' || userRole === 'moderator';
+
+    if (!canDelete) {
+      console.log('❌ Insufficient permissions to delete car:', carId, 'User:', req.user.username, 'Role:', userRole);
+      return res.status(403).json({ error: 'Недостаточно прав для удаления этого автомобиля' });
+    }
+
+    // Удалить автомобиль
+    await storage.deleteCarListing(carId);
+
+    console.log(`✅ Car ${carId} deleted successfully by ${req.user.username}`);
+    res.json({ message: 'Автомобиль успешно удален' });
+
+  } catch (error) {
+    console.error('❌ Error deleting car:', error);
+    res.status(500).json({ 
+      error: 'Ошибка при удалении автомобиля',
+      details: error.message 
+    });
+  }
+});
+
 // === СООБЩЕНИЯ ===
 router.get('/messages', requireAuth, async (req, res) => {
   try {
@@ -390,7 +464,7 @@ router.post('/messages', requireAuth, async (req, res) => {
 router.post('/messages/mark-read', requireAuth, async (req, res) => {
   try {
     const { carId } = req.body;
-    console.log('📖 Marking messages as read:', { carId, userId: req.user.id });
+    console.log('📖 Marking messages as read for car:', carId, 'user:', req.user.id);
     
     const { Client } = require('pg');
     const client = new Client({
@@ -403,20 +477,14 @@ router.post('/messages/mark-read', requireAuth, async (req, res) => {
     const updateQuery = `
       UPDATE messages 
       SET "isRead" = true 
-      WHERE "carId" = $1 
-        AND "receiverId" = $2
-        AND "isRead" = false
+      WHERE "carId" = $1 AND "receiverId" = $2 AND "isRead" = false
     `;
     
-    const result = await client.query(updateQuery, [carId, req.user.id]);
-    
+    await client.query(updateQuery, [carId, req.user.id]);
     await client.end();
     
-    console.log(`✅ Marked ${result.rowCount} messages as read`);
-    res.json({ 
-      success: true, 
-      messagesMarked: result.rowCount 
-    });
+    console.log('✅ Messages marked as read');
+    res.json({ message: 'Messages marked as read' });
     
   } catch (error) {
     console.error('❌ Error marking messages as read:', error);
@@ -424,77 +492,29 @@ router.post('/messages/mark-read', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/messages/unread-count', requireAuth, async (req, res) => {
+// === ИЗБРАННОЕ ===
+router.get('/favorites', requireAuth, async (req, res) => {
   try {
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
+    console.log('⭐ Fetching favorites for user:', req.user.username);
+    const favorites = await storage.getUserFavorites(req.user.id);
     
-    await client.connect();
-    
-    const countQuery = `
-      SELECT COUNT(*) as count
-      FROM messages 
-      WHERE "receiverId" = $1 AND "isRead" = false
-    `;
-    
-    const result = await client.query(countQuery, [req.user.id]);
-    await client.end();
-    
-    const count = parseInt(result.rows[0].count) || 0;
-    console.log(`📬 Unread messages count for user ${req.user.id}: ${count}`);
-    
-    res.json({ count });
-    
+    console.log(`✅ Found ${favorites.length} favorites`);
+    res.json(favorites);
   } catch (error) {
-    console.error('❌ Error getting unread count:', error);
-    res.status(500).json({ error: 'Failed to get unread count' });
+    console.error('❌ Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
   }
 });
 
-// === ИЗБРАННОЕ ===
 router.post('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
-    const userId = req.user.id;
+    console.log('⭐ Adding to favorites:', carId, 'for user:', req.user.username);
     
-    console.log('❤️ Adding to favorites:', { carId, userId });
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    // Проверяем, есть ли уже в избранном
-    const checkQuery = `
-      SELECT id FROM favorites 
-      WHERE "userId" = $1 AND "carId" = $2
-    `;
-    const checkResult = await client.query(checkQuery, [userId, carId]);
-    
-    if (checkResult.rows.length > 0) {
-      await client.end();
-      return res.status(400).json({ error: 'Already in favorites' });
-    }
-    
-    // Добавляем в избранное
-    const insertQuery = `
-      INSERT INTO favorites ("userId", "carId", "createdAt")
-      VALUES ($1, $2, NOW())
-      RETURNING *
-    `;
-    const result = await client.query(insertQuery, [userId, carId]);
-    
-    await client.end();
+    await storage.addToFavorites(req.user.id, carId);
     
     console.log('✅ Added to favorites successfully');
-    res.json(result.rows[0]);
-    
+    res.json({ message: 'Added to favorites' });
   } catch (error) {
     console.error('❌ Error adding to favorites:', error);
     res.status(500).json({ error: 'Failed to add to favorites' });
@@ -504,466 +524,79 @@ router.post('/favorites/:carId', requireAuth, async (req, res) => {
 router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
-    const userId = req.user.id;
+    console.log('⭐ Removing from favorites:', carId, 'for user:', req.user.username);
     
-    console.log('💔 Removing from favorites:', { carId, userId });
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const deleteQuery = `
-      DELETE FROM favorites 
-      WHERE "userId" = $1 AND "carId" = $2
-      RETURNING *
-    `;
-    const result = await client.query(deleteQuery, [userId, carId]);
-    
-    await client.end();
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Not in favorites' });
-    }
+    await storage.removeFromFavorites(req.user.id, carId);
     
     console.log('✅ Removed from favorites successfully');
-    res.json({ success: true });
-    
+    res.json({ message: 'Removed from favorites' });
   } catch (error) {
     console.error('❌ Error removing from favorites:', error);
     res.status(500).json({ error: 'Failed to remove from favorites' });
   }
 });
 
-router.get('/favorites', requireAuth, async (req, res) => {
-  try {
-    console.log('❤️ Fetching favorites for user:', req.user.id);
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const query = `
-      SELECT cl.*, u.username as "createdByUsername"
-      FROM favorites f
-      JOIN car_listings cl ON f."carId" = cl.id
-      LEFT JOIN users u ON cl.owner_id = u.id
-      WHERE f."userId" = $1
-      ORDER BY f."createdAt" DESC
-    `;
-    
-    const result = await client.query(query, [req.user.id]);
-    
-    const favorites = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      price: row.price,
-      description: row.description,
-      category: row.category,
-      server: row.server,
-      maxSpeed: row.maxSpeed,
-      acceleration: row.acceleration,
-      drive: row.drive,
-      isPremium: row.isPremium,
-      phone: row.phone,
-      telegram: row.telegram,
-      discord: row.discord,
-      imageUrl: row.imageUrl,
-      createdBy: row.owner_id,
-      createdByUsername: row.createdByUsername,
-      createdAt: row.created_at,
-      status: 'approved' // Только одобренные автомобили в избранном
-    }));
-    
-    await client.end();
-    
-    console.log(`✅ Found ${favorites.length} favorites`);
-    res.json(favorites);
-    
-  } catch (error) {
-    console.error('❌ Error fetching favorites:', error);
-    res.status(500).json({ error: 'Failed to fetch favorites' });
-  }
-});
-
-// === АВТОМОБИЛИ ===
-router.get('/cars', async (req, res) => {
-  try {
-    const { search, category, server } = req.query;
-    console.log('🚗 Fetching cars with filters:', { search, category, server });
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    let query = `
-      SELECT cl.*, u.username as "createdByUsername"
-      FROM car_listings cl
-      LEFT JOIN users u ON cl.owner_id = u.id
-      WHERE 1=1
-    `;
-    const params = [];
-    
-    if (search) {
-      params.push(`%${search}%`);
-      query += ` AND (cl.name ILIKE $${params.length} OR cl.description ILIKE $${params.length})`;
-    }
-    
-    if (category && category !== 'all') {
-      params.push(category);
-      query += ` AND cl.category = $${params.length}`;
-    }
-    
-    if (server && server !== 'all') {
-      params.push(server);
-      query += ` AND cl.server = $${params.length}`;
-    }
-    
-    query += ` ORDER BY cl.created_at DESC`;
-    
-    const result = await client.query(query, params);
-    
-    const cars = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      price: row.price,
-      description: row.description,
-      category: row.category,
-      server: row.server,
-      maxSpeed: row.maxSpeed,
-      acceleration: row.acceleration,
-      drive: row.drive,
-      isPremium: row.isPremium,
-      phone: row.phone,
-      telegram: row.telegram,
-      discord: row.discord,
-      imageUrl: row.imageUrl,
-      createdBy: row.owner_id,
-      owner_id: row.owner_id,
-      createdByUsername: row.createdByUsername,
-      createdAt: row.created_at,
-      status: 'approved' // Все автомобили в каталоге одобрены
-    }));
-    
-    await client.end();
-    
-    console.log(`✅ Found ${cars.length} cars`);
-    res.json(cars);
-    
-  } catch (error) {
-    console.error('❌ Error fetching cars:', error);
-    res.status(500).json({ error: 'Failed to fetch cars' });
-  }
-});
-
-router.get('/my-cars', requireAuth, async (req, res) => {
-  try {
-    console.log('🚗 Fetching my cars for user:', req.user.id);
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const query = `
-      SELECT cl.*, u.username as "createdByUsername"
-      FROM car_listings cl
-      LEFT JOIN users u ON cl.owner_id = u.id
-      WHERE cl.owner_id = $1
-      ORDER BY cl.created_at DESC
-    `;
-    
-    const result = await client.query(query, [req.user.id]);
-    
-    const cars = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      price: row.price,
-      description: row.description,
-      category: row.category,
-      server: row.server,
-      maxSpeed: row.maxSpeed,
-      acceleration: row.acceleration,
-      drive: row.drive,
-      isPremium: row.isPremium,
-      phone: row.phone,
-      telegram: row.telegram,
-      discord: row.discord,
-      imageUrl: row.imageUrl,
-      createdBy: row.owner_id,
-      owner_id: row.owner_id,
-      createdByUsername: row.createdByUsername,
-      createdAt: row.created_at,
-      status: 'approved'
-    }));
-    
-    await client.end();
-    
-    console.log(`✅ Found ${cars.length} cars for user`);
-    res.json(cars);
-    
-  } catch (error) {
-    console.error('❌ Error fetching my cars:', error);
-    res.status(500).json({ error: 'Failed to fetch my cars' });
-  }
-});
-
-router.put('/cars/:id', requireAuth, async (req, res) => {
-  try {
-    const carId = parseInt(req.params.id);
-    const userId = req.user.id;
-    
-    console.log('✏️ Editing car:', { carId, userId });
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    // Проверяем права доступа
-    const checkQuery = `
-      SELECT owner_id FROM car_listings WHERE id = $1
-    `;
-    const checkResult = await client.query(checkQuery, [carId]);
-    
-    if (checkResult.rows.length === 0) {
-      await client.end();
-      return res.status(404).json({ error: 'Car not found' });
-    }
-    
-    const carOwnerId = checkResult.rows[0].owner_id;
-    const isOwner = carOwnerId === userId;
-    const isAdmin = req.user.role === 'admin' || req.user.role === 'moderator';
-    
-    if (!isOwner && !isAdmin) {
-      await client.end();
-      return res.status(403).json({ error: 'You can only edit your own cars' });
-    }
-    
-    const {
-      name, price, description, category, server, maxSpeed,
-      acceleration, drive, isPremium, phone, telegram, discord, imageUrl
-    } = req.body;
-    
-    const updateQuery = `
-      UPDATE car_listings SET 
-        name = $1,
-        price = $2,
-        description = $3,
-        category = $4,
-        server = $5,
-        "maxSpeed" = $6,
-        acceleration = $7,
-        drive = $8,
-        "isPremium" = $9,
-        phone = $10,
-        telegram = $11,
-        discord = $12,
-        "imageUrl" = $13
-      WHERE id = $14
-      RETURNING *
-    `;
-    
-    const result = await client.query(updateQuery, [
-      name, price, description, category, server, maxSpeed,
-      acceleration, drive, isPremium, phone, telegram, discord, imageUrl, carId
-    ]);
-    
-    await client.end();
-    
-    console.log('✅ Car updated successfully');
-    res.json(result.rows[0]);
-    
-  } catch (error) {
-    console.error('❌ Error updating car:', error);
-    res.status(500).json({ error: 'Failed to update car' });
-  }
-});
-
-router.delete('/cars/:id', requireAuth, async (req, res) => {
-  try {
-    const carId = parseInt(req.params.id);
-    const userId = req.user.id;
-    
-    console.log('🗑️ Deleting car:', { carId, userId });
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    // Проверяем права доступа
-    const checkQuery = `
-      SELECT owner_id FROM car_listings WHERE id = $1
-    `;
-    const checkResult = await client.query(checkQuery, [carId]);
-    
-    if (checkResult.rows.length === 0) {
-      await client.end();
-      return res.status(404).json({ error: 'Car not found' });
-    }
-    
-    const carOwnerId = checkResult.rows[0].owner_id;
-    const isOwner = carOwnerId === userId;
-    const isAdmin = req.user.role === 'admin' || req.user.role === 'moderator';
-    
-    if (!isOwner && !isAdmin) {
-      await client.end();
-      return res.status(403).json({ error: 'You can only delete your own cars' });
-    }
-    
-    // Удаляем автомобиль
-    const deleteQuery = `
-      DELETE FROM car_listings WHERE id = $1
-    `;
-    await client.query(deleteQuery, [carId]);
-    
-    await client.end();
-    
-    console.log('✅ Car deleted successfully');
-    res.json({ success: true });
-    
-  } catch (error) {
-    console.error('❌ Error deleting car:', error);
-    res.status(500).json({ error: 'Failed to delete car' });
-  }
-});
-
 // === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для админов) ===
 router.get('/users', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('👥 Fetching users for admin:', req.user.username);
+    console.log('👥 Fetching all users for admin:', req.user.username);
+    const users = await storage.getAllUsers();
     
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const query = `
-      SELECT id, username, role, created_at
-      FROM users 
-      ORDER BY created_at DESC
-    `;
-    
-    const result = await client.query(query);
-    await client.end();
-    
-    console.log(`✅ Found ${result.rows.length} users`);
-    res.json(result.rows);
-    
+    console.log(`✅ Found ${users.length} users`);
+    res.json(users);
   } catch (error) {
     console.error('❌ Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
-router.patch('/users/:id/role', requireAuth, requireRole(['admin']), async (req, res) => {
+// === МОДЕРАЦИЯ СООБЩЕНИЙ ===
+router.get('/messages/all', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
-    const { role } = req.body;
+    console.log('📨 Fetching all messages for moderation by:', req.user.username);
+    const messages = await storage.getAllMessages();
     
-    console.log('🔄 Updating user role:', { userId, role, by: req.user.username });
-    
-    if (!['user', 'moderator', 'admin'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-    
-    // Не позволяем изменить роль самому себе
-    if (userId === req.user.id) {
-      return res.status(400).json({ error: 'Cannot change your own role' });
-    }
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const updateQuery = `
-      UPDATE users 
-      SET role = $1 
-      WHERE id = $2 
-      RETURNING id, username, role
-    `;
-    
-    const result = await client.query(updateQuery, [role, userId]);
-    await client.end();
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    console.log('✅ User role updated successfully');
-    res.json(result.rows[0]);
-    
+    console.log(`✅ Found ${messages.length} messages for moderation`);
+    res.json(messages);
   } catch (error) {
-    console.error('❌ Error updating user role:', error);
-    res.status(500).json({ error: 'Failed to update user role' });
+    console.error('❌ Error fetching all messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
 
-router.delete('/users/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+router.delete('/messages/:id', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const messageId = parseInt(req.params.id);
+    console.log('🗑️ Deleting message:', messageId, 'by moderator:', req.user.username);
     
-    console.log('🗑️ Deleting user:', { userId, by: req.user.username });
+    await storage.deleteMessage(messageId);
     
-    // Не позволяем удалить самого себя
-    if (userId === req.user.id) {
-      return res.status(400).json({ error: 'Cannot delete yourself' });
-    }
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    // Удаляем пользователя (связанные данные удалятся автоматически через CASCADE)
-    const deleteQuery = `
-      DELETE FROM users WHERE id = $1
-    `;
-    const result = await client.query(deleteQuery, [userId]);
-    
-    await client.end();
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    console.log('✅ User deleted successfully');
-    res.json({ success: true });
-    
+    console.log('✅ Message deleted successfully');
+    res.json({ message: 'Message deleted successfully' });
   } catch (error) {
-    console.error('❌ Error deleting user:', error);
-    res.status(500).json({ error: 'Failed to delete user' });
+    console.error('❌ Error deleting message:', error);
+    res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
+// === СТАТИСТИКА ===
+router.get('/stats', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    console.log('📊 Fetching stats for:', req.user.username);
+    
+    const pendingApplications = await storage.getPendingApplicationsCount();
+    const unmoderatedMessages = await storage.getUnmoderatedMessagesCount();
+    
+    const stats = {
+      pendingApplications,
+      unmoderatedMessages
+    };
+    
+    console.log('✅ Stats fetched:', stats);
+    res.json(stats);
+  } catch (error) {
+    console.error('❌ Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
 
