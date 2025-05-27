@@ -81,16 +81,27 @@ async function initializeDatabase() {
       )
     `);
 
-    // Создание таблицы избранного
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS favorites (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        car_id INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id, car_id)
-      )
-    `);
+    // ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ ИЗБРАННОГО
+    try {
+      // Удаляем старую таблицу
+      await client.query('DROP TABLE IF EXISTS favorites CASCADE');
+      console.log('🗑️ Old favorites table dropped');
+      
+      // Создаем новую таблицу с правильной схемой
+      await client.query(`
+        CREATE TABLE favorites (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          car_id INTEGER REFERENCES car_listings(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, car_id)
+        )
+      `);
+      console.log('✅ New favorites table created');
+      
+    } catch (error) {
+      console.error('❌ Error recreating favorites table:', error);
+    }
 
     // Создание индексов для оптимизации
     await client.query(`
@@ -770,6 +781,7 @@ async function getUnmoderatedMessagesCount() {
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
   });
+
   try {
     await client.connect();
     
@@ -799,6 +811,7 @@ async function getUnmoderatedMessagesCount() {
     await client.end();
   }
 }
+
 // === ИЗБРАННОЕ ===
 async function addToFavorites(userId, carId) {
   const client = new Client({
