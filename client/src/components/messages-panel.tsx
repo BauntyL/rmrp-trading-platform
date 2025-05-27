@@ -50,20 +50,24 @@ export function MessagesPanel() {
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return "Только что";
-    if (diffInMinutes < 60) return `${diffInMinutes} мин назад`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} ч назад`;
-    
-    return date.toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      
+      if (diffInMinutes < 1) return "Только что";
+      if (diffInMinutes < 60) return `${diffInMinutes} мин назад`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} ч назад`;
+      
+      return date.toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return "Недавно";
+    }
   };
 
   if (isChatsLoading) {
@@ -138,56 +142,71 @@ export function MessagesPanel() {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {chats.map((chat: any) => (
-                    <button
-                      key={chat.id}
-                      onClick={() => setSelectedChat(chat)}
-                      className={`w-full p-4 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
-                        selectedChat?.id === chat.id ? 'bg-slate-700' : ''
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <Avatar className="h-10 w-10 bg-emerald-600">
-                          <AvatarFallback className="bg-emerald-600 text-white">
-                            {chat.sellerName?.[0]?.toUpperCase() || '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-white font-medium text-sm truncate">
-                              {chat.sellerName || 'Неизвестный пользователь'}
-                            </h3>
-                            {chat.unreadCount > 0 && (
-                              <Badge className="bg-red-500 text-white text-xs ml-2">
-                                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                              </Badge>
-                            )}
-                          </div>
+                  {chats.map((chat: any) => {
+                    // ✅ БЕЗОПАСНАЯ ПРОВЕРКА ЧАТА
+                    if (!chat || typeof chat !== 'object') {
+                      console.warn('Invalid chat object:', chat);
+                      return null;
+                    }
+
+                    const chatId = chat.id || Math.random();
+                    const sellerName = chat.sellerName || chat.otherUserName || 'Неизвестный пользователь';
+                    const carName = chat.carName || 'Автомобиль';
+                    const lastMessage = chat.lastMessage || 'Нет сообщений';
+                    const unreadCount = chat.unreadCount || 0;
+                    const lastMessageTime = chat.lastMessageTime || chat.lastMessage?.createdAt;
+
+                    return (
+                      <button
+                        key={chatId}
+                        onClick={() => setSelectedChat(chat)}
+                        className={`w-full p-4 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
+                          selectedChat?.id === chat.id ? 'bg-slate-700' : ''
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <Avatar className="h-10 w-10 bg-emerald-600">
+                            <AvatarFallback className="bg-emerald-600 text-white">
+                              {sellerName[0]?.toUpperCase() || '?'}
+                            </AvatarFallback>
+                          </Avatar>
                           
-                          <div className="flex items-center space-x-1 mb-1">
-                            <Car className="h-3 w-3 text-emerald-400" />
-                            <span className="text-emerald-400 text-xs truncate">
-                              {chat.carName}
-                            </span>
-                          </div>
-                          
-                          <p className="text-slate-400 text-xs truncate">
-                            {chat.lastMessage || 'Нет сообщений'}
-                          </p>
-                          
-                          {chat.lastMessageTime && (
-                            <div className="flex items-center space-x-1 mt-1">
-                              <Clock className="h-3 w-3 text-slate-500" />
-                              <span className="text-slate-500 text-xs">
-                                {formatTime(chat.lastMessageTime)}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-white font-medium text-sm truncate">
+                                {sellerName}
+                              </h3>
+                              {unreadCount > 0 && (
+                                <Badge className="bg-red-500 text-white text-xs ml-2">
+                                  {unreadCount > 99 ? '99+' : unreadCount}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center space-x-1 mb-1">
+                              <Car className="h-3 w-3 text-emerald-400" />
+                              <span className="text-emerald-400 text-xs truncate">
+                                {carName}
                               </span>
                             </div>
-                          )}
+                            
+                            <p className="text-slate-400 text-xs truncate">
+                              {typeof lastMessage === 'string' ? lastMessage : lastMessage?.content || 'Нет сообщений'}
+                            </p>
+                            
+                            {lastMessageTime && (
+                              <div className="flex items-center space-x-1 mt-1">
+                                <Clock className="h-3 w-3 text-slate-500" />
+                                <span className="text-slate-500 text-xs">
+                                  {formatTime(lastMessageTime)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
@@ -211,17 +230,17 @@ export function MessagesPanel() {
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-10 w-10 bg-emerald-600">
                     <AvatarFallback className="bg-emerald-600 text-white">
-                      {selectedChat.sellerName?.[0]?.toUpperCase() || '?'}
+                      {(selectedChat.sellerName || selectedChat.otherUserName || '?')[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="text-white font-medium">
-                      {selectedChat.sellerName || 'Неизвестный пользователь'}
+                      {selectedChat.sellerName || selectedChat.otherUserName || 'Неизвестный пользователь'}
                     </h3>
                     <div className="flex items-center space-x-1">
                       <Car className="h-3 w-3 text-emerald-400" />
                       <span className="text-emerald-400 text-sm">
-                        {selectedChat.carName}
+                        {selectedChat.carName || 'Автомобиль'}
                       </span>
                     </div>
                   </div>
@@ -243,31 +262,46 @@ export function MessagesPanel() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {messages.map((message: any) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${
-                            message.senderId === selectedChat.buyerId ? 'justify-end' : 'justify-start'
-                          }`}
-                        >
+                      {messages.map((message: any) => {
+                        // ✅ БЕЗОПАСНАЯ ПРОВЕРКА СООБЩЕНИЯ
+                        if (!message || typeof message !== 'object') {
+                          console.warn('Invalid message object:', message);
+                          return null;
+                        }
+
+                        const messageContent = typeof message === 'string' ? message : (message.content || '');
+                        const messageId = message.id || Math.random();
+                        const senderId = message.senderId;
+                        const createdAt = message.createdAt || new Date().toISOString();
+
+                        return (
                           <div
-                            className={`max-w-[70%] rounded-lg px-3 py-2 ${
-                              message.senderId === selectedChat.buyerId
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-700 text-white'
+                            key={messageId}
+                            className={`flex ${
+                              senderId === selectedChat.buyerId ? 'justify-end' : 'justify-start'
                             }`}
                           >
-                            <p className="text-sm break-words">{message.content}</p>
-                            <p className={`text-xs mt-1 ${
-                              message.senderId === selectedChat.buyerId 
-                                ? 'text-emerald-100' 
-                                : 'text-slate-400'
-                            }`}>
-                              {formatTime(message.createdAt)}
-                            </p>
+                            <div
+                              className={`max-w-[70%] rounded-lg px-3 py-2 ${
+                                senderId === selectedChat.buyerId
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-700 text-white'
+                              }`}
+                            >
+                              <p className="text-sm break-words">
+                                {messageContent || 'Сообщение недоступно'}
+                              </p>
+                              <p className={`text-xs mt-1 ${
+                                senderId === selectedChat.buyerId 
+                                  ? 'text-emerald-100' 
+                                  : 'text-slate-400'
+                              }`}>
+                                {formatTime(createdAt)}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       <div ref={messagesEndRef} />
                     </div>
                   )}
@@ -281,12 +315,13 @@ export function MessagesPanel() {
                       onChange={(e) => setMessageInput(e.target.value)}
                       placeholder="Введите сообщение..."
                       maxLength={500}
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+                      className="flex-1 bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-emerald-500"
+                      disabled={sendMessageMutation.isPending}
                     />
                     <Button
                       type="submit"
                       disabled={!messageInput.trim() || sendMessageMutation.isPending}
-                      className="bg-emerald-600 hover:bg-emerald-700"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4"
                     >
                       {sendMessageMutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -295,9 +330,15 @@ export function MessagesPanel() {
                       )}
                     </Button>
                   </form>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {messageInput.length}/500 символов
-                  </p>
+                  
+                  <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+                    <span>{messageInput.length}/500</span>
+                    {sendMessageMutation.isError && (
+                      <span className="text-red-400">
+                        Ошибка отправки сообщения
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </>
