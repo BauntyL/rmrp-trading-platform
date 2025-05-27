@@ -30,7 +30,6 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
     server: "",
     price: "",
     maxSpeed: "",
-    acceleration: "",
     drive: "",
     phone: "",
     telegram: "",
@@ -71,7 +70,6 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         server: "",
         price: "",
         maxSpeed: "",
-        acceleration: "",
         drive: "",
         phone: "",
         telegram: "",
@@ -145,7 +143,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
       server: formData.server,
       price: parseInt(formData.price),
       maxSpeed: formData.maxSpeed ? parseInt(formData.maxSpeed) : 0,
-      acceleration: formData.acceleration || "Не указано",
+      acceleration: "Не указано", // Убираем поле разгона
       drive: formData.drive || "Не указано",
       description: formData.description.trim() || "Без описания",
       imageUrl: formData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Нет+фото',
@@ -197,12 +195,12 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
                   <SelectValue placeholder="Выберите категорию" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="Спорткары">Спорткары</SelectItem>
-                  <SelectItem value="Суперкары">Суперкары</SelectItem>
-                  <SelectItem value="Гиперкары">Гиперкары</SelectItem>
-                  <SelectItem value="Электрокары">Электрокары</SelectItem>
-                  <SelectItem value="Классика">Классика</SelectItem>
-                  <SelectItem value="Другое">Другое</SelectItem>
+                  <SelectItem value="Стандарт">Стандарт</SelectItem>
+                  <SelectItem value="Купе">Купе</SelectItem>
+                  <SelectItem value="Внедорожники">Внедорожники</SelectItem>
+                  <SelectItem value="Спорт">Спорт</SelectItem>
+                  <SelectItem value="Мотоциклы">Мотоциклы</SelectItem>
+                  <SelectItem value="Специальные">Специальные</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -214,12 +212,10 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
                   <SelectValue placeholder="Выберите сервер" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="Arizona RP">Arizona RP</SelectItem>
-                  <SelectItem value="Radmir RP">Radmir RP</SelectItem>
-                  <SelectItem value="Advance RP">Advance RP</SelectItem>
-                  <SelectItem value="Trinity RP">Trinity RP</SelectItem>
-                  <SelectItem value="Amazing RP">Amazing RP</SelectItem>
-                  <SelectItem value="Другой">Другой</SelectItem>
+                  <SelectItem value="Арбат">Арбат</SelectItem>
+                  <SelectItem value="Патрики">Патрики</SelectItem>
+                  <SelectItem value="Рублевка">Рублевка</SelectItem>
+                  <SelectItem value="Тверской">Тверской</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -253,31 +249,19 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             </div>
           </div>
 
-          {/* Разгон и Тип привода */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-slate-300">Разгон до 100 км/ч</Label>
-              <Input
-                placeholder="3.5 сек"
-                value={formData.acceleration}
-                onChange={(e) => handleInputChange('acceleration', e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-slate-300">Тип привода</Label>
-              <Select value={formData.drive} onValueChange={(value) => handleInputChange('drive', value)}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Выберите привод" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="AWD">AWD (Полный)</SelectItem>
-                  <SelectItem value="RWD">RWD (Задний)</SelectItem>
-                  <SelectItem value="FWD">FWD (Передний)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Тип привода */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">Тип привода</Label>
+            <Select value={formData.drive} onValueChange={(value) => handleInputChange('drive', value)}>
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Выберите привод" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-700 border-slate-600">
+                <SelectItem value="AWD">AWD (Полный)</SelectItem>
+                <SelectItem value="RWD">RWD (Задний)</SelectItem>
+                <SelectItem value="FWD">FWD (Передний)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Контактная информация */}
