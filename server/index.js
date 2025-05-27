@@ -614,20 +614,34 @@ app.post('/api/messages', (req, res) => {
   }
 });
 
-// ✅ ВОССТАНОВЛЕННЫЕ СООБЩЕНИЯ С ПРАВИЛЬНЫМИ ДАННЫМИ
+// ✅ ИСПРАВЛЕННЫЙ GET /api/messages ДЛЯ КОНКРЕТНОГО ЧАТА
 app.get('/api/messages', (req, res) => {
   try {
-    console.log('💬 GET /api/messages');
+    console.log('💬 GET /api/messages - ALL MESSAGES');
     
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const userMessages = messages.filter(m => 
-      m.senderId === req.session.userId || m.receiverId === req.session.userId
+    const userId = req.session.userId;
+    const { chatId } = req.query;
+
+    console.log('📨 Chat ID requested:', chatId);
+    console.log('👤 User ID:', userId);
+
+    let userMessages = messages.filter(m => 
+      m.senderId === userId || m.receiverId === userId
     );
 
-    // Очищаем и проверяем данные перед отправкой
+    // Если указан chatId, фильтруем по чату
+    if (chatId) {
+      const [userId1, userId2] = chatId.split('-').map(Number);
+      userMessages = userMessages.filter(m => 
+        (m.senderId === userId1 && m.receiverId === userId2) ||
+        (m.senderId === userId2 && m.receiverId === userId1)
+      );
+    }
+
     const cleanMessages = userMessages.map(msg => {
       const sender = users.find(u => u.id === msg.senderId);
       const receiver = users.find(u => u.id === msg.receiverId);
@@ -645,9 +659,9 @@ app.get('/api/messages', (req, res) => {
         receiverName: receiver ? String(receiver.username) : 'Пользователь',
         carName: car ? String(car.name) : null
       };
-    }).filter(msg => msg.content && msg.createdAt); // Фильтруем только валидные сообщения
+    }).filter(msg => msg.content && msg.createdAt);
 
-    console.log(`💬 Returning ${cleanMessages.length} clean messages`);
+    console.log(`💬 Returning ${cleanMessages.length} messages for chat ${chatId}:`, cleanMessages);
     res.json(cleanMessages);
 
   } catch (error) {
@@ -656,33 +670,48 @@ app.get('/api/messages', (req, res) => {
   }
 });
 
-// ✅ ВОССТАНОВЛЕННЫЕ ЧАТЫ
+// ✅ ИСПРАВЛЕННЫЙ GET /api/messages/chats
 app.get('/api/messages/chats', (req, res) => {
   try {
-    console.log('💬 GET /api/messages/chats');
+    console.log('💬 GET /api/messages/chats - ДЕТАЛЬНАЯ ДИАГНОСТИКА');
+    console.log('👤 User ID:', req.session?.userId);
+    console.log('📊 Total messages in system:', messages.length);
     
     if (!req.session?.userId) {
+      console.log('❌ No authentication - returning 401');
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    const userId = req.session.userId;
     const userMessages = messages.filter(m => 
-      m.senderId === req.session.userId || m.receiverId === req.session.userId
+      m.senderId === userId || m.receiverId === userId
     );
+
+    console.log('📨 User messages found:', userMessages.length);
+    console.log('📨 User messages data:', userMessages);
+
+    if (userMessages.length === 0) {
+      console.log('📨 No messages found, returning empty array');
+      return res.json([]);
+    }
 
     const chats = {};
     
     userMessages.forEach(msg => {
-      if (!msg.content || !msg.createdAt) return; // Пропускаем невалидные сообщения
+      if (!msg.content || !msg.createdAt) return;
       
-      const otherUserId = msg.senderId === req.session.userId ? msg.receiverId : msg.senderId;
-      const chatKey = `${Math.min(req.session.userId, otherUserId)}-${Math.max(req.session.userId, otherUserId)}`;
+      const otherUserId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+      const chatKey = `${Math.min(userId, otherUserId)}-${Math.max(userId, otherUserId)}`;
       
       if (!chats[chatKey]) {
         const otherUser = users.find(u => u.id === otherUserId);
+        const car = msg.carId ? cars.find(c => c.id === msg.carId) : null;
+        
         chats[chatKey] = {
           id: String(chatKey),
           otherUserId: Number(otherUserId),
           otherUserName: otherUser ? String(otherUser.username) : 'Пользователь',
+          carName: car ? String(car.name) : 'Автомобиль',
           messages: [],
           lastMessage: null,
           unreadCount: 0
@@ -705,7 +734,7 @@ app.get('/api/messages/chats', (req, res) => {
         chats[chatKey].lastMessage = cleanMessage;
       }
       
-      if (!msg.isRead && msg.receiverId === req.session.userId) {
+      if (!msg.isRead && msg.receiverId === userId) {
         chats[chatKey].unreadCount++;
       }
     });
@@ -714,7 +743,7 @@ app.get('/api/messages/chats', (req, res) => {
       new Date(b.lastMessage?.createdAt || 0) - new Date(a.lastMessage?.createdAt || 0)
     );
 
-    console.log(`💬 Returning ${chatsList.length} chats`);
+    console.log(`💬 Returning ${chatsList.length} chats:`, chatsList);
     res.json(chatsList);
 
   } catch (error) {
