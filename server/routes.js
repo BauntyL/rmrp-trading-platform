@@ -425,15 +425,187 @@ router.patch('/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin
   }
 });
 
-// Получение избранного (заглушка)
+// === ИЗБРАННОЕ (FAVORITES) ===
+
+// Получение избранного пользователя
 router.get('/favorites', requireAuth, async (req, res) => {
   try {
     console.log('❤️ Fetching favorites for user:', req.user.username);
-    // Пока возвращаем пустой массив
-    res.json([]);
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    // Создаем таблицу избранного если её нет
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        car_id INTEGER REFERENCES cars(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, car_id)
+      )
+    `);
+    
+    // Получаем избранные автомобили с полной информацией
+    const query = `
+      SELECT 
+        c.id,
+        c.name,
+        c.server,
+        c.category,
+        c.drive_type as "driveType",
+        c.server_id as "serverId",
+        c.price,
+        c.description,
+        c.image_url as "imageUrl",
+        c.contact_info as "contactInfo",
+        c.user_id as "userId",
+        c.status,
+        c.created_at as "createdAt",
+        f.created_at as "favoriteAddedAt"
+      FROM favorites f
+      JOIN cars c ON f.car_id = c.id
+      WHERE f.user_id = $1
+      ORDER BY f.created_at DESC
+    `;
+    
+    const result = await client.query(query, [req.user.id]);
+    await client.end();
+    
+    console.log(`✅ Found ${result.rows.length} favorites for user`);
+    res.json(result.rows);
+    
   } catch (error) {
     console.error('❌ Error fetching favorites:', error);
     res.status(500).json({ error: 'Failed to fetch favorites' });
+  }
+});
+
+// Добавление в избранное
+router.post('/favorites/:carId', requireAuth, async (req, res) => {
+  try {
+    const { carId } = req.params;
+    console.log('❤️ Adding car to favorites:', carId, 'for user:', req.user.username);
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    // Создаем таблицу избранного если её нет
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        car_id INTEGER REFERENCES cars(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, car_id)
+      )
+    `);
+    
+    // Проверяем, существует ли автомобиль
+    const carCheck = await client.query('SELECT id FROM cars WHERE id = $1', [parseInt(carId)]);
+    if (carCheck.rows.length === 0) {
+      await client.end();
+      return res.status(404).json({ error: 'Автомобиль не найден' });
+    }
+    
+    // Добавляем в избранное (ON CONFLICT DO NOTHING для избежания дублей)
+    const insertQuery = `
+      INSERT INTO favorites (user_id, car_id, created_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (user_id, car_id) DO NOTHING
+      RETURNING *
+    `;
+    
+    const result = await client.query(insertQuery, [req.user.id, parseInt(carId)]);
+    await client.end();
+    
+    if (result.rows.length > 0) {
+      console.log('✅ Car added to favorites successfully');
+      res.json({ message: 'Добавлено в избранное', favorite: result.rows[0] });
+    } else {
+      console.log('ℹ️ Car already in favorites');
+      res.json({ message: 'Уже в избранном' });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error adding to favorites:', error);
+    res.status(500).json({ error: 'Failed to add to favorites' });
+  }
+});
+
+// Удаление из избранного
+router.delete('/favorites/:carId', requireAuth, async (req, res) => {
+  try {
+    const { carId } = req.params;
+    console.log('💔 Removing car from favorites:', carId, 'for user:', req.user.username);
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    const deleteQuery = `
+      DELETE FROM favorites 
+      WHERE user_id = $1 AND car_id = $2
+      RETURNING *
+    `;
+    
+    const result = await client.query(deleteQuery, [req.user.id, parseInt(carId)]);
+    await client.end();
+    
+    if (result.rows.length > 0) {
+      console.log('✅ Car removed from favorites successfully');
+      res.json({ message: 'Удалено из избранного' });
+    } else {
+      console.log('ℹ️ Car was not in favorites');
+      res.status(404).json({ error: 'Автомобиль не был в избранном' });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error removing from favorites:', error);
+    res.status(500).json({ error: 'Failed to remove from favorites' });
+  }
+});
+
+// Проверка, находится ли автомобиль в избранном
+router.get('/favorites/:carId/check', requireAuth, async (req, res) => {
+  try {
+    const { carId } = req.params;
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    const query = `
+      SELECT id FROM favorites 
+      WHERE user_id = $1 AND car_id = $2
+    `;
+    
+    const result = await client.query(query, [req.user.id, parseInt(carId)]);
+    await client.end();
+    
+    res.json({ isFavorite: result.rows.length > 0 });
+    
+  } catch (error) {
+    console.error('❌ Error checking favorite status:', error);
+    res.json({ isFavorite: false });
   }
 });
 
