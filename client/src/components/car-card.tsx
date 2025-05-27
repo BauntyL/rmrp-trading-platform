@@ -44,7 +44,7 @@ interface CarCardProps {
   onModerate?: (action: 'approve' | 'reject') => void;
 }
 
-export default function CarCard({ 
+function CarCard({ 
   car, 
   showEditButton = false, 
   showModerationActions = false,
@@ -352,3 +352,7 @@ export default function CarCard({
     </>
   );
 }
+
+// Экспортируем и как default, и как именованный экспорт
+export default CarCard;
+export { CarCard };
