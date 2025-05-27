@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import {
   X, 
   Phone,
   Eye,
-  Copy,
   Zap,
   Gauge,
   Settings,
@@ -43,7 +42,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
   const { data: favorites = [] } = useQuery({
     queryKey: ["/api/favorites"],
     refetchInterval: 30000,
-  }) || { data: [] };
+  });
   
   const isFavorite = Array.isArray(favorites) && favorites.some((fav: any) => fav.id === car.id);
 
@@ -334,7 +333,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
 
         <CardFooter className="p-4 pt-0 space-y-3">
           {/* Основные кнопки действий */}
-          {!isOwner && !showModerationButtons && (
+          {!isOwner && (
             <div className="flex gap-2 w-full">
               <Button 
                 onClick={() => setDetailsModalOpen(true)}
