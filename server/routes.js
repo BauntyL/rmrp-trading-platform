@@ -156,7 +156,7 @@ router.get('/user', (req, res) => {
   }
 });
 
-// Заявки
+// === ЗАЯВКИ ===
 router.post('/applications', requireAuth, async (req, res) => {
   try {
     console.log('📝 Creating application for user:', req.user.username);
@@ -211,7 +211,6 @@ router.get('/my-applications', requireAuth, async (req, res) => {
   }
 });
 
-// СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ И ИЗОБРАЖЕНИЕМ
 router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -225,7 +224,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
     
     const application = await storage.updateApplicationStatus(id, status);
     
-    // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ
+    // Создание объявления при одобрении
     if (status === 'approved') {
       console.log('✅ Creating car listing from approved application');
       console.log('📋 Application data for car listing:', application);
@@ -253,7 +252,6 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
         
       } catch (carError) {
         console.error('❌ Error creating car listing:', carError);
-        // Не возвращаем ошибку, продолжаем выполнение
       }
     }
     
@@ -266,8 +264,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
   }
 });
 
-// === ИСПРАВЛЕННЫЕ СООБЩЕНИЯ ===
-// Получение всех сообщений пользователя
+// === СООБЩЕНИЯ ===
 router.get('/messages', requireAuth, async (req, res) => {
   try {
     console.log('📨 Fetching messages for user:', req.user.id);
@@ -280,7 +277,6 @@ router.get('/messages', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Получаем все сообщения с информацией об автомобилях и пользователях
     const query = `
       SELECT 
         m.id,
@@ -308,7 +304,6 @@ router.get('/messages', requireAuth, async (req, res) => {
     
     const result = await client.query(query, [req.user.id]);
     
-    // Форматируем ответ для фронтенда
     const messages = result.rows.map(row => ({
       id: row.id,
       carId: row.carId,
@@ -335,7 +330,6 @@ router.get('/messages', requireAuth, async (req, res) => {
   }
 });
 
-// Отправка сообщения
 router.post('/messages', requireAuth, async (req, res) => {
   try {
     const { carId, sellerId, message } = req.body;
@@ -350,7 +344,7 @@ router.post('/messages', requireAuth, async (req, res) => {
     }
     
     // Проверка на запрещенные слова
-    const bannedWords = ['мат', 'политика', 'http', 'www', 'telegram', '@'];
+    const bannedWords = ['мат', 'политика', 'http', 'www'];
     const containsBanned = bannedWords.some(word => 
       message.toLowerCase().includes(word.toLowerCase())
     );
@@ -369,7 +363,6 @@ router.post('/messages', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Вставляем сообщение
     const insertQuery = `
       INSERT INTO messages ("senderId", "receiverId", "carId", content, "isRead", "createdAt")
       VALUES ($1, $2, $3, $4, false, NOW())
@@ -377,8 +370,8 @@ router.post('/messages', requireAuth, async (req, res) => {
     `;
     
     const result = await client.query(insertQuery, [
-      req.user.id,  // senderId
-      sellerId,     // receiverId  
+      req.user.id,
+      sellerId,     
       carId,
       message
     ]);
@@ -394,11 +387,10 @@ router.post('/messages', requireAuth, async (req, res) => {
   }
 });
 
-// Отметка сообщений как прочитанных
 router.post('/messages/mark-read', requireAuth, async (req, res) => {
   try {
-    const { carId, buyerId, sellerId } = req.body;
-    console.log('📖 Marking messages as read:', { carId, buyerId, sellerId, userId: req.user.id });
+    const { carId } = req.body;
+    console.log('📖 Marking messages as read:', { carId, userId: req.user.id });
     
     const { Client } = require('pg');
     const client = new Client({
@@ -408,7 +400,6 @@ router.post('/messages/mark-read', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Отмечаем все сообщения в данном диалоге как прочитанные для текущего пользователя
     const updateQuery = `
       UPDATE messages 
       SET "isRead" = true 
@@ -433,7 +424,6 @@ router.post('/messages/mark-read', requireAuth, async (req, res) => {
   }
 });
 
-// Получение количества непрочитанных сообщений
 router.get('/messages/unread-count', requireAuth, async (req, res) => {
   try {
     const { Client } = require('pg');
@@ -464,14 +454,13 @@ router.get('/messages/unread-count', requireAuth, async (req, res) => {
   }
 });
 
-// === ИСПРАВЛЕННОЕ ИЗБРАННОЕ ===
-// Добавление/удаление из избранного
-router.post('/favorites/toggle/:carId', requireAuth, async (req, res) => {
+// === ИЗБРАННОЕ ===
+router.post('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
     const userId = req.user.id;
     
-    console.log('❤️ Toggling favorite:', { carId, userId });
+    console.log('❤️ Adding to favorites:', { carId, userId });
     
     const { Client } = require('pg');
     const client = new Client({
@@ -488,44 +477,36 @@ router.post('/favorites/toggle/:carId', requireAuth, async (req, res) => {
     `;
     const checkResult = await client.query(checkQuery, [userId, carId]);
     
-    let action;
     if (checkResult.rows.length > 0) {
-      // Удаляем из избранного
-      const deleteQuery = `
-        DELETE FROM favorites 
-        WHERE "userId" = $1 AND "carId" = $2
-      `;
-      await client.query(deleteQuery, [userId, carId]);
-      action = 'removed';
-    } else {
-      // Добавляем в избранное
-      const insertQuery = `
-        INSERT INTO favorites ("userId", "carId", "createdAt")
-        VALUES ($1, $2, NOW())
-      `;
-      await client.query(insertQuery, [userId, carId]);
-      action = 'added';
+      await client.end();
+      return res.status(400).json({ error: 'Already in favorites' });
     }
+    
+    // Добавляем в избранное
+    const insertQuery = `
+      INSERT INTO favorites ("userId", "carId", "createdAt")
+      VALUES ($1, $2, NOW())
+      RETURNING *
+    `;
+    const result = await client.query(insertQuery, [userId, carId]);
     
     await client.end();
     
-    console.log(`✅ Favorite ${action} successfully`);
-    res.json({ 
-      action, 
-      isFavorite: action === 'added' 
-    });
+    console.log('✅ Added to favorites successfully');
+    res.json(result.rows[0]);
     
   } catch (error) {
-    console.error('❌ Error toggling favorite:', error);
-    res.status(500).json({ error: 'Failed to toggle favorite' });
+    console.error('❌ Error adding to favorites:', error);
+    res.status(500).json({ error: 'Failed to add to favorites' });
   }
 });
 
-// Проверка избранного
-router.get('/favorites/check/:carId', requireAuth, async (req, res) => {
+router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
     const userId = req.user.id;
+    
+    console.log('💔 Removing from favorites:', { carId, userId });
     
     const { Client } = require('pg');
     const client = new Client({
@@ -535,23 +516,28 @@ router.get('/favorites/check/:carId', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    const checkQuery = `
-      SELECT id FROM favorites 
+    const deleteQuery = `
+      DELETE FROM favorites 
       WHERE "userId" = $1 AND "carId" = $2
+      RETURNING *
     `;
-    const result = await client.query(checkQuery, [userId, carId]);
+    const result = await client.query(deleteQuery, [userId, carId]);
     
     await client.end();
     
-    res.json({ isFavorite: result.rows.length > 0 });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Not in favorites' });
+    }
+    
+    console.log('✅ Removed from favorites successfully');
+    res.json({ success: true });
     
   } catch (error) {
-    console.error('❌ Error checking favorite:', error);
-    res.status(500).json({ error: 'Failed to check favorite' });
+    console.error('❌ Error removing from favorites:', error);
+    res.status(500).json({ error: 'Failed to remove from favorites' });
   }
 });
 
-// Получение избранных автомобилей
 router.get('/favorites', requireAuth, async (req, res) => {
   try {
     console.log('❤️ Fetching favorites for user:', req.user.id);
@@ -575,7 +561,6 @@ router.get('/favorites', requireAuth, async (req, res) => {
     
     const result = await client.query(query, [req.user.id]);
     
-    // Преобразуем данные для фронтенда
     const favorites = result.rows.map(row => ({
       id: row.id,
       name: row.name,
@@ -593,7 +578,8 @@ router.get('/favorites', requireAuth, async (req, res) => {
       imageUrl: row.imageUrl,
       createdBy: row.owner_id,
       createdByUsername: row.createdByUsername,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      status: 'approved' // Только одобренные автомобили в избранном
     }));
     
     await client.end();
@@ -608,7 +594,6 @@ router.get('/favorites', requireAuth, async (req, res) => {
 });
 
 // === АВТОМОБИЛИ ===
-// Получение всех автомобилей с фильтрацией
 router.get('/cars', async (req, res) => {
   try {
     const { search, category, server } = req.query;
@@ -632,7 +617,7 @@ router.get('/cars', async (req, res) => {
     
     if (search) {
       params.push(`%${search}%`);
-      query += ` AND cl.name ILIKE $${params.length}`;
+      query += ` AND (cl.name ILIKE $${params.length} OR cl.description ILIKE $${params.length})`;
     }
     
     if (category && category !== 'all') {
@@ -649,7 +634,6 @@ router.get('/cars', async (req, res) => {
     
     const result = await client.query(query, params);
     
-    // Преобразуем данные для фронтенда
     const cars = result.rows.map(row => ({
       id: row.id,
       name: row.name,
@@ -666,8 +650,10 @@ router.get('/cars', async (req, res) => {
       discord: row.discord,
       imageUrl: row.imageUrl,
       createdBy: row.owner_id,
+      owner_id: row.owner_id,
       createdByUsername: row.createdByUsername,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      status: 'approved' // Все автомобили в каталоге одобрены
     }));
     
     await client.end();
@@ -681,7 +667,6 @@ router.get('/cars', async (req, res) => {
   }
 });
 
-// Получение автомобилей пользователя
 router.get('/my-cars', requireAuth, async (req, res) => {
   try {
     console.log('🚗 Fetching my cars for user:', req.user.id);
@@ -720,8 +705,10 @@ router.get('/my-cars', requireAuth, async (req, res) => {
       discord: row.discord,
       imageUrl: row.imageUrl,
       createdBy: row.owner_id,
+      owner_id: row.owner_id,
       createdByUsername: row.createdByUsername,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      status: 'approved'
     }));
     
     await client.end();
@@ -735,7 +722,6 @@ router.get('/my-cars', requireAuth, async (req, res) => {
   }
 });
 
-// Редактирование автомобиля (только владелец)
 router.put('/cars/:id', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.id);
@@ -751,7 +737,7 @@ router.put('/cars/:id', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Проверяем права доступа (только владелец или админ/модератор)
+    // Проверяем права доступа
     const checkQuery = `
       SELECT owner_id FROM car_listings WHERE id = $1
     `;
@@ -771,7 +757,6 @@ router.put('/cars/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'You can only edit your own cars' });
     }
     
-    // Обновляем автомобиль
     const {
       name, price, description, category, server, maxSpeed,
       acceleration, drive, isPremium, phone, telegram, discord, imageUrl
@@ -812,7 +797,6 @@ router.put('/cars/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Удаление автомобиля (только владелец)
 router.delete('/cars/:id', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.id);
@@ -848,7 +832,7 @@ router.delete('/cars/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'You can only delete your own cars' });
     }
     
-    // Удаляем автомобиль (связанные сообщения и избранное удалятся автоматически через CASCADE)
+    // Удаляем автомобиль
     const deleteQuery = `
       DELETE FROM car_listings WHERE id = $1
     `;
@@ -862,6 +846,124 @@ router.delete('/cars/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('❌ Error deleting car:', error);
     res.status(500).json({ error: 'Failed to delete car' });
+  }
+});
+
+// === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для админов) ===
+router.get('/users', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('👥 Fetching users for admin:', req.user.username);
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    const query = `
+      SELECT id, username, role, created_at
+      FROM users 
+      ORDER BY created_at DESC
+    `;
+    
+    const result = await client.query(query);
+    await client.end();
+    
+    console.log(`✅ Found ${result.rows.length} users`);
+    res.json(result.rows);
+    
+  } catch (error) {
+    console.error('❌ Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.patch('/users/:id/role', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { role } = req.body;
+    
+    console.log('🔄 Updating user role:', { userId, role, by: req.user.username });
+    
+    if (!['user', 'moderator', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    
+    // Не позволяем изменить роль самому себе
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    const updateQuery = `
+      UPDATE users 
+      SET role = $1 
+      WHERE id = $2 
+      RETURNING id, username, role
+    `;
+    
+    const result = await client.query(updateQuery, [role, userId]);
+    await client.end();
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('✅ User role updated successfully');
+    res.json(result.rows[0]);
+    
+  } catch (error) {
+    console.error('❌ Error updating user role:', error);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+router.delete('/users/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    
+    console.log('🗑️ Deleting user:', { userId, by: req.user.username });
+    
+    // Не позволяем удалить самого себя
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete yourself' });
+    }
+    
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    // Удаляем пользователя (связанные данные удалятся автоматически через CASCADE)
+    const deleteQuery = `
+      DELETE FROM users WHERE id = $1
+    `;
+    const result = await client.query(deleteQuery, [userId]);
+    
+    await client.end();
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('✅ User deleted successfully');
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('❌ Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
