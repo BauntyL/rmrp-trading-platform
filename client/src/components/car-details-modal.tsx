@@ -1,308 +1,173 @@
-import { useState } from "react";
-import { Car } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { Heart, Phone, MessageCircle, Crown } from "lucide-react";
-import { SiTelegram, SiDiscord } from "react-icons/si";
-import { ContactSellerModal } from "./contact-seller-modal";
+import { Phone, MessageCircle, Copy } from "lucide-react";
+
+// Константы для отображения
+const SERVER_NAMES = {
+  arbat: 'Арбат',
+  patriki: 'Патрики', 
+  rublevka: 'Рублёвка',
+  tverskoy: 'Тверской'
+};
+
+const CATEGORY_NAMES = {
+  standard: 'Стандарт',
+  sport: 'Спорт',
+  coupe: 'Купе',
+  suv: 'Внедорожник',
+  service: 'Служебная',
+  motorcycle: 'Мотоцикл'
+};
+
+const DRIVE_TYPE_NAMES = {
+  front: 'Передний',
+  rear: 'Задний',
+  all: 'Полный'
+};
 
 interface CarDetailsModalProps {
-  car: Car;
+  car: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const categoryNames = {
-  standard: "Стандарт",
-  sport: "Спорт", 
-  coupe: "Купе",
-  suv: "Внедорожник",
-  motorcycle: "Мотоцикл",
-};
-
-const serverNames = {
-  arbat: "Арбат",
-  patriki: "Патрики",
-  rublevka: "Рублёвка",
-  tverskoy: "Тверской",
-};
-
-const categoryColors = {
-  standard: "bg-gray-500 text-gray-100",
-  sport: "bg-red-500 text-red-100",
-  coupe: "bg-purple-500 text-purple-100",
-  suv: "bg-green-500 text-green-100",
-  motorcycle: "bg-orange-500 text-orange-100",
-};
-
-const serverColors = {
-  arbat: "bg-blue-500 text-blue-100",
-  patriki: "bg-green-500 text-green-100",
-  rublevka: "bg-purple-500 text-purple-100",
-  tverskoy: "bg-yellow-500 text-yellow-900",
-};
-
 export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProps) {
-  const [contactModalOpen, setContactModalOpen] = useState(false);
-  const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: favoriteCheck } = useQuery({
-    queryKey: ["/api/favorites/check", car.id],
-    enabled: open,
-  });
-
-  const toggleFavoriteMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/favorites/toggle/${car.id}`, {});
-      return await response.json();
-    },
-    onSuccess: (result) => {
-      queryClient.setQueryData(["/api/favorites/check", car.id], { isFavorite: result.isFavorite });
-      queryClient.removeQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites/check"] });
-      
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
       toast({
-        title: result.action === "added" ? "Добавлено в избранное" : "Удалено из избранного",
-        description: result.action === "added" 
-          ? `${car.name} добавлен в избранное`
-          : `${car.name} удален из избранного`,
+        title: "Скопировано!",
+        description: `${label} скопирован в буфер обмена`,
       });
-    },
-    onError: () => {
+    }).catch(() => {
       toast({
         title: "Ошибка",
-        description: "Не удалось обновить избранное",
+        description: "Не удалось скопировать в буфер обмена",
         variant: "destructive",
       });
-    },
-  });
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 0,
-    }).format(price);
+    });
   };
 
-  const getImageUrl = (imageUrl?: string | null) => {
-    if (imageUrl) return imageUrl;
-    
-    const defaultImages = {
-      standard: "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?w=600&h=400&fit=crop",
-      sport: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&h=400&fit=crop",
-      coupe: "https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&h=400&fit=crop",
-      suv: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=600&h=400&fit=crop",
-      motorcycle: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop",
-    };
-    
-    return defaultImages[car.category];
-  };
-
-  const handleContactClick = (type: "phone" | "telegram" | "discord", value: string) => {
-    switch (type) {
-      case "phone":
-        navigator.clipboard.writeText(value);
-        toast({
-          title: "Телефон скопирован",
-          description: `${value} скопирован в буфер обмена`,
-        });
-        break;
-      case "telegram":
-        window.open(`https://t.me/${value.replace('@', '')}`, '_blank');
-        break;
-      case "discord":
-        navigator.clipboard.writeText(value);
-        toast({
-          title: "Discord скопирован",
-          description: `${value} скопирован в буфер обмена`,
-        });
-        break;
-    }
-  };
+  if (!car) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-800 border-slate-700">
+      <DialogContent className="max-w-2xl bg-slate-800 border-slate-700 text-white">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <DialogTitle className="text-2xl font-bold text-white">{car.name}</DialogTitle>
-              {car.isPremium && (
-                <Badge className="bg-amber-500 text-amber-900 hover:bg-amber-500">
-                  <Crown className="h-3 w-3 mr-1" />
-                  Премиум
-                </Badge>
-              )}
-            </div>
-            
-            {/* Кнопка "В избранное" в заголовке */}
-            <Button 
-              variant="secondary"
-              className="bg-slate-700 hover:bg-slate-600"
-              onClick={() => toggleFavoriteMutation.mutate()}
-              disabled={toggleFavoriteMutation.isPending}
-            >
-              <Heart 
-                className={`h-4 w-4 mr-2 ${
-                  favoriteCheck?.isFavorite ? "fill-current text-red-500" : ""
-                }`} 
-              />
-              {favoriteCheck?.isFavorite ? "Убрать из избранного" : "В избранное"}
-            </Button>
-          </div>
+          <DialogTitle className="text-xl text-white">{car.name}</DialogTitle>
         </DialogHeader>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Car Image */}
-          <div>
-            <img 
-              src={getImageUrl(car.imageUrl)} 
-              alt={car.name}
-              className="w-full h-80 object-cover rounded-xl shadow-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&h=400&fit=crop";
-              }}
-            />
+        
+        <div className="space-y-6">
+          {/* Изображение */}
+          <div className="relative">
+            <div className="aspect-video bg-slate-700 rounded-lg overflow-hidden">
+              <img
+                src={car.imageUrl || 'https://via.placeholder.com/600x400?text=Нет+фото'}
+                alt={car.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://via.placeholder.com/600x400?text=Нет+фото';
+                }}
+              />
+            </div>
             
-            {/* Contact Information */}
-            <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
-              <h4 className="font-semibold text-white mb-3">Контактная информация</h4>
-              <div className="space-y-3">
-                {car.phone && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="h-5 w-5 text-green-400" />
-                    <button 
-                      onClick={() => handleContactClick("phone", car.phone!)}
-                      className="text-slate-300 hover:text-white transition-colors"
-                    >
-                      {car.phone}
-                    </button>
-                  </div>
-                )}
-                {car.telegram && (
-                  <div className="flex items-center space-x-3">
-                    <SiTelegram className="h-5 w-5 text-blue-400" />
-                    <button 
-                      onClick={() => handleContactClick("telegram", car.telegram!)}
-                      className="text-slate-300 hover:text-white transition-colors"
-                    >
-                      {car.telegram}
-                    </button>
-                  </div>
-                )}
-                {car.discord && (
-                  <div className="flex items-center space-x-3">
-                    <SiDiscord className="h-5 w-5 text-purple-400" />
-                    <button 
-                      onClick={() => handleContactClick("discord", car.discord!)}
-                      className="text-slate-300 hover:text-white transition-colors"
-                    >
-                      {car.discord}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Car Details */}
-          <div>
-            {/* Car Title and Badges */}
-            <div className="mb-4">
-              <div className="flex flex-wrap gap-2 mb-4">
-                <Badge className={`${categoryColors[car.category]}`}>
-                  {categoryNames[car.category]}
-                </Badge>
-                <Badge className={`${serverColors[car.server]}`}>
-                  {serverNames[car.server]}
-                </Badge>
-              </div>
-              <div className="text-3xl font-bold text-emerald-400 mb-4">
-                {formatPrice(car.price)}
-              </div>
-            </div>
-
-            {/* Specifications */}
-            <div className="space-y-4 mb-6">
-              <h4 className="font-semibold text-white">Характеристики</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-700 p-3 rounded-lg">
-                  <p className="text-slate-400 text-sm">Максимальная скорость</p>
-                  <p className="text-white font-semibold">{car.maxSpeed} км/ч</p>
-                </div>
-                <div className="bg-slate-700 p-3 rounded-lg">
-                  <p className="text-slate-400 text-sm">Разгон до 100 км/ч</p>
-                  <p className="text-white font-semibold">{car.acceleration}</p>
-                </div>
-                <div className="bg-slate-700 p-3 rounded-lg">
-                  <p className="text-slate-400 text-sm">Тип привода</p>
-                  <p className="text-white font-semibold">{car.drive}</p>
-                </div>
-                <div className="bg-slate-700 p-3 rounded-lg">
-                  <p className="text-slate-400 text-sm">Сервер</p>
-                  <p className="text-white font-semibold">{serverNames[car.server]}</p>
-                </div>
-                {car.serverId && (
-                  <div className="bg-slate-700 p-3 rounded-lg col-span-2">
-                    <p className="text-slate-400 text-sm">ID на сервере</p>
-                    <p className="text-white font-semibold">{car.serverId}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Description */}
-            {car.description && (
-              <div className="mb-6">
-                <h4 className="font-medium text-white mb-2">Описание</h4>
-                <p className="text-slate-300 leading-relaxed">{car.description}</p>
-              </div>
+            {/* Статус */}
+            {car.status === 'pending' && (
+              <Badge className="absolute top-3 left-3 bg-yellow-500 text-black">
+                На модерации
+              </Badge>
             )}
+          </div>
 
-            {/* Action Buttons */}
-            <div className="flex space-x-3">
-              {car.phone && (
-                <Button 
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                  onClick={() => handleContactClick("phone", car.phone!)}
-                >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Скопировать телефон
-                </Button>
-              )}
+          {/* Основная информация */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-emerald-400">Основные характеристики</h3>
               
-              {/* Contact Seller Button - только если это не собственный автомобиль */}
-              {user && user.id !== car.createdBy && (
-                <Button 
-                  variant="outline"
-                  className="flex-1 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                  onClick={() => setContactModalOpen(true)}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Написать продавцу
-                </Button>
-              )}
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between py-2 border-b border-slate-700">
+                  <span className="text-slate-400">Цена:</span>
+                  <span className="text-emerald-400 font-semibold text-lg">
+                    {car.price ? `${car.price.toLocaleString('ru-RU')} ₽` : 'Цена не указана'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b border-slate-700">
+                  <span className="text-slate-400">Сервер:</span>
+                  <span className="text-white font-medium">
+                    {SERVER_NAMES[car.server] || car.server || 'Не указано'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b border-slate-700">
+                  <span className="text-slate-400">Категория:</span>
+                  <span className="text-white font-medium">
+                    {CATEGORY_NAMES[car.category] || car.category || 'Не указано'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b border-slate-700">
+                  <span className="text-slate-400">Привод:</span>
+                  <span className="text-white font-medium">
+                    {DRIVE_TYPE_NAMES[car.driveType] || car.driveType || 'Не указано'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-2 border-b border-slate-700">
+                  <span className="text-slate-400">ID сервера:</span>
+                  <span className="text-white font-medium">{car.serverId || 'Не указано'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-blue-400">Контактная информация</h3>
+              
+              <div className="space-y-3">
+                {car.contactInfo && (
+                  <div className="space-y-2">
+                    <span className="text-slate-400 text-sm">Контакты:</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-white bg-slate-700 px-3 py-2 rounded flex-1">
+                        {car.contactInfo}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(car.contactInfo, "Контакт")}
+                        className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex space-x-2">
+                  <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Написать сообщение
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Описание */}
+          {car.description && (
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-slate-300">Описание</h3>
+              <div className="bg-slate-700 p-4 rounded-lg">
+                <p className="text-slate-300 whitespace-pre-wrap">{car.description}</p>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
-      
-      {/* Contact Seller Modal */}
-      <ContactSellerModal 
-        car={car}
-        open={contactModalOpen}
-        onOpenChange={setContactModalOpen}
-      />
     </Dialog>
   );
 }
