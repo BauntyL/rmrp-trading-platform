@@ -318,7 +318,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
           {/* Дата создания */}
           <div className="flex items-center text-xs text-slate-500 mb-4">
             <Calendar className="h-3 w-3 mr-1" />
-            <span>Добавлено: {formatDate(car.createdAt)}</span>
+            <span>Добавлено: {formatDate(car.createdAt || car.created_at)}</span>
           </div>
         </CardContent>
 
@@ -405,7 +405,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
                   size="sm"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  {user?.role === 'admin' || user?.role === 'moderator' ? 'Удалить' : 'Удалить'}
+                  Удалить
                 </Button>
               )}
             </div>
