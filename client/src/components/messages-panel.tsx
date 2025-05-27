@@ -66,14 +66,6 @@ export function MessagesPanel() {
     });
   };
 
-  const handleChatSelect = (chat: any) => {
-    setSelectedChat(chat);
-  };
-
-  const handleBackToChats = () => {
-    setSelectedChat(null);
-  };
-
   if (isChatsLoading) {
     return (
       <div className="space-y-6">
@@ -113,7 +105,7 @@ export function MessagesPanel() {
         {selectedChat && (
           <Button
             variant="outline"
-            onClick={handleBackToChats}
+            onClick={() => setSelectedChat(null)}
             className="md:hidden bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -149,7 +141,7 @@ export function MessagesPanel() {
                   {chats.map((chat: any) => (
                     <button
                       key={chat.id}
-                      onClick={() => handleChatSelect(chat)}
+                      onClick={() => setSelectedChat(chat)}
                       className={`w-full p-4 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${
                         selectedChat?.id === chat.id ? 'bg-slate-700' : ''
                       }`}
@@ -263,7 +255,7 @@ export function MessagesPanel() {
                               message.senderId === selectedChat.buyerId
                                 ? 'bg-emerald-600 text-white'
                                 : 'bg-slate-700 text-white'
-                            } ${message.isTemporary ? 'opacity-60' : ''}`}
+                            }`}
                           >
                             <p className="text-sm break-words">{message.content}</p>
                             <p className={`text-xs mt-1 ${
@@ -272,7 +264,6 @@ export function MessagesPanel() {
                                 : 'text-slate-400'
                             }`}>
                               {formatTime(message.createdAt)}
-                              {message.isTemporary && ' • Отправляется...'}
                             </p>
                           </div>
                         </div>
@@ -282,16 +273,15 @@ export function MessagesPanel() {
                   )}
                 </ScrollArea>
 
-                {/* Форма отправки сообщения */}
-                <div className="border-t border-slate-700 p-4">
+                {/* Форма отправки */}
+                <div className="p-4 border-t border-slate-700">
                   <form onSubmit={handleSendMessage} className="flex space-x-2">
                     <Input
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
-                      placeholder="Напишите сообщение..."
-                      className="flex-1 bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      disabled={sendMessageMutation.isPending}
+                      placeholder="Введите сообщение..."
                       maxLength={500}
+                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
                     />
                     <Button
                       type="submit"
