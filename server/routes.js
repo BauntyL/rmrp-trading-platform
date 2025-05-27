@@ -35,7 +35,7 @@ function requireRole(roles) {
 }
 
 // Аутентификация
-router.post('/login', async (req, res) => {
+router.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     console.log('🔑 Login attempt for:', username);
@@ -88,7 +88,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.post('/register', async (req, res) => {
+router.post('/api/register', async (req, res) => {
   try {
     const { username, password } = req.body;
     console.log('📝 Registration attempt for:', username);
@@ -125,7 +125,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/logout', (req, res) => {
+router.post('/api/logout', (req, res) => {
   const username = req.session?.user?.username || 'Unknown';
   req.session.destroy((err) => {
     if (err) {
@@ -137,7 +137,7 @@ router.post('/logout', (req, res) => {
   });
 });
 
-router.get('/user', (req, res) => {
+router.get('/api/user', (req, res) => {
   console.log('👤 User info requested');
   
   if (req.session && req.session.user) {
@@ -159,7 +159,7 @@ router.get('/user', (req, res) => {
 // === АВТОМОБИЛИ (CARS) ===
 
 // Получение всех автомобилей
-router.get('/cars', async (req, res) => {
+router.get('/api/cars', async (req, res) => {
   try {
     console.log('🚗 Fetching all cars');
     
@@ -170,6 +170,25 @@ router.get('/cars', async (req, res) => {
     });
     
     await client.connect();
+    
+    // Создаем таблицу cars если её нет
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cars (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        server TEXT NOT NULL,
+        category TEXT NOT NULL,
+        "driveType" TEXT,
+        "serverId" TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        description TEXT NOT NULL,
+        "imageUrl" TEXT,
+        "contactInfo" TEXT NOT NULL,
+        "userId" INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'pending',
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )
+    `);
     
     const query = `
       SELECT 
@@ -188,12 +207,12 @@ router.get('/cars', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error fetching cars:', error);
-    res.status(500).json({ error: 'Failed to fetch cars' });
+    res.status(500).json({ error: 'Failed to fetch cars', details: error.message });
   }
 });
 
 // Добавление автомобиля
-router.post('/cars', requireAuth, async (req, res) => {
+router.post('/api/cars', requireAuth, async (req, res) => {
   try {
     const { 
       name, 
@@ -209,6 +228,11 @@ router.post('/cars', requireAuth, async (req, res) => {
 
     console.log('🚗 Adding car for user:', req.user.username);
     console.log('📋 Car data:', req.body);
+
+    // Валидация обязательных полей
+    if (!name || !server || !category || !serverId || !price || !description || !contactInfo) {
+      return res.status(400).json({ error: 'Все обязательные поля должны быть заполнены' });
+    }
 
     const { Client } = require('pg');
     const client = new Client({
@@ -248,9 +272,17 @@ router.post('/cars', requireAuth, async (req, res) => {
     `;
     
     const result = await client.query(insertQuery, [
-      name, server, category, driveType, serverId,
-      parseInt(price), description, imageUrl, contactInfo,
-      req.user.id, 'pending'
+      name, 
+      server, 
+      category, 
+      driveType || null, 
+      serverId,
+      parseInt(price), 
+      description, 
+      imageUrl || null, 
+      contactInfo,
+      req.user.id, 
+      'pending'
     ]);
     
     await client.end();
@@ -260,12 +292,15 @@ router.post('/cars', requireAuth, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error adding car:', error);
-    res.status(500).json({ error: 'Ошибка при добавлении автомобиля' });
+    res.status(500).json({ 
+      error: 'Ошибка при добавлении автомобиля', 
+      details: error.message 
+    });
   }
 });
 
 // Получение автомобилей пользователя
-router.get('/cars/my', requireAuth, async (req, res) => {
+router.get('/api/cars/my', requireAuth, async (req, res) => {
   try {
     console.log('🚗 Fetching cars for user:', req.user.username);
     
@@ -276,6 +311,25 @@ router.get('/cars/my', requireAuth, async (req, res) => {
     });
     
     await client.connect();
+    
+    // Создаем таблицу cars если её нет
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cars (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        server TEXT NOT NULL,
+        category TEXT NOT NULL,
+        "driveType" TEXT,
+        "serverId" TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        description TEXT NOT NULL,
+        "imageUrl" TEXT,
+        "contactInfo" TEXT NOT NULL,
+        "userId" INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'pending',
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )
+    `);
     
     const query = `
       SELECT * FROM cars 
@@ -291,12 +345,12 @@ router.get('/cars/my', requireAuth, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error fetching user cars:', error);
-    res.status(500).json({ error: 'Failed to fetch user cars' });
+    res.status(500).json({ error: 'Failed to fetch user cars', details: error.message });
   }
 });
 
 // Модерация автомобиля
-router.patch('/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.patch('/api/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { action } = req.body; // 'approve' или 'reject'
@@ -332,12 +386,12 @@ router.patch('/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin
     
   } catch (error) {
     console.error('❌ Error moderating car:', error);
-    res.status(500).json({ error: "Ошибка при модерации автомобиля" });
+    res.status(500).json({ error: "Ошибка при модерации автомобиля", details: error.message });
   }
 });
 
 // Получение избранного (заглушка)
-router.get('/favorites', requireAuth, async (req, res) => {
+router.get('/api/favorites', requireAuth, async (req, res) => {
   try {
     console.log('❤️ Fetching favorites for user:', req.user.username);
     // Пока возвращаем пустой массив
@@ -348,8 +402,36 @@ router.get('/favorites', requireAuth, async (req, res) => {
   }
 });
 
+// Получение количества непрочитанных сообщений
+router.get('/api/unread-count', requireAuth, async (req, res) => {
+  try {
+    const { Client } = require('pg');
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    
+    await client.connect();
+    
+    const query = `
+      SELECT COUNT(*) as count 
+      FROM messages 
+      WHERE "receiverId" = $1 AND "isRead" = false
+    `;
+    
+    const result = await client.query(query, [req.user.id]);
+    await client.end();
+    
+    res.json({ count: parseInt(result.rows[0].count) });
+    
+  } catch (error) {
+    console.error('❌ Error fetching unread count:', error);
+    res.json({ count: 0 }); // Возвращаем 0 при ошибке
+  }
+});
+
 // Заявки
-router.post('/applications', requireAuth, async (req, res) => {
+router.post('/api/applications', requireAuth, async (req, res) => {
   try {
     console.log('📝 Creating application for user:', req.user.username);
     console.log('📋 RAW request body:', req.body);
@@ -376,7 +458,7 @@ router.post('/applications', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/applications/pending', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.get('/api/applications/pending', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📋 Fetching pending applications for:', req.user.username);
     const applications = await storage.getApplications();
@@ -390,7 +472,7 @@ router.get('/applications/pending', requireAuth, requireRole(['moderator', 'admi
   }
 });
 
-router.get('/my-applications', requireAuth, async (req, res) => {
+router.get('/api/my-applications', requireAuth, async (req, res) => {
   try {
     console.log('📋 Fetching applications for user:', req.user.username);
     const applications = await storage.getUserApplications(req.user.id);
@@ -404,7 +486,7 @@ router.get('/my-applications', requireAuth, async (req, res) => {
 });
 
 // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ И ИЗОБРАЖЕНИЕМ
-router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.patch('/api/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -460,7 +542,7 @@ router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 
 
 // === ИСПРАВЛЕННЫЕ СООБЩЕНИЯ ===
 // Получение всех сообщений пользователя
-router.get('/messages', requireAuth, async (req, res) => {
+router.get('/api/messages', requireAuth, async (req, res) => {
   try {
     console.log('📨 Fetching messages for user:', req.user.id);
     
@@ -523,12 +605,12 @@ router.get('/messages', requireAuth, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error fetching messages:', error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
+    res.json([]); // Возвращаем пустой массив при ошибке
   }
 });
 
 // Отправка сообщения
-router.post('/messages', requireAuth, async (req, res) => {
+router.post('/api/messages', requireAuth, async (req, res) => {
   try {
     const { carId, sellerId, message } = req.body;
     console.log('📤 Sending message:', { carId, sellerId, message, fromUser: req.user.id });
@@ -581,7 +663,7 @@ router.post('/messages', requireAuth, async (req, res) => {
 });
 
 // Отметка сообщения как прочитанного
-router.patch('/messages/:id/read', requireAuth, async (req, res) => {
+router.patch('/api/messages/:id/read', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -608,34 +690,6 @@ router.patch('/messages/:id/read', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('❌ Error marking message as read:', error);
     res.status(500).json({ error: 'Failed to mark message as read' });
-  }
-});
-
-// Получение количества непрочитанных сообщений
-router.get('/unread-count', requireAuth, async (req, res) => {
-  try {
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const query = `
-      SELECT COUNT(*) as count 
-      FROM messages 
-      WHERE "receiverId" = $1 AND "isRead" = false
-    `;
-    
-    const result = await client.query(query, [req.user.id]);
-    await client.end();
-    
-    res.json({ count: parseInt(result.rows[0].count) });
-    
-  } catch (error) {
-    console.error('❌ Error fetching unread count:', error);
-    res.status(500).json({ error: 'Failed to fetch unread count' });
   }
 });
 
