@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Car } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { MessageCircle, Send } from "lucide-react";
 
 interface ContactSellerModalProps {
-  car: Car | null;
+  car: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -28,41 +27,32 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { carId: number; sellerId: number; message: string }) => {
-      try {
-        console.log('📤 Отправка сообщения через contact modal:', data);
-        
-        const response = await fetch('/api/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            carId: data.carId,
-            sellerId: data.sellerId,
-            message: data.message
-          }),
-        });
-        
-        console.log('📨 Статус ответа:', response.status);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Ошибка отправки сообщения');
-        }
-
-        const result = await response.json();
-        console.log('✅ Сообщение отправлено успешно:', result);
-        return result;
-      } catch (error) {
-        console.error("❌ Ошибка отправки сообщения:", error);
-        throw error;
+      console.log('📤 Отправка сообщения через contact modal:', data);
+      
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          carId: data.carId,
+          sellerId: data.sellerId,
+          message: data.message
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка отправки сообщения');
       }
+
+      return response.json();
     },
     onSuccess: () => {
       // Обновляем все связанные кеши
-      queryClient.removeQueries({ queryKey: ["/api/messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/chats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
       
       toast({
@@ -75,19 +65,19 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
     onError: (error: any) => {
       const errorMessage = error.message || "Не удалось отправить сообщение";
       
-      if (errorMessage.includes("заблокировано") || errorMessage.includes("запрещенные слова")) {
+      if (errorMessage.includes("prohibited") || errorMessage.includes("запрещенные")) {
         toast({
           title: "🚫 Сообщение заблокировано",
-          description: errorMessage,
+          description: "Сообщение содержит запрещенные слова или ссылки",
           variant: "destructive",
         });
-      } else if (errorMessage.includes("Authentication required") || errorMessage.includes("авторизац")) {
+      } else if (errorMessage.includes("Authentication") || errorMessage.includes("авторизац")) {
         toast({
           title: "Ошибка авторизации",
           description: "Необходимо войти в систему для отправки сообщений",
           variant: "destructive",
         });
-      } else if (errorMessage.includes("слишком длинное")) {
+      } else if (errorMessage.includes("too long")) {
         toast({
           title: "Сообщение слишком длинное",
           description: "Максимальная длина сообщения 500 символов",
@@ -107,7 +97,6 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
     e.preventDefault();
     if (!car || !message.trim()) return;
     
-    // Проверяем длину сообщения
     if (message.length > 500) {
       toast({
         title: "Сообщение слишком длинное",
@@ -117,24 +106,9 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
       return;
     }
     
-    // Простая проверка на запрещенные слова
-    const bannedWords = ['http', 'https', 'www', '.com', '.ru', 'telegram', '@', 'discord'];
-    const containsBanned = bannedWords.some(word => 
-      message.toLowerCase().includes(word.toLowerCase())
-    );
-    
-    if (containsBanned) {
-      toast({
-        title: "🚫 Запрещенные слова",
-        description: "Сообщение содержит запрещенные слова или ссылки",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     sendMessageMutation.mutate({
       carId: car.id,
-      sellerId: car.createdBy,
+      sellerId: car.owner_id || car.createdBy,
       message: message.trim(),
     });
   };
@@ -146,7 +120,6 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
     }
   };
 
-  // Сброс формы при закрытии
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setMessage("");
@@ -179,7 +152,7 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
               onChange={handleMessageChange}
               rows={5}
               required
-              className="resize-none bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-primary"
+              className="resize-none bg-slate-700 border-slate-600 text-white placeholder-slate-400"
             />
             <div className="flex justify-between items-center">
               <p className="text-xs text-slate-500">
@@ -192,9 +165,9 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
               )}
             </div>
             
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mt-2">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                ⚠️ <strong>Правила общения:</strong> Запрещены мат, политика, межнациональная рознь, ссылки и контакты. Максимум 500 символов.
+            <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-3 mt-2">
+              <p className="text-sm text-amber-200">
+                ⚠️ <strong>Правила общения:</strong> Запрещены ссылки, контакты, мат и оскорбления. Максимум 500 символов.
               </p>
             </div>
           </div>
@@ -211,7 +184,7 @@ export function ContactSellerModal({ car, open, onOpenChange }: ContactSellerMod
             <Button 
               type="submit" 
               disabled={!message.trim() || sendMessageMutation.isPending || message.length > 500}
-              className="gap-2 bg-primary hover:bg-primary/90"
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700"
             >
               {sendMessageMutation.isPending ? (
                 <>
