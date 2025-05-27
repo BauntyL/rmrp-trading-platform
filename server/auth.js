@@ -1,6 +1,6 @@
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcrypt');
-const storage = require('./storage');
+const storage = require('./storage-fixed');  // ← ИСПРАВЛЕННЫЙ ИМПОРТ
 
 function setupAuth(passport) {
   // Local Strategy
@@ -49,7 +49,7 @@ function setupAuth(passport) {
   passport.deserializeUser(async (id, done) => {
     try {
       console.log(`🔧 Deserializing user ID: ${id}`);
-      const user = await storage.getUserById(id);
+      const user = await storage.getUserById(id);  // ← ТЕПЕРЬ ФУНКЦИЯ СУЩЕСТВУЕТ
       console.log(`✅ User deserialized: ${user?.username || 'not found'}`);
       done(null, user);
     } catch (error) {
