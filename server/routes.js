@@ -254,35 +254,27 @@ router.post('/cars', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Удаляем старую таблицу и создаем новую с правильной структурой
-    try {
-      await client.query('DROP TABLE IF EXISTS cars CASCADE');
-      console.log('🗑️ Dropped old cars table');
-      
-      await client.query(`
-        CREATE TABLE cars (
-          id SERIAL PRIMARY KEY,
-          name TEXT NOT NULL,
-          server TEXT NOT NULL,
-          category TEXT NOT NULL,
-          drive_type TEXT,
-          server_id TEXT NOT NULL,
-          price INTEGER NOT NULL,
-          description TEXT NOT NULL,
-          image_url TEXT,
-          contact_info TEXT NOT NULL,
-          user_id INTEGER REFERENCES users(id),
-          status TEXT DEFAULT 'pending',
-          created_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      console.log('✅ Created new cars table with correct structure');
-      
-    } catch (tableError) {
-      console.error('❌ Error managing table:', tableError);
-      // Если не удалось пересоздать таблицу, попробуем работать со старой
-    }
+    // ТОЛЬКО создаем таблицу если её нет - НЕ УДАЛЯЕМ существующую
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cars (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        server TEXT NOT NULL,
+        category TEXT NOT NULL,
+        drive_type TEXT,
+        server_id TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        description TEXT NOT NULL,
+        image_url TEXT,
+        contact_info TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Ensured cars table exists');
     
+    // ПРОСТО добавляем новую запись
     const insertQuery = `
       INSERT INTO cars (
         name, server, category, drive_type, server_id, 
