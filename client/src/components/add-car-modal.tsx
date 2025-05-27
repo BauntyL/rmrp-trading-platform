@@ -15,15 +15,15 @@ interface AddCarModalProps {
 
 export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
   const [formData, setFormData] = useState({
-    brand: "",
-    model: "",
+    name: "",
     server: "",
     category: "",
     driveType: "",
     serverId: "",
     price: "",
     description: "",
-    imageUrl: ""
+    imageUrl: "",
+    contactInfo: ""
   });
 
   const { toast } = useToast();
@@ -48,15 +48,15 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         description: "Ваш автомобиль отправлен на модерацию.",
       });
       setFormData({
-        brand: "",
-        model: "",
+        name: "",
         server: "",
         category: "",
         driveType: "",
         serverId: "",
         price: "",
         description: "",
-        imageUrl: ""
+        imageUrl: "",
+        contactInfo: ""
       });
       onOpenChange(false);
     },
@@ -86,29 +86,16 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="brand" className="text-white">Марка</Label>
-              <Input
-                id="brand"
-                value={formData.brand}
-                onChange={(e) => handleInputChange("brand", e.target.value)}
-                placeholder="BMW, Mercedes, Audi..."
-                className="bg-slate-700 border-slate-600 text-white"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="model" className="text-white">Модель</Label>
-              <Input
-                id="model"
-                value={formData.model}
-                onChange={(e) => handleInputChange("model", e.target.value)}
-                placeholder="X5, E-Class, A6..."
-                className="bg-slate-700 border-slate-600 text-white"
-                required
-              />
-            </div>
+          <div>
+            <Label htmlFor="name" className="text-white">Название</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleInputChange("name", e.target.value)}
+              placeholder="BMW X5, Mercedes E-Class, Audi A6..."
+              className="bg-slate-700 border-slate-600 text-white"
+              required
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -193,6 +180,18 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
               onChange={(e) => handleInputChange("imageUrl", e.target.value)}
               placeholder="https://example.com/car-image.jpg"
               className="bg-slate-700 border-slate-600 text-white"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="contactInfo" className="text-white">Контактная информация</Label>
+            <Input
+              id="contactInfo"
+              value={formData.contactInfo}
+              onChange={(e) => handleInputChange("contactInfo", e.target.value)}
+              placeholder="Телефон, Telegram, Discord..."
+              className="bg-slate-700 border-slate-600 text-white"
+              required
             />
           </div>
 
