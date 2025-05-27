@@ -614,18 +614,41 @@ app.post('/api/messages', (req, res) => {
   }
 });
 
-// ✅ ВРЕМЕННЫЙ ПУСТОЙ ENDPOINT ДЛЯ ДИАГНОСТИКИ
+// ✅ ВОССТАНОВЛЕННЫЕ СООБЩЕНИЯ С ПРАВИЛЬНЫМИ ДАННЫМИ
 app.get('/api/messages', (req, res) => {
   try {
-    console.log('💬 GET /api/messages - ДИАГНОСТИКА');
+    console.log('💬 GET /api/messages');
     
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Возвращаем пустой массив для тестирования
-    console.log('✅ Returning empty array for testing');
-    res.json([]);
+    const userMessages = messages.filter(m => 
+      m.senderId === req.session.userId || m.receiverId === req.session.userId
+    );
+
+    // Очищаем и проверяем данные перед отправкой
+    const cleanMessages = userMessages.map(msg => {
+      const sender = users.find(u => u.id === msg.senderId);
+      const receiver = users.find(u => u.id === msg.receiverId);
+      const car = msg.carId ? cars.find(c => c.id === msg.carId) : null;
+
+      return {
+        id: Number(msg.id),
+        senderId: Number(msg.senderId),
+        receiverId: Number(msg.receiverId),
+        carId: msg.carId ? Number(msg.carId) : null,
+        content: String(msg.content || ''),
+        isRead: Boolean(msg.isRead),
+        createdAt: String(msg.createdAt || new Date().toISOString()),
+        senderName: sender ? String(sender.username) : 'Пользователь',
+        receiverName: receiver ? String(receiver.username) : 'Пользователь',
+        carName: car ? String(car.name) : null
+      };
+    }).filter(msg => msg.content && msg.createdAt); // Фильтруем только валидные сообщения
+
+    console.log(`💬 Returning ${cleanMessages.length} clean messages`);
+    res.json(cleanMessages);
 
   } catch (error) {
     console.error('❌ Get messages error:', error);
@@ -633,18 +656,66 @@ app.get('/api/messages', (req, res) => {
   }
 });
 
-// ✅ ВРЕМЕННЫЙ ПУСТОЙ ENDPOINT ДЛЯ ЧАТОВ
+// ✅ ВОССТАНОВЛЕННЫЕ ЧАТЫ
 app.get('/api/messages/chats', (req, res) => {
   try {
-    console.log('💬 GET /api/messages/chats - ДИАГНОСТИКА');
+    console.log('💬 GET /api/messages/chats');
     
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Возвращаем пустой массив для тестирования
-    console.log('✅ Returning empty chats array for testing');
-    res.json([]);
+    const userMessages = messages.filter(m => 
+      m.senderId === req.session.userId || m.receiverId === req.session.userId
+    );
+
+    const chats = {};
+    
+    userMessages.forEach(msg => {
+      if (!msg.content || !msg.createdAt) return; // Пропускаем невалидные сообщения
+      
+      const otherUserId = msg.senderId === req.session.userId ? msg.receiverId : msg.senderId;
+      const chatKey = `${Math.min(req.session.userId, otherUserId)}-${Math.max(req.session.userId, otherUserId)}`;
+      
+      if (!chats[chatKey]) {
+        const otherUser = users.find(u => u.id === otherUserId);
+        chats[chatKey] = {
+          id: String(chatKey),
+          otherUserId: Number(otherUserId),
+          otherUserName: otherUser ? String(otherUser.username) : 'Пользователь',
+          messages: [],
+          lastMessage: null,
+          unreadCount: 0
+        };
+      }
+      
+      const cleanMessage = {
+        id: Number(msg.id),
+        senderId: Number(msg.senderId),
+        receiverId: Number(msg.receiverId),
+        carId: msg.carId ? Number(msg.carId) : null,
+        content: String(msg.content),
+        isRead: Boolean(msg.isRead),
+        createdAt: String(msg.createdAt)
+      };
+      
+      chats[chatKey].messages.push(cleanMessage);
+      
+      if (!chats[chatKey].lastMessage || new Date(msg.createdAt) > new Date(chats[chatKey].lastMessage.createdAt)) {
+        chats[chatKey].lastMessage = cleanMessage;
+      }
+      
+      if (!msg.isRead && msg.receiverId === req.session.userId) {
+        chats[chatKey].unreadCount++;
+      }
+    });
+
+    const chatsList = Object.values(chats).sort((a, b) => 
+      new Date(b.lastMessage?.createdAt || 0) - new Date(a.lastMessage?.createdAt || 0)
+    );
+
+    console.log(`💬 Returning ${chatsList.length} chats`);
+    res.json(chatsList);
 
   } catch (error) {
     console.error('❌ Get chats error:', error);
@@ -652,18 +723,21 @@ app.get('/api/messages/chats', (req, res) => {
   }
 });
 
-// ✅ ВРЕМЕННЫЙ ENDPOINT ДЛЯ ПОДСЧЕТА
+// ✅ ВОССТАНОВЛЕННЫЙ ПОДСЧЕТ
 app.get('/api/messages/unread-count', (req, res) => {
   try {
-    console.log('📬 GET /api/messages/unread-count - ДИАГНОСТИКА');
+    console.log('📬 GET /api/messages/unread-count');
     
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Возвращаем 0 для тестирования
-    console.log('✅ Returning 0 unread count for testing');
-    res.json({ count: 0 });
+    const unreadCount = messages.filter(m => 
+      m.receiverId === req.session.userId && !m.isRead && m.content
+    ).length;
+
+    console.log(`📬 User ${req.session.userId} has ${unreadCount} unread messages`);
+    res.json({ count: Number(unreadCount) });
 
   } catch (error) {
     console.error('❌ Get unread count error:', error);
