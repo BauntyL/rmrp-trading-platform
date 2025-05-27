@@ -197,6 +197,8 @@ async function createApplication(applicationData) {
   try {
     await client.connect();
     
+    console.log('📝 Creating application with data:', applicationData);
+    
     const query = `
       INSERT INTO applications (
         name, price, description, category, server, "maxSpeed", 
@@ -213,22 +215,43 @@ async function createApplication(applicationData) {
       applicationData.description,
       applicationData.category,
       applicationData.server,
-      applicationData.maxSpeed,
-      applicationData.acceleration,
-      applicationData.drive,
+      applicationData.maxSpeed || 0,
+      applicationData.acceleration || 'Не указано',
+      applicationData.drive || 'Не указано',
       applicationData.isPremium || false,
-      applicationData.phone,
-      applicationData.telegram,
-      applicationData.discord,
-      applicationData.imageUrl,
+      applicationData.phone || '',
+      applicationData.telegram || '',
+      applicationData.discord || '',
+      applicationData.imageUrl || 'https://via.placeholder.com/400x300?text=Нет+фото',
       applicationData.createdBy,
       applicationData.status || 'pending'
     ];
     
+    console.log('📋 Executing query with values:', values);
+    
     const result = await client.query(query, values);
+    
+    console.log('✅ Application created successfully:', result.rows[0]);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Error creating application:', error);
+    console.error('❌ Query values were:', [
+      applicationData.name,
+      applicationData.price,
+      applicationData.description,
+      applicationData.category,
+      applicationData.server,
+      applicationData.maxSpeed || 0,
+      applicationData.acceleration || 'Не указано',
+      applicationData.drive || 'Не указано',
+      applicationData.isPremium || false,
+      applicationData.phone || '',
+      applicationData.telegram || '',
+      applicationData.discord || '',
+      applicationData.imageUrl || 'https://via.placeholder.com/400x300?text=Нет+фото',
+      applicationData.createdBy,
+      applicationData.status || 'pending'
+    ]);
     throw error;
   } finally {
     await client.end();
