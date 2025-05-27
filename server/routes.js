@@ -178,25 +178,37 @@ router.get('/cars', async (req, res) => {
         name TEXT NOT NULL,
         server TEXT NOT NULL,
         category TEXT NOT NULL,
-        "driveType" TEXT,
-        "serverId" TEXT NOT NULL,
+        drive_type TEXT,
+        server_id TEXT NOT NULL,
         price INTEGER NOT NULL,
         description TEXT NOT NULL,
-        "imageUrl" TEXT,
-        "contactInfo" TEXT NOT NULL,
-        "userId" INTEGER REFERENCES users(id),
+        image_url TEXT,
+        contact_info TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id),
         status TEXT DEFAULT 'pending',
-        "createdAt" TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW()
       )
     `);
     
     const query = `
       SELECT 
-        c.*,
+        c.id,
+        c.name,
+        c.server,
+        c.category,
+        c.drive_type as "driveType",
+        c.server_id as "serverId",
+        c.price,
+        c.description,
+        c.image_url as "imageUrl",
+        c.contact_info as "contactInfo",
+        c.user_id as "userId",
+        c.status,
+        c.created_at as "createdAt",
         u.username
       FROM cars c
-      LEFT JOIN users u ON c."userId" = u.id
-      ORDER BY c."createdAt" DESC
+      LEFT JOIN users u ON c.user_id = u.id
+      ORDER BY c.created_at DESC
     `;
     
     const result = await client.query(query);
@@ -242,24 +254,34 @@ router.post('/cars', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Создаем таблицу cars если её нет
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS cars (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        server TEXT NOT NULL,
-        category TEXT NOT NULL,
-        drive_type TEXT,
-        server_id TEXT NOT NULL,
-        price INTEGER NOT NULL,
-        description TEXT NOT NULL,
-        image_url TEXT,
-        contact_info TEXT NOT NULL,
-        user_id INTEGER REFERENCES users(id),
-        status TEXT DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
+    // Удаляем старую таблицу и создаем новую с правильной структурой
+    try {
+      await client.query('DROP TABLE IF EXISTS cars CASCADE');
+      console.log('🗑️ Dropped old cars table');
+      
+      await client.query(`
+        CREATE TABLE cars (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          server TEXT NOT NULL,
+          category TEXT NOT NULL,
+          drive_type TEXT,
+          server_id TEXT NOT NULL,
+          price INTEGER NOT NULL,
+          description TEXT NOT NULL,
+          image_url TEXT,
+          contact_info TEXT NOT NULL,
+          user_id INTEGER REFERENCES users(id),
+          status TEXT DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      console.log('✅ Created new cars table with correct structure');
+      
+    } catch (tableError) {
+      console.error('❌ Error managing table:', tableError);
+      // Если не удалось пересоздать таблицу, попробуем работать со старой
+    }
     
     const insertQuery = `
       INSERT INTO cars (
@@ -325,29 +347,24 @@ router.get('/cars/my', requireAuth, async (req, res) => {
     
     await client.connect();
     
-    // Создаем таблицу cars если её нет
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS cars (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        server TEXT NOT NULL,
-        category TEXT NOT NULL,
-        "driveType" TEXT,
-        "serverId" TEXT NOT NULL,
-        price INTEGER NOT NULL,
-        description TEXT NOT NULL,
-        "imageUrl" TEXT,
-        "contactInfo" TEXT NOT NULL,
-        "userId" INTEGER REFERENCES users(id),
-        status TEXT DEFAULT 'pending',
-        "createdAt" TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    
     const query = `
-      SELECT * FROM cars 
-      WHERE "userId" = $1 
-      ORDER BY "createdAt" DESC
+      SELECT 
+        id,
+        name,
+        server,
+        category,
+        drive_type as "driveType",
+        server_id as "serverId",
+        price,
+        description,
+        image_url as "imageUrl",
+        contact_info as "contactInfo",
+        user_id as "userId",
+        status,
+        created_at as "createdAt"
+      FROM cars 
+      WHERE user_id = $1 
+      ORDER BY created_at DESC
     `;
     
     const result = await client.query(query, [req.user.id]);
@@ -384,7 +401,20 @@ router.patch('/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin
       UPDATE cars 
       SET status = $1 
       WHERE id = $2 
-      RETURNING *
+      RETURNING 
+        id,
+        name,
+        server,
+        category,
+        drive_type as "driveType",
+        server_id as "serverId",
+        price,
+        description,
+        image_url as "imageUrl",
+        contact_info as "contactInfo",
+        user_id as "userId",
+        status,
+        created_at as "createdAt"
     `;
     
     const result = await client.query(updateQuery, [status, parseInt(id)]);
