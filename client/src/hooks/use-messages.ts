@@ -94,48 +94,17 @@ export function useSendMessage() {
 
       return response.json();
     },
-    onMutate: async (newMessage) => {
-      // Оптимистичное обновление
-      await queryClient.cancelQueries({ queryKey: ["/api/messages", newMessage.chatId] });
-      
-      const previousMessages = queryClient.getQueryData(["/api/messages", newMessage.chatId]);
-      
-      // Добавляем временное сообщение
-      const tempMessage = {
-        id: `temp-${Date.now()}`,
-        content: newMessage.content,
-        senderId: 'current-user', // Заменится на реальный ID
-        createdAt: new Date().toISOString(),
-        isTemporary: true
-      };
-      
-      queryClient.setQueryData(
-        ["/api/messages", newMessage.chatId],
-        (old: any) => [...(old || []), tempMessage]
-      );
-      
-      return { previousMessages };
-    },
     onSuccess: () => {
       // Обновляем все связанные кеши
       queryClient.invalidateQueries({ queryKey: ["/api/messages/chats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
     },
-    onError: (error, newMessage, context) => {
-      // Откатываем оптимистичное обновление
-      if (context?.previousMessages) {
-        queryClient.setQueryData(["/api/messages", newMessage.chatId], context.previousMessages);
-      }
-      
+    onError: (error: any) => {
       toast({
         title: "Ошибка отправки",
         description: error.message,
         variant: "destructive",
       });
-    },
-    onSettled: (data, error, variables) => {
-      // Всегда обновляем данные
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", variables.chatId] });
     },
   });
 }
