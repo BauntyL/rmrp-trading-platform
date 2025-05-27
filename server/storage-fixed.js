@@ -246,6 +246,52 @@ async function getCarListingById(id) {
   }
 }
 
+async function updateCarListing(carId, updateData) {
+  try {
+    const client = getClient();
+    console.log('✏️ Storage: Updating car listing:', carId, 'with data:', updateData);
+    
+    // Преобразуем входные данные к нужным названиям полей
+    const { 
+      name, 
+      price, 
+      description, 
+      category,
+      server,
+      maxSpeed,
+      acceleration,
+      drive,
+      isPremium,
+      phone,
+      telegram,
+      discord,
+      imageUrl
+    } = updateData;
+    
+    const result = await client.query(
+      `UPDATE car_listings 
+       SET name = $1, price = $2, description = $3, category = $4, 
+           server = $5, "maxSpeed" = $6, acceleration = $7, drive = $8, "isPremium" = $9,
+           phone = $10, telegram = $11, discord = $12, "imageUrl" = $13
+       WHERE id = $14 
+       RETURNING *`,
+      [name, price, description, category, server, maxSpeed, acceleration, drive, isPremium, 
+       phone, telegram, discord, imageUrl, carId]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error('Car listing not found');
+    }
+    
+    console.log('✅ Storage: Car listing updated successfully:', carId);
+    return result.rows[0];
+    
+  } catch (error) {
+    console.error('❌ Storage: Error updating car listing:', error);
+    throw error;
+  }
+}
+
 async function deleteCarListing(carId) {
   try {
     const client = getClient();
@@ -528,6 +574,7 @@ module.exports = {
   createCarListing,
   getCarListings,
   getCarListingById,
+  updateCarListing,
   deleteCarListing,
   getUserCarListings,
   createMessage,
