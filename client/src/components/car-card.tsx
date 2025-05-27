@@ -18,6 +18,29 @@ import {
 import { ContactSellerModal } from "@/components/contact-seller-modal";
 import { EditCarModal } from "@/components/edit-car-modal";
 
+// Константы для отображения
+const SERVER_NAMES = {
+  arbat: 'Арбат',
+  patriki: 'Патрики', 
+  rublevka: 'Рублёвка',
+  tverskoy: 'Тверской'
+};
+
+const CATEGORY_NAMES = {
+  standard: 'Стандарт',
+  sport: 'Спорт',
+  coupe: 'Купе',
+  suv: 'Внедорожник',
+  service: 'Служебная',
+  motorcycle: 'Мотоцикл'
+};
+
+const DRIVE_TYPE_NAMES = {
+  front: 'Передний',
+  rear: 'Задний',
+  all: 'Полный'
+};
+
 interface CarCardProps {
   car: any;
   showEditButton?: boolean;
@@ -216,17 +239,17 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
             
             <div className="flex justify-between">
               <span>Сервер:</span>
-              <span className="text-white">{car.server || 'Не указано'}</span>
+              <span className="text-white">{SERVER_NAMES[car.server] || car.server || 'Не указано'}</span>
             </div>
             
             <div className="flex justify-between">
               <span>Категория:</span>
-              <span>{car.category || 'Не указано'}</span>
+              <span className="text-white">{CATEGORY_NAMES[car.category] || car.category || 'Не указано'}</span>
             </div>
             
             <div className="flex justify-between">
               <span>Привод:</span>
-              <span>{car.driveType || 'Не указано'}</span>
+              <span className="text-white">{DRIVE_TYPE_NAMES[car.driveType] || car.driveType || 'Не указано'}</span>
             </div>
           </div>
         </CardContent>
