@@ -547,7 +547,7 @@ app.delete('/api/favorites/:carId', (req, res) => {
   }
 });
 
-// ✅ СООБЩЕНИЯ - ОТПРАВКА РАБОТАЕТ
+// ✅ ИСПРАВЛЕННАЯ ОТПРАВКА СООБЩЕНИЙ
 app.post('/api/messages', (req, res) => {
   try {
     console.log('📤 POST /api/messages - Request body:', req.body);
@@ -558,42 +558,61 @@ app.post('/api/messages', (req, res) => {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
-    const { carId, sellerId, message } = req.body;
+    // Поддерживаем разные форматы входных данных
+    const { 
+      carId, 
+      sellerId, 
+      receiverId, 
+      message, 
+      content,
+      chatId
+    } = req.body;
+
+    // Определяем содержимое сообщения
+    const messageContent = message || content;
+    
+    // Определяем получателя
+    let targetReceiverId = sellerId || receiverId;
+    
+    // Если передан chatId, извлекаем получателя из него
+    if (chatId && !targetReceiverId) {
+      const [userId1, userId2] = chatId.split('-').map(Number);
+      targetReceiverId = userId1 === req.session.userId ? userId2 : userId1;
+    }
+
+    console.log('📝 Message content:', messageContent);
+    console.log('👥 Target receiver ID:', targetReceiverId);
 
     // Валидация данных
-    if (!message || !message.trim()) {
+    if (!messageContent || !messageContent.trim()) {
       console.log('❌ Empty message');
       return res.status(400).json({ error: 'Сообщение не может быть пустым' });
     }
 
-    if (message.length > 500) {
+    if (messageContent.length > 500) {
       console.log('❌ Message too long');
       return res.status(400).json({ error: 'Сообщение слишком длинное (максимум 500 символов)' });
     }
 
-    if (!sellerId) {
-      console.log('❌ No seller ID');
+    if (!targetReceiverId) {
+      console.log('❌ No receiver ID');
       return res.status(400).json({ error: 'Не указан получатель сообщения' });
     }
 
-    // Проверка на запрещенные слова (опционально)
-    const prohibitedWords = ['telegram', 'discord', 'whatsapp', 'viber', '@', 'http', 'www'];
-    const containsProhibited = prohibitedWords.some(word => 
-      message.toLowerCase().includes(word.toLowerCase())
-    );
-
-    if (containsProhibited) {
-      console.log('❌ Prohibited words found');
-      return res.status(400).json({ error: 'Сообщение содержит запрещенные слова или ссылки' });
+    // Проверяем что получатель существует
+    const receiver = users.find(u => u.id === parseInt(targetReceiverId));
+    if (!receiver) {
+      console.log('❌ Receiver not found');
+      return res.status(400).json({ error: 'Получатель не найден' });
     }
 
     // Создаем сообщение
     const newMessage = {
       id: messages.length + 1,
       senderId: req.session.userId,
-      receiverId: parseInt(sellerId),
+      receiverId: parseInt(targetReceiverId),
       carId: carId ? parseInt(carId) : null,
-      content: message.trim(),
+      content: messageContent.trim(),
       isRead: false,
       createdAt: new Date().toISOString()
     };
@@ -879,7 +898,7 @@ app.patch('/api/applications/:id/status', (req, res) => {
     }
 
     const applicationIndex = applications.findIndex(app => app.id === applicationId);
-     if (applicationIndex === -1) {
+    if (applicationIndex === -1) {
       return res.status(404).json({ error: 'Application not found' });
     }
 
