@@ -30,6 +30,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
     server: "",
     price: "",
     maxSpeed: "",
+    acceleration: "",
     drive: "",
     phone: "",
     telegram: "",
@@ -70,6 +71,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         server: "",
         price: "",
         maxSpeed: "",
+        acceleration: "",
         drive: "",
         phone: "",
         telegram: "",
@@ -143,7 +145,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
       server: formData.server,
       price: parseInt(formData.price),
       maxSpeed: formData.maxSpeed ? parseInt(formData.maxSpeed) : 0,
-      acceleration: "Не указано", // Убираем поле разгона
+      acceleration: formData.acceleration || "Не указано",
       drive: formData.drive || "Не указано",
       description: formData.description.trim() || "Без описания",
       imageUrl: formData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Нет+фото',
@@ -221,21 +223,22 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             </div>
           </div>
 
-          {/* Цена и Макс. скорость */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-slate-300">Цена (₽) *</Label>
-              <Input
-                type="number"
-                placeholder="1000000"
-                value={formData.price}
-                onChange={(e) => handleInputChange('price', e.target.value)}
-                min="1"
-                required
-                className="bg-slate-700 border-slate-600 text-white"
-              />
-            </div>
+          {/* Цена */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">Цена (₽) *</Label>
+            <Input
+              type="number"
+              placeholder="1000000"
+              value={formData.price}
+              onChange={(e) => handleInputChange('price', e.target.value)}
+              min="1"
+              required
+              className="bg-slate-700 border-slate-600 text-white"
+            />
+          </div>
 
+          {/* Макс. скорость и Разгон */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-slate-300">Макс. скорость (км/ч)</Label>
               <Input
@@ -243,6 +246,19 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
                 placeholder="250"
                 value={formData.maxSpeed}
                 onChange={(e) => handleInputChange('maxSpeed', e.target.value)}
+                min="0"
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Разгон 0-100 км/ч (сек)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="5.2"
+                value={formData.acceleration}
+                onChange={(e) => handleInputChange('acceleration', e.target.value)}
                 min="0"
                 className="bg-slate-700 border-slate-600 text-white"
               />
