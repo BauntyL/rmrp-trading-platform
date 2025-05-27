@@ -408,98 +408,97 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
           </div>
         </CardContent>
 
-        <CardFooter className="p-4 pt-0 space-y-3">
-          {/* Кнопки модерации (для заявок) */}
-          {showModerationButtons && (
-            <div className="flex space-x-2 w-full">
-              <Button
-                onClick={() => handleModeration('approved')}
-                disabled={moderateApplicationMutation.isPending}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                size="sm"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Одобрить
-              </Button>
-              <Button
-                onClick={() => handleModeration('rejected')}
-                disabled={moderateApplicationMutation.isPending}
-                variant="destructive"
-                className="flex-1"
-                size="sm"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Отклонить
-              </Button>
-            </div>
-          )}
+<CardFooter className="p-4 pt-0 flex flex-col space-y-2">
+  {/* Кнопки модерации (для заявок) */}
+  {showModerationButtons && (
+    <div className="flex space-x-2 w-full">
+      <Button
+        onClick={() => handleModeration('approved')}
+        disabled={moderateApplicationMutation.isPending}
+        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+        size="sm"
+      >
+        <Check className="h-4 w-4 mr-1" />
+        Одобрить
+      </Button>
+      <Button
+        onClick={() => handleModeration('rejected')}
+        disabled={moderateApplicationMutation.isPending}
+        variant="destructive"
+        className="flex-1"
+        size="sm"
+      >
+        <X className="h-4 w-4 mr-1" />
+        Отклонить
+      </Button>
+    </div>
+  )}
 
-          {/* Основные кнопки действий */}
-          <div className="flex space-x-2 w-full">
-            {/* Кнопка "Подробнее" */}
-            <Button
-              onClick={() => setDetailsModalOpen(true)}
-              variant="outline"
-              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
-              size="sm"
-            >
-              <Eye className="h-4 w-4 mr-1" />
-              Подробнее
-            </Button>
+  {/* Основные кнопки действий */}
+  <div className="flex space-x-2 w-full">
+    {/* Кнопка "Подробнее" */}
+    <Button
+      onClick={() => setDetailsModalOpen(true)}
+      variant="outline"
+      className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+      size="sm"
+    >
+      <Eye className="h-4 w-4 mr-1" />
+      Подробнее
+    </Button>
 
-            {/* Кнопка "Связаться" */}
-            <Button
-              onClick={() => setContactModalOpen(true)}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-              size="sm"
-            >
-              <MessageCircle className="h-4 w-4 mr-1" />
-              Связаться
-            </Button>
+    {/* Кнопка "Связаться" */}
+    <Button
+      onClick={() => setContactModalOpen(true)}
+      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+      size="sm"
+    >
+      <MessageCircle className="h-4 w-4 mr-1" />
+      Связаться
+    </Button>
 
-            {/* Кнопка телефона */}
-            {car.phone && (
-              <Button
-                onClick={handleCopyPhone}
-                variant="outline"
-                size="sm"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
-              >
-                <Phone className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+    {/* Кнопка телефона */}
+    {car.phone && (
+      <Button
+        onClick={handleCopyPhone}
+        variant="outline"
+        size="sm"
+        className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white px-3"
+      >
+        <Phone className="h-4 w-4" />
+      </Button>
+    )}
+  </div>
 
-          {/* Кнопки редактирования/удаления */}
-          {(showEditButton || canEdit || canDelete) && (
-            <div className="flex space-x-2 w-full">
-              {canEdit && (
-                <Button
-                  onClick={() => setEditModalOpen(true)}
-                  variant="outline"
-                  className="flex-1 border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
-                  size="sm"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Редактировать
-                </Button>
-              )}
-              
-              {canDelete && (
-                <Button
-                  onClick={() => setDeleteModalOpen(true)}
-                  variant="destructive"
-                  className="flex-1"
-                  size="sm"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Удалить
-                </Button>
-              )}
-            </div>
-          )}
-        </CardFooter>
-      </Card>
+  {/* ✅ ОТДЕЛЬНЫЙ РЯД ДЛЯ КНОПОК РЕДАКТИРОВАНИЯ/УДАЛЕНИЯ */}
+  {(showEditButton || canEdit || canDelete) && (
+    <div className="flex space-x-2 w-full">
+      {canEdit && (
+        <Button
+          onClick={() => setEditModalOpen(true)}
+          variant="outline"
+          className="flex-1 border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+          size="sm"
+        >
+          <Edit className="h-4 w-4 mr-1" />
+          Редактировать
+        </Button>
+      )}
+      
+      {canDelete && (
+        <Button
+          onClick={() => setDeleteModalOpen(true)}
+          variant="destructive"
+          className="flex-1"
+          size="sm"
+        >
+          <Trash2 className="h-4 w-4 mr-1" />
+          Удалить
+        </Button>
+      )}
+    </div>
+  )}
+</CardFooter>
 
       {/* Модальные окна */}
       <ContactSellerModal
