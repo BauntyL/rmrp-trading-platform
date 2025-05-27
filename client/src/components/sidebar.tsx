@@ -1,285 +1,246 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
-import { UnreadMessagesCounter } from "@/components/unread-messages-counter";
-import { CarApplication } from "@shared/schema";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Car,
   Heart,
-  Plus,
-  ClipboardList,
+  MessageSquare,
+  FileText,
   Shield,
   Users,
-  MessageCircle,
-  LogOut,
-  Crown,
   Lock,
-  Send,
+  LogOut,
+  User,
+  BarChart3
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { useUnreadMessageCount } from "@/hooks/use-messages";
 
 interface SidebarProps {
   activeSection: string;
-  onSectionChange: (section: any) => void;
+  onSectionChange: (section: string) => void;
 }
 
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
-  const { user, logoutMutation } = useAuth();
+  const { user, logout } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const { data: myApplications = [] } = useQuery<CarApplication[]>({
-    queryKey: ["/api/my-applications"],
-    refetchInterval: 5000, // Автообновление каждые 5 секунд
-    refetchOnWindowFocus: true,
+  // Используем оптимизированный хук для счетчика
+  const { data: unreadData, isLoading: isUnreadLoading } = useUnreadMessageCount();
+  const unreadCount = unreadData?.count || 0;
+
+  // Статистика для админов/модераторов
+  const { data: stats } = useQuery({
+    queryKey: ["/api/admin/stats"],
+    enabled: user?.role === 'admin' || user?.role === 'moderator',
+    refetchInterval: 30000,
   });
 
-  const { data: pendingApplications = [] } = useQuery<CarApplication[]>({
-    queryKey: ["/api/applications/pending"],
-    enabled: user?.role === "moderator" || user?.role === "admin",
-    refetchInterval: 5000, // Автообновление заявок для модераторов каждые 5 секунд
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: favorites = [] } = useQuery({
-    queryKey: ["/api/favorites"],
-    refetchInterval: 10000, // Автообновление избранного каждые 10 секунд
-    refetchOnWindowFocus: true,
-  });
-
-  const handleLogout = () => {
-    logoutMutation.mutate();
-  };
-
-  const pendingCount = myApplications.filter(app => app.status === "pending").length;
-  const pendingModerationCount = pendingApplications.length;
-
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "admin":
-        return (
-          <Badge className="bg-amber-500 text-amber-900 hover:bg-amber-500">
-            <Crown className="h-3 w-3 mr-1" />
-            Администратор
-          </Badge>
-        );
-      case "moderator":
-        return (
-          <Badge className="bg-blue-500 text-blue-100 hover:bg-blue-500">
-            <Shield className="h-3 w-3 mr-1" />
-            Модератор
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary">
-            Пользователь
-          </Badge>
-        );
+  const menuItems = [
+    {
+      id: "catalog",
+      label: "Каталог",
+      icon: Car,
+      description: "Все автомобили"
+    },
+    {
+      id: "favorites", 
+      label: "Избранное",
+      icon: Heart,
+      description: "Любимые авто"
+    },
+    {
+      id: "my-cars",
+      label: "Мои авто",
+      icon: Car,
+      description: "Управление автомобилями"
+    },
+    {
+      id: "applications",
+      label: "Мои заявки", 
+      icon: FileText,
+      description: "Статус заявок"
+    },
+    {
+      id: "messages",
+      label: "Сообщения",
+      icon: MessageSquare,
+      description: "Переписка",
+      badge: unreadCount,
+      isLoading: isUnreadLoading
+    },
+    {
+      id: "security",
+      label: "Безопасность",
+      icon: Lock,
+      description: "Настройки безопасности"
     }
+  ];
+
+  const adminMenuItems = [
+    {
+      id: "moderation",
+      label: "Заявки",
+      icon: Shield,
+      description: "Модерация заявок",
+      badge: stats?.pendingApplications,
+      roles: ['admin', 'moderator']
+    },
+    {
+      id: "message-moderation", 
+      label: "Модерация",
+      icon: BarChart3,
+      description: "Модерация сообщений",
+      badge: stats?.unmoderatedMessages,
+      roles: ['admin', 'moderator']
+    },
+    {
+      id: "users",
+      label: "Пользователи",
+      icon: Users, 
+      description: "Управление пользователями",
+      roles: ['admin']
+    }
+  ];
+
+  const canShowAdminItem = (item: any) => {
+    if (!item.roles) return true;
+    return item.roles.includes(user?.role);
   };
 
-  return (
-    <aside className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
-      {/* Logo and Brand */}
-      <div className="p-6 border-b border-slate-700">
+  const renderMenuItem = (item: any) => (
+    <Button
+      key={item.id}
+      variant={activeSection === item.id ? "secondary" : "ghost"}
+      className={`w-full justify-start h-auto p-3 mb-2 ${
+        activeSection === item.id 
+          ? "bg-emerald-600 text-white hover:bg-emerald-700" 
+          : "text-slate-300 hover:text-white hover:bg-slate-800"
+      }`}
+      onClick={() => onSectionChange(item.id)}
+    >
+      <div className="flex items-center justify-between w-full">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Car className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">АвтоКаталог</h1>
-            <p className="text-slate-400 text-sm">v2.0</p>
-          </div>
-        </div>
-      </div>
-
-      {/* User Profile Section */}
-      <div className="p-6 border-b border-slate-700">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary/40 to-primary rounded-full flex items-center justify-center">
-            <span className="text-white font-semibold text-lg">
-              {user?.username?.charAt(0).toUpperCase()}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-white truncate">{user?.username}</p>
-            <div className="mt-1">
-              {getRoleBadge(user?.role || "user")}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Menu */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        <Button
-          variant={activeSection === "catalog" ? "default" : "ghost"}
-          className={`w-full justify-start ${
-            activeSection === "catalog" 
-              ? "bg-primary text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
-          onClick={() => onSectionChange("catalog")}
-        >
-          <Car className="h-5 w-5 mr-3" />
-          Каталог автомобилей
-        </Button>
-
-        <Button
-          variant={activeSection === "favorites" ? "default" : "ghost"}
-          className={`w-full justify-start ${
-            activeSection === "favorites" 
-              ? "bg-primary text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
-          onClick={() => onSectionChange("favorites")}
-        >
-          <Heart className="h-5 w-5 mr-3" />
-          Избранное
-          {favorites.length > 0 && (
-            <Badge className="ml-auto bg-slate-600 text-slate-200">
-              {favorites.length}
-            </Badge>
-          )}
-        </Button>
-
-        <Button
-          variant={activeSection === "messages" ? "default" : "ghost"}
-          className={`w-full justify-start ${
-            activeSection === "messages" 
-              ? "bg-primary text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
-          onClick={() => onSectionChange("messages")}
-        >
-          <MessageCircle className="h-5 w-5 mr-3" />
-          Сообщения
-          {/* Показываем счетчик непрочитанных сообщений */}
-          <UnreadMessagesCounter />
-        </Button>
-
-        <Button
-          variant={activeSection === "security" ? "default" : "ghost"}
-          className={`w-full justify-start ${
-            activeSection === "security" 
-              ? "bg-primary text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
-          onClick={() => onSectionChange("security")}
-        >
-          <Lock className="h-5 w-5 mr-3" />
-          Безопасность
-        </Button>
-
-        <Button
-          variant={activeSection === "my-cars" ? "default" : "ghost"}
-          className={`w-full justify-start ${
-            activeSection === "my-cars" 
-              ? "bg-primary text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
-          onClick={() => onSectionChange("my-cars")}
-        >
-          <Plus className="h-5 w-5 mr-3" />
-          Мои автомобили
-        </Button>
-
-        <Button
-          variant={activeSection === "applications" ? "default" : "ghost"}
-          className={`w-full justify-start ${
-            activeSection === "applications" 
-              ? "bg-primary text-white" 
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
-          onClick={() => onSectionChange("applications")}
-        >
-          <ClipboardList className="h-5 w-5 mr-3" />
-          Мои заявки
-          {pendingCount > 0 && (
-            <Badge className="ml-auto bg-amber-500 text-amber-900">
-              {pendingCount}
-            </Badge>
-          )}
-        </Button>
-
-        {(user?.role === "moderator" || user?.role === "admin") && (
-          <div className="pt-4 border-t border-slate-700 space-y-2">
-            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Модерация
-            </p>
-            
-            <Button
-              variant={activeSection === "moderation" ? "default" : "ghost"}
-              className={`w-full justify-start ${
-                activeSection === "moderation" 
-                  ? "bg-primary text-white" 
-                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-              onClick={() => onSectionChange("moderation")}
-            >
-              <Shield className="h-5 w-5 mr-3" />
-              Заявки на модерацию
-              {pendingModerationCount > 0 && (
-                <Badge className="ml-auto bg-red-500 text-red-100">
-                  {pendingModerationCount}
-                </Badge>
-              )}
-            </Button>
-
-            <Button
-              variant={activeSection === "message-moderation" ? "default" : "ghost"}
-              className={`w-full justify-start ${
-                activeSection === "message-moderation" 
-                  ? "bg-primary text-white" 
-                  : "text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-              onClick={() => onSectionChange("message-moderation")}
-            >
-              <MessageCircle className="h-5 w-5 mr-3" />
-              Модерация сообщений
-            </Button>
-
-            {user?.role === "admin" && (
-              <Button
-                variant={activeSection === "users" ? "default" : "ghost"}
-                className={`w-full justify-start ${
-                  activeSection === "users" 
-                    ? "bg-primary text-white" 
-                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
-                }`}
-                onClick={() => onSectionChange("users")}
-              >
-                <Users className="h-5 w-5 mr-3" />
-                Управление пользователями
-              </Button>
+          <item.icon className="h-5 w-5 flex-shrink-0" />
+          <div className="text-left min-w-0">
+            <div className="font-medium">{item.label}</div>
+            {!isCollapsed && item.description && (
+              <div className="text-xs opacity-75 truncate">
+                {item.description}
+              </div>
             )}
           </div>
-        )}
-      </nav>
+        </div>
+        
+        {/* Счетчик */}
+        <div className="flex items-center space-x-2">
+          {item.isLoading && (
+            <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+          )}
+          
+          {item.badge && !item.isLoading && item.badge > 0 && (
+            <Badge 
+              className={`text-xs min-w-[20px] h-5 flex items-center justify-center p-0 ${
+                item.id === 'messages' 
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-amber-500 text-amber-900 hover:bg-amber-600'
+              }`}
+            >
+              {item.badge > 99 ? '99+' : item.badge}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </Button>
+  );
 
-      {/* Theme Toggle & Logout */}
-      <div className="p-4 border-t border-slate-700 space-y-2">
-        {/* Кнопка Telegram */}
+  return (
+    <div className={`${isCollapsed ? 'w-20' : 'w-80'} bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-300`}>
+      {/* Заголовок */}
+      <div className="p-6 border-b border-slate-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <Car className="h-6 w-6 text-white" />
+            </div>
+            {!isCollapsed && (
+              <div>
+                <h1 className="text-xl font-bold text-white">RMRP</h1>
+                <p className="text-xs text-slate-400">Russian Motor Racing</p>
+              </div>
+            )}
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-slate-400 hover:text-white"
+          >
+            <Car className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Навигация */}
+      <ScrollArea className="flex-1 px-3 py-6">
+        <div className="space-y-2">
+          {/* Основные разделы */}
+          <div className="mb-6">
+            {!isCollapsed && (
+              <h3 className="px-3 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Основное
+              </h3>
+            )}
+            {menuItems.map(renderMenuItem)}
+          </div>
+
+          {/* Админ разделы */}
+          {(user?.role === 'admin' || user?.role === 'moderator') && (
+            <div className="mb-6">
+              {!isCollapsed && (
+                <h3 className="px-3 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Администрирование
+                </h3>
+              )}
+              {adminMenuItems
+                .filter(canShowAdminItem)
+                .map(renderMenuItem)}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Профиль пользователя */}
+      <div className="p-4 border-t border-slate-700">
+        <div className="flex items-center space-x-3 mb-3">
+          <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">
+            <User className="h-5 w-5 text-slate-400" />
+          </div>
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.username}
+              </p>
+              <p className="text-xs text-slate-400 capitalize">
+                {user?.role === 'admin' ? 'Администратор' : 
+                 user?.role === 'moderator' ? 'Модератор' : 'Пользователь'}
+              </p>
+            </div>
+          )}
+        </div>
+        
         <Button
           variant="ghost"
-          className="w-full justify-start text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-          onClick={() => window.open('https://t.me/bauntyprog', '_blank')}
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-700"
+          onClick={logout}
         >
-          <Send className="h-5 w-5 mr-3 text-blue-400" />
-          Мы в Telegram
-        </Button>
-        
-
-        
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-red-400 hover:bg-red-900/20 hover:text-red-300"
-          onClick={handleLogout}
-          disabled={logoutMutation.isPending}
-        >
-          <LogOut className="h-5 w-5 mr-3" />
-          Выйти
+          <LogOut className="h-4 w-4 mr-3" />
+          {!isCollapsed && "Выйти"}
         </Button>
       </div>
-    </aside>
+    </div>
   );
 }
