@@ -1,165 +1,195 @@
-import React from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Car } from "@shared/schema";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-
-const editCarSchema = z.object({
-  name: z.string().min(1, "Введите название автомобиля"),
-  category: z.enum(["standard", "sport", "coupe", "suv", "motorcycle"], {
-    required_error: "Выберите категорию",
-  }),
-  server: z.enum(["arbat", "patriki", "rublevka", "tverskoy"], {
-    required_error: "Выберите сервер",
-  }),
-  price: z.coerce.number().min(1, "Цена должна быть больше 0"),
-  maxSpeed: z.coerce.number().min(1, "Максимальная скорость должна быть больше 0"),
-  acceleration: z.string().min(1, "Введите время разгона"),
-  drive: z.enum(["FWD", "RWD", "AWD"], {
-    required_error: "Выберите тип привода",
-  }),
-  serverId: z.string().optional(),
-  phone: z.string().optional(),
-  telegram: z.string().optional(),
-  discord: z.string().optional(),
-  imageUrl: z.string().url().optional().or(z.literal("")),
-  description: z.string().optional(),
-  isPremium: z.boolean().default(false),
-  createdBy: z.number(),
-});
-
-type EditCarFormData = z.infer<typeof editCarSchema>;
+import { X } from "lucide-react";
 
 interface EditCarModalProps {
-  car: Car | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  car: any;
 }
 
-export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
+export function EditCarModal({ open, onOpenChange, car }: EditCarModalProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
-  const form = useForm<EditCarFormData>({
-    resolver: zodResolver(editCarSchema),
-    defaultValues: {
-      name: "",
-      category: "standard",
-      server: "arbat", 
-      price: 0,
-      maxSpeed: 0,
-      acceleration: "",
-      drive: "FWD",
-      serverId: "",
-      phone: "",
-      telegram: "",
-      discord: "",
-      imageUrl: "",
-      description: "",
-      isPremium: false,
-      createdBy: 1,
-    },
+  const [formData, setFormData] = useState({
+    name: "",
+    category: "",
+    server: "",
+    price: "",
+    maxSpeed: "",
+    acceleration: "",
+    drive: "",
+    phone: "",
+    telegram: "",
+    discord: "",
+    imageUrl: "",
+    description: "",
+    isPremium: false,
   });
 
-  // Проверяем права доступа - только владелец или админ/модератор
-  const canEdit = React.useMemo(() => {
-    if (!user || !car) return false;
-    
-    // Владелец автомобиля
-    const isOwner = car.createdBy === user.id;
-    
-    // Администратор или модератор
-    const isAdmin = user.role === 'admin' || user.role === 'moderator';
-    
-    return isOwner || isAdmin;
-  }, [user, car]);
-
-  // Reset form when car changes
-  React.useEffect(() => {
-    if (car) {
-      form.reset({
-        name: car.name,
-        category: car.category,
-        server: car.server,
-        price: car.price,
-        maxSpeed: car.maxSpeed,
-        acceleration: car.acceleration,
-        drive: car.drive as "FWD" | "RWD" | "AWD",
-        serverId: car.serverId || "",
+  // Заполняем форму данными автомобиля при открытии
+  useEffect(() => {
+    if (car && open) {
+      console.log('🚗 EditModal: Loading car data:', car);
+      setFormData({
+        name: car.name || "",
+        category: car.category || "",
+        server: car.server || "",
+        price: car.price?.toString() || "",
+        maxSpeed: car.maxSpeed?.toString() || "",
+        acceleration: car.acceleration || "",
+        drive: car.drive || "",
         phone: car.phone || "",
         telegram: car.telegram || "",
         discord: car.discord || "",
         imageUrl: car.imageUrl || "",
         description: car.description || "",
         isPremium: car.isPremium || false,
-        createdBy: car.createdBy,
       });
     }
-  }, [car, form]);
+  }, [car, open]);
 
   const updateCarMutation = useMutation({
-    mutationFn: async (data: EditCarFormData) => {
-      if (!car) return;
+    mutationFn: async (carData: any) => {
+      console.log('🔄 EditModal: Updating car with data:', carData);
       
-      const cleanData = {
-        ...data,
-        serverId: data.serverId || undefined,
-        phone: data.phone || undefined,
-        telegram: data.telegram || undefined,
-        discord: data.discord || undefined,
-        imageUrl: data.imageUrl || undefined,
-        description: data.description || undefined,
-      };
-      
-      const res = await apiRequest("PUT", `/api/cars/${car.id}`, cleanData);
-      return await res.json();
+      const response = await fetch(`/api/cars/${car.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(carData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка обновления автомобиля');
+      }
+
+      const result = await response.json();
+      console.log('✅ EditModal: Car updated successfully:', result);
+      return result;
     },
     onSuccess: () => {
-      // Принудительно обновляем все связанные кеши
-      queryClient.removeQueries({ queryKey: ["/api/cars"] });
+      // Обновляем все связанные кеши
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+      
       toast({
         title: "Автомобиль обновлен",
         description: "Изменения успешно сохранены",
       });
+      
       onOpenChange(false);
     },
     onError: (error: any) => {
+      console.error('❌ EditModal: Update error:', error);
       toast({
-        title: "Ошибка",
+        title: "Ошибка обновления",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: EditCarFormData) => {
-    updateCarMutation.mutate(data);
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  if (!car) return null;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    console.log('📝 EditModal: Form submitted with data:', formData);
+    
+    // Валидация обязательных полей
+    if (!formData.name.trim()) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Название автомобиля обязательно",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  // Если нет прав на редактирование, показываем сообщение
+    if (!formData.category) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Категория обязательна",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.server) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Сервер обязателен",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.price || parseInt(formData.price) <= 0) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Укажите корректную цену",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Подготовка данных для API
+    const carData = {
+      name: formData.name.trim(),
+      category: formData.category,
+      server: formData.server,
+      price: parseInt(formData.price),
+      maxSpeed: formData.maxSpeed ? parseInt(formData.maxSpeed) : 0,
+      acceleration: formData.acceleration || "Не указано",
+      drive: formData.drive || "Не указано",
+      description: formData.description.trim() || "Без описания",
+      imageUrl: formData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Нет+фото',
+      phone: formData.phone.trim(),
+      telegram: formData.telegram.trim(),
+      discord: formData.discord.trim(),
+      isPremium: formData.isPremium,
+    };
+
+    console.log('🚀 EditModal: Sending car data:', carData);
+    updateCarMutation.mutate(carData);
+  };
+
+  // Проверка прав доступа
+  const canEdit = user && (
+    user.id === car?.owner_id || 
+    user.id === car?.createdBy || 
+    user.role === 'admin'
+  );
+
   if (!canEdit) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md bg-slate-800 border-slate-700">
+        <DialogContent className="sm:max-w-[400px] bg-slate-800 border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white">Нет доступа</DialogTitle>
+            <DialogTitle className="text-white">Нет доступа</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="text-slate-300">
@@ -182,341 +212,223 @@ export function EditCarModal({ car, open, onOpenChange }: EditCarModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-800 border-slate-700">
+      <DialogContent className="sm:max-w-[600px] bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-white">
-            Редактировать автомобиль
-            {user?.role === 'admin' || user?.role === 'moderator' ? (
-              <span className="text-sm text-amber-400 ml-2">(режим модератора)</span>
-            ) : null}
+          <DialogTitle className="flex items-center justify-between text-white">
+            <span>Редактировать автомобиль</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Car Name */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">Название автомобиля *</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Например: BMW M5 Competition"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Название автомобиля */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">Название автомобиля *</Label>
+            <Input
+              placeholder="Например: BMW M5 Competition"
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              required
+              className="bg-slate-700 border-slate-600 text-white"
             />
+          </div>
 
-            {/* Category and Server */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Категория *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                          <SelectValue placeholder="Выберите категорию" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="standard">Стандарт</SelectItem>
-                        <SelectItem value="sport">Спорт</SelectItem>
-                        <SelectItem value="coupe">Купе</SelectItem>
-                        <SelectItem value="suv">Внедорожник</SelectItem>
-                        <SelectItem value="motorcycle">Мотоцикл</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          {/* Категория и Сервер */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Категория *</Label>
+              <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Выберите категорию" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="Стандарт">Стандарт</SelectItem>
+                  <SelectItem value="Купе">Купе</SelectItem>
+                  <SelectItem value="Внедорожники">Внедорожники</SelectItem>
+                  <SelectItem value="Спорт">Спорт</SelectItem>
+                  <SelectItem value="Мотоциклы">Мотоциклы</SelectItem>
+                  <SelectItem value="Специальные">Специальные</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <FormField
-                control={form.control}
-                name="server"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Сервер *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                          <SelectValue placeholder="Выберите сервер" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="arbat">Арбат</SelectItem>
-                        <SelectItem value="patriki">Патрики</SelectItem>
-                        <SelectItem value="rublevka">Рублёвка</SelectItem>
-                        <SelectItem value="tverskoy">Тверской</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <Label className="text-slate-300">Сервер *</Label>
+              <Select value={formData.server} onValueChange={(value) => handleInputChange('server', value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Выберите сервер" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="Арбат">Арбат</SelectItem>
+                  <SelectItem value="Патрики">Патрики</SelectItem>
+                  <SelectItem value="Рублевка">Рублевка</SelectItem>
+                  <SelectItem value="Тверской">Тверской</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Цена и Макс. скорость */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Цена (₽) *</Label>
+              <Input
+                type="number"
+                placeholder="1000000"
+                value={formData.price}
+                onChange={(e) => handleInputChange('price', e.target.value)}
+                min="1"
+                required
+                className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
 
-            {/* Price and Max Speed */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Цена (₽) *</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        placeholder="1000000"
-                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <Label className="text-slate-300">Макс. скорость (км/ч)</Label>
+              <Input
+                type="number"
+                placeholder="250"
+                value={formData.maxSpeed}
+                onChange={(e) => handleInputChange('maxSpeed', e.target.value)}
+                min="0"
+                className="bg-slate-700 border-slate-600 text-white"
               />
+            </div>
+          </div>
 
-              <FormField
-                control={form.control}
-                name="maxSpeed"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Макс. скорость (км/ч) *</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        placeholder="250"
-                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          {/* Разгон и Тип привода */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Разгон до 100 км/ч</Label>
+              <Input
+                placeholder="3.5 сек"
+                value={formData.acceleration}
+                onChange={(e) => handleInputChange('acceleration', e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
 
-            {/* Acceleration and Drive */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="acceleration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Разгон до 100 км/ч *</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="3.5 сек"
-                        className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="space-y-2">
+              <Label className="text-slate-300">Тип привода</Label>
+              <Select value={formData.drive} onValueChange={(value) => handleInputChange('drive', value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Выберите привод" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="AWD">AWD (Полный)</SelectItem>
+                  <SelectItem value="RWD">RWD (Задний)</SelectItem>
+                  <SelectItem value="FWD">FWD (Передний)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-              <FormField
-                control={form.control}
-                name="drive"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">Привод *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                          <SelectValue placeholder="Выберите привод" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="FWD">Передний (FWD)</SelectItem>
-                        <SelectItem value="RWD">Задний (RWD)</SelectItem>
-                        <SelectItem value="AWD">Полный (AWD)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          {/* Контактная информация */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-white">Контактная информация</h3>
+            
+            <div className="space-y-2">
+              <Label className="text-slate-300">Телефон</Label>
+              <Input
+                placeholder="+7 (999) 123-45-67"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
 
-            {/* Contact Info */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Контактная информация</h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-slate-300">Телефон</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="+7 (999) 123-45-67"
-                          className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="serverId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-slate-300">ID в игре</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="123456"
-                          className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-300">Telegram</Label>
+                <Input
+                  placeholder="@username"
+                  value={formData.telegram}
+                  onChange={(e) => handleInputChange('telegram', e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="telegram"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-slate-300">Telegram</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="@username"
-                          className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="discord"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-slate-300">Discord</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="username#1234"
-                          className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              <div className="space-y-2">
+                <Label className="text-slate-300">Discord</Label>
+                <Input
+                  placeholder="username#1234"
+                  value={formData.discord}
+                  onChange={(e) => handleInputChange('discord', e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
             </div>
 
-            {/* Image URL */}
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">Ссылка на изображение</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="https://example.com/car-image.jpg"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-slate-300">Описание</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Дополнительная информация об автомобиле..."
-                      rows={4}
-                      className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 resize-none"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Premium Status - только для админов */}
-            {(user?.role === 'admin' || user?.role === 'moderator') && (
-              <FormField
-                control={form.control}
-                name="isPremium"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-slate-600 p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="text-slate-300">
-                        Премиум статус
-                      </FormLabel>
-                      <p className="text-sm text-slate-400">
-                        Объявления с премиум статусом отображаются выше остальных
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <Label className="text-slate-300">Ссылка на изображение</Label>
+              <Input
+                type="url"
+                placeholder="https://example.com/car.jpg"
+                value={formData.imageUrl}
+                onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
               />
-            )}
-
-            {/* Submit Button */}
-            <div className="flex space-x-4 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="flex-1 bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
-              >
-                Отмена
-              </Button>
-              <Button
-                type="submit"
-                disabled={updateCarMutation.isPending}
-                className="flex-1 bg-primary hover:bg-primary/90"
-              >
-                {updateCarMutation.isPending ? "Сохранение..." : "Сохранить изменения"}
-              </Button>
             </div>
-          </form>
-        </Form>
+          </div>
+
+          {/* Дополнительное описание */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">Дополнительное описание</Label>
+            <Textarea
+              placeholder="Дополнительная информация об автомобиле..."
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              rows={4}
+              className="bg-slate-700 border-slate-600 text-white resize-none"
+            />
+          </div>
+
+          {/* Премиум автомобиль */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="premium"
+              checked={formData.isPremium}
+              onCheckedChange={(checked) => handleInputChange('isPremium', !!checked)}
+              className="border-slate-600"
+            />
+            <Label htmlFor="premium" className="text-slate-300 text-sm">
+              Премиум автомобиль
+            </Label>
+          </div>
+
+          {/* Кнопки */}
+          <div className="flex space-x-3 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="flex-1 bg-slate-700 text-white border-slate-600 hover:bg-slate-600"
+            >
+              Отмена
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={updateCarMutation.isPending}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {updateCarMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Сохраняем...
+                </>
+              ) : (
+                'Сохранить изменения'
+              )}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
