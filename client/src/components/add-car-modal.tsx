@@ -23,7 +23,10 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
     price: "",
     description: "",
     imageUrl: "",
-    contactInfo: ""
+    phone: "",
+    telegram: "",
+    discord: "",
+    vk: ""
   });
 
   const { toast } = useToast();
@@ -31,11 +34,24 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
 
   const addCarMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Объединяем контактную информацию в одну строку для отправки на сервер
+      const contactInfo = [
+        data.phone && `📞 ${data.phone}`,
+        data.telegram && `📱 Telegram: ${data.telegram}`,
+        data.discord && `🎮 Discord: ${data.discord}`,
+        data.vk && `👥 VK: ${data.vk}`
+      ].filter(Boolean).join(' | ');
+
+      const payload = {
+        ...data,
+        contactInfo: contactInfo || data.phone // Fallback на телефон если ничего не заполнено
+      };
+
       const response = await fetch("/api/cars", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Ошибка при добавлении автомобиля");
       return response.json();
@@ -56,7 +72,10 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
         price: "",
         description: "",
         imageUrl: "",
-        contactInfo: ""
+        phone: "",
+        telegram: "",
+        discord: "",
+        vk: ""
       });
       onOpenChange(false);
     },
@@ -71,6 +90,17 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Проверяем, что хотя бы один контакт заполнен
+    if (!formData.phone && !formData.telegram && !formData.discord && !formData.vk) {
+      toast({
+        title: "Ошибка",
+        description: "Укажите хотя бы один способ связи",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     addCarMutation.mutate(formData);
   };
 
@@ -80,14 +110,14 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-800 border-slate-700 max-w-2xl">
+      <DialogContent className="bg-slate-800 border-slate-700 max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">Добавить автомобиль</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name" className="text-white">Название</Label>
+            <Label htmlFor="name" className="text-white">Название *</Label>
             <Input
               id="name"
               value={formData.name}
@@ -100,7 +130,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="server" className="text-white">Сервер</Label>
+              <Label htmlFor="server" className="text-white">Сервер *</Label>
               <Select value={formData.server} onValueChange={(value) => handleInputChange("server", value)}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue placeholder="Выберите сервер" />
@@ -114,7 +144,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
               </Select>
             </div>
             <div>
-              <Label htmlFor="category" className="text-white">Категория</Label>
+              <Label htmlFor="category" className="text-white">Категория *</Label>
               <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue placeholder="Выберите категорию" />
@@ -146,7 +176,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
               </Select>
             </div>
             <div>
-              <Label htmlFor="serverId" className="text-white">ID на сервере</Label>
+              <Label htmlFor="serverId" className="text-white">ID на сервере *</Label>
               <Input
                 id="serverId"
                 value={formData.serverId}
@@ -159,7 +189,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
           </div>
 
           <div>
-            <Label htmlFor="price" className="text-white">Цена (₽)</Label>
+            <Label htmlFor="price" className="text-white">Цена (₽) *</Label>
             <Input
               id="price"
               type="number"
@@ -183,20 +213,60 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             />
           </div>
 
-          <div>
-            <Label htmlFor="contactInfo" className="text-white">Контактная информация</Label>
-            <Input
-              id="contactInfo"
-              value={formData.contactInfo}
-              onChange={(e) => handleInputChange("contactInfo", e.target.value)}
-              placeholder="Телефон, Telegram, Discord..."
-              className="bg-slate-700 border-slate-600 text-white"
-              required
-            />
+          {/* НОВАЯ СЕКЦИЯ: Контактная информация */}
+          <div className="space-y-3">
+            <Label className="text-white text-base font-semibold">Контактная информация *</Label>
+            <p className="text-slate-400 text-sm">Укажите хотя бы один способ связи</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="phone" className="text-white">📞 Телефон</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  placeholder="+7 (999) 123-45-67"
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="telegram" className="text-white">📱 Telegram</Label>
+                <Input
+                  id="telegram"
+                  value={formData.telegram}
+                  onChange={(e) => handleInputChange("telegram", e.target.value)}
+                  placeholder="@username или t.me/username"
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="discord" className="text-white">🎮 Discord</Label>
+                <Input
+                  id="discord"
+                  value={formData.discord}
+                  onChange={(e) => handleInputChange("discord", e.target.value)}
+                  placeholder="username#1234"
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="vk" className="text-white">👥 VKontakte</Label>
+                <Input
+                  id="vk"
+                  value={formData.vk}
+                  onChange={(e) => handleInputChange("vk", e.target.value)}
+                  placeholder="vk.com/username"
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <Label htmlFor="description" className="text-white">Описание</Label>
+            <Label htmlFor="description" className="text-white">Описание *</Label>
             <Textarea
               id="description"
               value={formData.description}
