@@ -547,7 +547,7 @@ app.delete('/api/favorites/:carId', (req, res) => {
   }
 });
 
-// ✅ УЛУЧШЕННЫЕ СООБЩЕНИЯ
+// ✅ ИСПРАВЛЕННЫЕ СООБЩЕНИЯ
 app.post('/api/messages', (req, res) => {
   try {
     console.log('📤 POST /api/messages - Request body:', req.body);
@@ -614,7 +614,7 @@ app.post('/api/messages', (req, res) => {
   }
 });
 
-// ✅ ПОЛУЧЕНИЕ СООБЩЕНИЙ ПОЛЬЗОВАТЕЛЯ
+// ✅ ИСПРАВЛЕННОЕ ПОЛУЧЕНИЕ СООБЩЕНИЙ ПОЛЬЗОВАТЕЛЯ
 app.get('/api/messages', (req, res) => {
   try {
     if (!req.session?.userId) {
@@ -632,15 +632,27 @@ app.get('/api/messages', (req, res) => {
       const car = msg.carId ? cars.find(c => c.id === msg.carId) : null;
 
       return {
-        ...msg,
-        senderName: sender ? sender.username : 'Неизвестный пользователь',
-        receiverName: receiver ? receiver.username : 'Неизвестный пользователь',
-        carName: car ? car.name : null
+        id: msg.id,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        carId: msg.carId,
+        content: String(msg.content), // ✅ ПРИНУДИТЕЛЬНО СТРОКА
+        isRead: Boolean(msg.isRead), // ✅ ПРИНУДИТЕЛЬНО BOOLEAN
+        createdAt: String(msg.createdAt), // ✅ ПРИНУДИТЕЛЬНО СТРОКА
+        senderName: sender ? String(sender.username) : 'Неизвестный пользователь',
+        receiverName: receiver ? String(receiver.username) : 'Неизвестный пользователь',
+        carName: car ? String(car.name) : null
       };
     });
 
     console.log(`💬 Found ${enrichedMessages.length} messages for user ${req.session.userId}`);
-    res.json(enrichedMessages);
+    
+    // ✅ ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА НА ВАЛИДНОСТЬ
+    const validMessages = enrichedMessages.filter(msg => 
+      msg.id && msg.content && msg.createdAt
+    );
+    
+    res.json(validMessages);
 
   } catch (error) {
     console.error('❌ Get messages error:', error);
@@ -648,7 +660,7 @@ app.get('/api/messages', (req, res) => {
   }
 });
 
-// ✅ ПОЛУЧЕНИЕ ЧАТОВ ПОЛЬЗОВАТЕЛЯ
+// ✅ ИСПРАВЛЕННОЕ ПОЛУЧЕНИЕ ЧАТОВ ПОЛЬЗОВАТЕЛЯ
 app.get('/api/messages/chats', (req, res) => {
   try {
     if (!req.session?.userId) {
@@ -669,20 +681,31 @@ app.get('/api/messages/chats', (req, res) => {
       if (!chats[chatKey]) {
         const otherUser = users.find(u => u.id === otherUserId);
         chats[chatKey] = {
-          id: chatKey,
-          otherUserId: otherUserId,
-          otherUserName: otherUser ? otherUser.username : 'Неизвестный пользователь',
+          id: String(chatKey), // ✅ ПРИНУДИТЕЛЬНО СТРОКА
+          otherUserId: Number(otherUserId), // ✅ ПРИНУДИТЕЛЬНО ЧИСЛО
+          otherUserName: otherUser ? String(otherUser.username) : 'Неизвестный пользователь',
           messages: [],
           lastMessage: null,
           unreadCount: 0
         };
       }
       
-      chats[chatKey].messages.push(msg);
+      // ✅ ЧИСТИМ СООБЩЕНИЕ ПЕРЕД ДОБАВЛЕНИЕМ
+      const cleanMessage = {
+        id: msg.id,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        carId: msg.carId,
+        content: String(msg.content),
+        isRead: Boolean(msg.isRead),
+        createdAt: String(msg.createdAt)
+      };
+      
+      chats[chatKey].messages.push(cleanMessage);
       
       // Обновляем последнее сообщение
       if (!chats[chatKey].lastMessage || new Date(msg.createdAt) > new Date(chats[chatKey].lastMessage.createdAt)) {
-        chats[chatKey].lastMessage = msg;
+        chats[chatKey].lastMessage = cleanMessage;
       }
       
       // Считаем непрочитанные
