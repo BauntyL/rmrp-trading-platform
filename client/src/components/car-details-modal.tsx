@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Phone, MessageCircle, Copy, Heart } from "lucide-react";
 import { ContactSellerModal } from "@/components/contact-seller-modal";
@@ -43,8 +43,13 @@ export function CarDetailsModal({ car, open, onOpenChange }: CarDetailsModalProp
   const queryClient = useQueryClient();
   const [contactModalOpen, setContactModalOpen] = useState(false);
 
+  // Получаем избранное пользователя
+  const { data: favorites = [] } = useQuery({
+    queryKey: ["/api/favorites"],
+    enabled: !!user,
+  });
+
   // Проверяем, находится ли автомобиль в избранном
-  const { data: favorites = [] } = queryClient.getQueryData(["/api/favorites"]) || [];
   const isFavorite = Array.isArray(favorites) && favorites.some((fav: any) => fav.id === car?.id);
   const isOwner = user?.id === car?.userId;
 
