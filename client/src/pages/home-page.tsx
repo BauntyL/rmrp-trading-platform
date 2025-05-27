@@ -106,9 +106,12 @@ export default function HomePage() {
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
                   <SelectItem value="all">Все категории</SelectItem>
-                  <SelectItem value="sedan">Седан</SelectItem>
+                  <SelectItem value="standard">Стандарт</SelectItem>
+                  <SelectItem value="coupe">Купе</SelectItem>
                   <SelectItem value="suv">Внедорожник</SelectItem>
-                  <SelectItem value="hatchback">Хэтчбек</SelectItem>
+                  <SelectItem value="sport">Спорт</SelectItem>
+                  <SelectItem value="service">Служебная</SelectItem>
+                  <SelectItem value="motorcycle">Мотоцикл</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedBrand} onValueChange={setSelectedBrand}>
