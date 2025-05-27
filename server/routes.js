@@ -35,7 +35,7 @@ function requireRole(roles) {
 }
 
 // Аутентификация
-router.post('/api/login', async (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     console.log('🔑 Login attempt for:', username);
@@ -88,7 +88,7 @@ router.post('/api/login', async (req, res) => {
   }
 });
 
-router.post('/api/register', async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
     console.log('📝 Registration attempt for:', username);
@@ -125,7 +125,7 @@ router.post('/api/register', async (req, res) => {
   }
 });
 
-router.post('/api/logout', (req, res) => {
+router.post('/logout', (req, res) => {
   const username = req.session?.user?.username || 'Unknown';
   req.session.destroy((err) => {
     if (err) {
@@ -137,7 +137,7 @@ router.post('/api/logout', (req, res) => {
   });
 });
 
-router.get('/api/user', (req, res) => {
+router.get('/user', (req, res) => {
   console.log('👤 User info requested');
   
   if (req.session && req.session.user) {
@@ -159,7 +159,7 @@ router.get('/api/user', (req, res) => {
 // === АВТОМОБИЛИ (CARS) ===
 
 // Получение всех автомобилей
-router.get('/api/cars', async (req, res) => {
+router.get('/cars', async (req, res) => {
   try {
     console.log('🚗 Fetching all cars');
     
@@ -212,7 +212,7 @@ router.get('/api/cars', async (req, res) => {
 });
 
 // Добавление автомобиля
-router.post('/api/cars', requireAuth, async (req, res) => {
+router.post('/cars', requireAuth, async (req, res) => {
   try {
     const { 
       name, 
@@ -300,7 +300,7 @@ router.post('/api/cars', requireAuth, async (req, res) => {
 });
 
 // Получение автомобилей пользователя
-router.get('/api/cars/my', requireAuth, async (req, res) => {
+router.get('/cars/my', requireAuth, async (req, res) => {
   try {
     console.log('🚗 Fetching cars for user:', req.user.username);
     
@@ -350,7 +350,7 @@ router.get('/api/cars/my', requireAuth, async (req, res) => {
 });
 
 // Модерация автомобиля
-router.patch('/api/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.patch('/cars/:id/moderate', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { action } = req.body; // 'approve' или 'reject'
@@ -391,7 +391,7 @@ router.patch('/api/cars/:id/moderate', requireAuth, requireRole(['moderator', 'a
 });
 
 // Получение избранного (заглушка)
-router.get('/api/favorites', requireAuth, async (req, res) => {
+router.get('/favorites', requireAuth, async (req, res) => {
   try {
     console.log('❤️ Fetching favorites for user:', req.user.username);
     // Пока возвращаем пустой массив
@@ -403,7 +403,7 @@ router.get('/api/favorites', requireAuth, async (req, res) => {
 });
 
 // Получение количества непрочитанных сообщений
-router.get('/api/unread-count', requireAuth, async (req, res) => {
+router.get('/unread-count', requireAuth, async (req, res) => {
   try {
     const { Client } = require('pg');
     const client = new Client({
@@ -431,7 +431,7 @@ router.get('/api/unread-count', requireAuth, async (req, res) => {
 });
 
 // Заявки
-router.post('/api/applications', requireAuth, async (req, res) => {
+router.post('/applications', requireAuth, async (req, res) => {
   try {
     console.log('📝 Creating application for user:', req.user.username);
     console.log('📋 RAW request body:', req.body);
@@ -458,7 +458,7 @@ router.post('/api/applications', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/api/applications/pending', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.get('/applications/pending', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📋 Fetching pending applications for:', req.user.username);
     const applications = await storage.getApplications();
@@ -472,7 +472,7 @@ router.get('/api/applications/pending', requireAuth, requireRole(['moderator', '
   }
 });
 
-router.get('/api/my-applications', requireAuth, async (req, res) => {
+router.get('/my-applications', requireAuth, async (req, res) => {
   try {
     console.log('📋 Fetching applications for user:', req.user.username);
     const applications = await storage.getUserApplications(req.user.id);
@@ -486,7 +486,7 @@ router.get('/api/my-applications', requireAuth, async (req, res) => {
 });
 
 // СОЗДАНИЕ ОБЪЯВЛЕНИЯ СО ВСЕМИ ПОЛЯМИ И ИЗОБРАЖЕНИЕМ
-router.patch('/api/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.patch('/applications/:id/status', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -542,7 +542,7 @@ router.patch('/api/applications/:id/status', requireAuth, requireRole(['moderato
 
 // === ИСПРАВЛЕННЫЕ СООБЩЕНИЯ ===
 // Получение всех сообщений пользователя
-router.get('/api/messages', requireAuth, async (req, res) => {
+router.get('/messages', requireAuth, async (req, res) => {
   try {
     console.log('📨 Fetching messages for user:', req.user.id);
     
@@ -610,7 +610,7 @@ router.get('/api/messages', requireAuth, async (req, res) => {
 });
 
 // Отправка сообщения
-router.post('/api/messages', requireAuth, async (req, res) => {
+router.post('/messages', requireAuth, async (req, res) => {
   try {
     const { carId, sellerId, message } = req.body;
     console.log('📤 Sending message:', { carId, sellerId, message, fromUser: req.user.id });
@@ -663,7 +663,7 @@ router.post('/api/messages', requireAuth, async (req, res) => {
 });
 
 // Отметка сообщения как прочитанного
-router.patch('/api/messages/:id/read', requireAuth, async (req, res) => {
+router.patch('/messages/:id/read', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
