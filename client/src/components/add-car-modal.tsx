@@ -4,7 +4,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -14,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PlusCircle, X } from "lucide-react";
+import { X } from "lucide-react";
 
 interface AddCarModalProps {
   open: boolean;
@@ -28,12 +27,11 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     category: "",
-    series: "",
-    year: "",
+    server: "",
     price: "",
-    mileage: "",
-    gearboxType: "",
-    region: "",
+    maxSpeed: "",
+    acceleration: "",
+    drive: "",
     phone: "",
     telegram: "",
     discord: "",
@@ -43,40 +41,38 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
   });
 
   const addCarMutation = useMutation({
-    mutationFn: async (carData: any) => {
-      const response = await fetch('/api/cars', {
+    mutationFn: async (applicationData: any) => {
+      const response = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(carData),
+        body: JSON.stringify(applicationData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка добавления автомобиля');
+        throw new Error(errorData.error || 'Ошибка создания заявки');
       }
 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cars/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-applications"] });
       
       toast({
-        title: "Автомобиль добавлен",
-        description: "Ваш автомобиль отправлен на модерацию",
+        title: "Заявка отправлена",
+        description: "Ваша заявка отправлена на модерацию",
       });
       
       // Сброс формы
       setFormData({
         name: "",
         category: "",
-        series: "",
-        year: "",
+        server: "",
         price: "",
-        mileage: "",
-        gearboxType: "",
-        region: "",
+        maxSpeed: "",
+        acceleration: "",
+        drive: "",
         phone: "",
         telegram: "",
         discord: "",
@@ -88,7 +84,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
     },
     onError: (error: any) => {
       toast({
-        title: "Ошибка добавления",
+        title: "Ошибка отправки заявки",
         description: error.message,
         variant: "destructive",
       });
@@ -105,45 +101,61 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Валидация
-    if (!formData.name.trim() || !formData.category || !formData.series) {
+    // Валидация обязательных полей
+    if (!formData.name.trim()) {
       toast({
         title: "Заполните обязательные поля",
-        description: "Название, категория и серия обязательны",
+        description: "Название автомобиля обязательно",
         variant: "destructive",
       });
       return;
     }
 
-    if (!formData.year || !formData.price) {
+    if (!formData.category) {
       toast({
         title: "Заполните обязательные поля",
-        description: "Год и цена обязательны",
+        description: "Категория обязательна",
         variant: "destructive",
       });
       return;
     }
 
-    const carData = {
+    if (!formData.server) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Сервер обязателен",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.price || parseInt(formData.price) <= 0) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Укажите корректную цену",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Подготовка данных для API
+    const applicationData = {
       name: formData.name.trim(),
-      brand: formData.category,
-      model: formData.series,
-      year: parseInt(formData.year),
+      category: formData.category,
+      server: formData.server,
       price: parseInt(formData.price),
-      mileage: formData.mileage ? parseInt(formData.mileage) : 0,
-      transmission: formData.gearboxType || 'Не указано',
-      fuelType: 'Не указано',
-      description: formData.description.trim(),
+      maxSpeed: formData.maxSpeed ? parseInt(formData.maxSpeed) : 0,
+      acceleration: formData.acceleration || "Не указано",
+      drive: formData.drive || "Не указано",
+      description: formData.description.trim() || "Без описания",
       imageUrl: formData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Нет+фото',
-      // Дополнительные поля для контактов
-      contactPhone: formData.phone.trim(),
-      contactTelegram: formData.telegram.trim(),
-      contactDiscord: formData.discord.trim(),
-      region: formData.region.trim(),
+      phone: formData.phone.trim(),
+      telegram: formData.telegram.trim(),
+      discord: formData.discord.trim(),
       isPremium: formData.isPremium,
     };
 
-    addCarMutation.mutate(carData);
+    addCarMutation.mutate(applicationData);
   };
 
   return (
@@ -151,7 +163,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
       <DialogContent className="sm:max-w-[600px] bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between text-white">
-            <span>Добавить автомобиль</span>
+            <span>Подать заявку на автомобиль</span>
             <Button
               variant="ghost"
               size="sm"
@@ -176,7 +188,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             />
           </div>
 
-          {/* Категория и Серия */}
+          {/* Категория и Сервер */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-slate-300">Категория *</Label>
@@ -185,55 +197,41 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
                   <SelectValue placeholder="Выберите категорию" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="BMW">BMW</SelectItem>
-                  <SelectItem value="Mercedes">Mercedes</SelectItem>
-                  <SelectItem value="Audi">Audi</SelectItem>
-                  <SelectItem value="Toyota">Toyota</SelectItem>
-                  <SelectItem value="Lada">Lada</SelectItem>
+                  <SelectItem value="Спорткары">Спорткары</SelectItem>
+                  <SelectItem value="Суперкары">Суперкары</SelectItem>
+                  <SelectItem value="Гиперкары">Гиперкары</SelectItem>
+                  <SelectItem value="Электрокары">Электрокары</SelectItem>
+                  <SelectItem value="Классика">Классика</SelectItem>
                   <SelectItem value="Другое">Другое</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-300">Серия *</Label>
-              <Select value={formData.series} onValueChange={(value) => handleInputChange('series', value)}>
+              <Label className="text-slate-300">Сервер *</Label>
+              <Select value={formData.server} onValueChange={(value) => handleInputChange('server', value)}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Выберите серию" />
+                  <SelectValue placeholder="Выберите сервер" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="M5">M5</SelectItem>
-                  <SelectItem value="X5">X5</SelectItem>
-                  <SelectItem value="E-класс">E-класс</SelectItem>
-                  <SelectItem value="A4">A4</SelectItem>
-                  <SelectItem value="Camry">Camry</SelectItem>
-                  <SelectItem value="Другое">Другое</SelectItem>
+                  <SelectItem value="Arizona RP">Arizona RP</SelectItem>
+                  <SelectItem value="Radmir RP">Radmir RP</SelectItem>
+                  <SelectItem value="Advance RP">Advance RP</SelectItem>
+                  <SelectItem value="Trinity RP">Trinity RP</SelectItem>
+                  <SelectItem value="Amazing RP">Amazing RP</SelectItem>
+                  <SelectItem value="Другой">Другой</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Год и Цена */}
+          {/* Цена и Макс. скорость */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-slate-300">Год (г) *</Label>
+              <Label className="text-slate-300">Цена (₽) *</Label>
               <Input
                 type="number"
-                placeholder="0"
-                value={formData.year}
-                onChange={(e) => handleInputChange('year', e.target.value)}
-                min="1900"
-                max={new Date().getFullYear() + 1}
-                required
-                className="bg-slate-700 border-slate-600 text-white"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-slate-300">Макс. скорость (км/ч) *</Label>
-              <Input
-                type="number"
-                placeholder="0"
+                placeholder="1000000"
                 value={formData.price}
                 onChange={(e) => handleInputChange('price', e.target.value)}
                 min="1"
@@ -241,44 +239,45 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
                 className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Макс. скорость (км/ч)</Label>
+              <Input
+                type="number"
+                placeholder="250"
+                value={formData.maxSpeed}
+                onChange={(e) => handleInputChange('maxSpeed', e.target.value)}
+                min="0"
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
           </div>
 
-          {/* Пробег и Тип привода */}
+          {/* Разгон и Тип привода */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-slate-300">Разгон до 100 км/ч *</Label>
+              <Label className="text-slate-300">Разгон до 100 км/ч</Label>
               <Input
-                placeholder="5.2 сек"
-                value={formData.mileage}
-                onChange={(e) => handleInputChange('mileage', e.target.value)}
+                placeholder="3.5 сек"
+                value={formData.acceleration}
+                onChange={(e) => handleInputChange('acceleration', e.target.value)}
                 className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-300">Тип привода *</Label>
-              <Select value={formData.gearboxType} onValueChange={(value) => handleInputChange('gearboxType', value)}>
+              <Label className="text-slate-300">Тип привода</Label>
+              <Select value={formData.drive} onValueChange={(value) => handleInputChange('drive', value)}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue placeholder="Выберите привод" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
-                  <SelectItem value="AWD">AWD</SelectItem>
-                  <SelectItem value="RWD">RWD</SelectItem>
-                  <SelectItem value="FWD">FWD</SelectItem>
+                  <SelectItem value="AWD">AWD (Полный)</SelectItem>
+                  <SelectItem value="RWD">RWD (Задний)</SelectItem>
+                  <SelectItem value="FWD">FWD (Передний)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          {/* ID на сервере */}
-          <div className="space-y-2">
-            <Label className="text-slate-300">ID на сервере</Label>
-            <Input
-              placeholder="Например: BMWC-123"
-              value={formData.region}
-              onChange={(e) => handleInputChange('region', e.target.value)}
-              className="bg-slate-700 border-slate-600 text-white"
-            />
           </div>
 
           {/* Контактная информация */}
@@ -354,7 +353,7 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             </Label>
           </div>
           <p className="text-xs text-slate-500">
-            Отметьте, если хотите для релиза или эксклюзивный автомобиль
+            Отметьте, если это редкий или эксклюзивный автомобиль
           </p>
 
           {/* Кнопки */}
@@ -370,12 +369,12 @@ export function AddCarModal({ open, onOpenChange }: AddCarModalProps) {
             <Button 
               type="submit" 
               disabled={addCarMutation.isPending}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {addCarMutation.isPending ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Отправить заявку
+                  Отправляем заявку...
                 </>
               ) : (
                 'Отправить заявку'
