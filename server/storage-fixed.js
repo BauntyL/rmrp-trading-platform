@@ -162,6 +162,27 @@ async function getUserByUsername(username) {
   }
 }
 
+async function getUserById(id) {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+
+  try {
+    await client.connect();
+    
+    const query = 'SELECT * FROM users WHERE id = $1';
+    const result = await client.query(query, [id]);
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('❌ Error getting user by ID:', error);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
 async function getAllUsers() {
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
@@ -857,6 +878,7 @@ module.exports = {
   // Пользователи
   createUser,
   getUserByUsername,
+  getUserById,
   getAllUsers,
   
   // Заявки
