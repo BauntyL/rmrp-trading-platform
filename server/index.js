@@ -11,7 +11,7 @@ let users = [];
 let cars = [];
 let favorites = [];
 let messages = [];
-let applications = []; // ✅ МАССИВ ДЛЯ ЗАЯВОК
+let applications = [];
 
 // ✅ ИНИЦИАЛИЗАЦИЯ ПОЛЬЗОВАТЕЛЕЙ ПОСЛЕ ЗАПУСКА СЕРВЕРА
 async function initializeUsers() {
@@ -213,6 +213,42 @@ async function initializeApplications() {
   console.log(`📋 Создано ${testApplications.length} тестовых заявок`);
 }
 
+// ✅ ИНИЦИАЛИЗАЦИЯ ТЕСТОВЫХ СООБЩЕНИЙ
+async function initializeMessages() {
+  const testMessages = [
+    {
+      id: 1,
+      senderId: 3, // testuser
+      receiverId: 1, // admin (Баунти Миллер)
+      carId: 1,
+      content: 'Здравствуйте! Интересует ваш BMW M5. Возможен торг?',
+      isRead: false,
+      createdAt: new Date(Date.now() - 60000).toISOString() // 1 минуту назад
+    },
+    {
+      id: 2,
+      senderId: 1, // admin (Баунти Миллер)
+      receiverId: 3, // testuser
+      carId: 1,
+      content: 'Добро пожаловать! Да, небольшой торг возможен. Когда удобно посмотреть?',
+      isRead: false,
+      createdAt: new Date(Date.now() - 30000).toISOString() // 30 секунд назад
+    },
+    {
+      id: 3,
+      senderId: 3, // testuser
+      receiverId: 1, // admin
+      carId: 4,
+      content: 'Porsche тоже заинтересовал. Можно узнать состояние двигателя?',
+      isRead: true,
+      createdAt: new Date(Date.now() - 120000).toISOString() // 2 минуты назад
+    }
+  ];
+  
+  messages.push(...testMessages);
+  console.log(`💬 Создано ${testMessages.length} тестовых сообщений`);
+}
+
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -261,7 +297,8 @@ app.get('/api/status', (req, res) => {
     time: new Date().toISOString(),
     usersCount: users.length,
     carsCount: cars.length,
-    applicationsCount: applications.length
+    applicationsCount: applications.length,
+    messagesCount: messages.length
   });
 });
 
@@ -510,34 +547,206 @@ app.delete('/api/favorites/:carId', (req, res) => {
   }
 });
 
-// ✅ СООБЩЕНИЯ
+// ✅ УЛУЧШЕННЫЕ СООБЩЕНИЯ
 app.post('/api/messages', (req, res) => {
   try {
+    console.log('📤 POST /api/messages - Request body:', req.body);
+    console.log('👤 User ID from session:', req.session?.userId);
+    
     if (!req.session?.userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+      console.log('❌ No authentication');
+      return res.status(401).json({ error: 'Требуется авторизация' });
     }
 
     const { carId, sellerId, message } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ error: 'Message required' });
+    // Валидация данных
+    if (!message || !message.trim()) {
+      console.log('❌ Empty message');
+      return res.status(400).json({ error: 'Сообщение не может быть пустым' });
     }
 
+    if (message.length > 500) {
+      console.log('❌ Message too long');
+      return res.status(400).json({ error: 'Сообщение слишком длинное (максимум 500 символов)' });
+    }
+
+    if (!sellerId) {
+      console.log('❌ No seller ID');
+      return res.status(400).json({ error: 'Не указан получатель сообщения' });
+    }
+
+    // Проверка на запрещенные слова (опционально)
+    const prohibitedWords = ['telegram', 'discord', 'whatsapp', 'viber', '@', 'http', 'www'];
+    const containsProhibited = prohibitedWords.some(word => 
+      message.toLowerCase().includes(word.toLowerCase())
+    );
+
+    if (containsProhibited) {
+      console.log('❌ Prohibited words found');
+      return res.status(400).json({ error: 'Сообщение содержит запрещенные слова или ссылки' });
+    }
+
+    // Создаем сообщение
     const newMessage = {
       id: messages.length + 1,
       senderId: req.session.userId,
-      receiverId: sellerId,
-      carId: carId,
-      content: message,
+      receiverId: parseInt(sellerId),
+      carId: carId ? parseInt(carId) : null,
+      content: message.trim(),
       isRead: false,
       createdAt: new Date().toISOString()
     };
 
     messages.push(newMessage);
-    res.json({ success: true, message: newMessage });
+    
+    console.log('✅ Message created successfully:', newMessage);
+    
+    res.json({ 
+      success: true, 
+      message: newMessage,
+      msg: 'Сообщение успешно отправлено' 
+    });
+
   } catch (error) {
     console.error('❌ Send message error:', error);
-    res.status(500).json({ error: 'Failed to send message' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// ✅ ПОЛУЧЕНИЕ СООБЩЕНИЙ ПОЛЬЗОВАТЕЛЯ
+app.get('/api/messages', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const userMessages = messages.filter(m => 
+      m.senderId === req.session.userId || m.receiverId === req.session.userId
+    );
+
+    // Дополняем сообщения информацией о пользователях и автомобилях
+    const enrichedMessages = userMessages.map(msg => {
+      const sender = users.find(u => u.id === msg.senderId);
+      const receiver = users.find(u => u.id === msg.receiverId);
+      const car = msg.carId ? cars.find(c => c.id === msg.carId) : null;
+
+      return {
+        ...msg,
+        senderName: sender ? sender.username : 'Неизвестный пользователь',
+        receiverName: receiver ? receiver.username : 'Неизвестный пользователь',
+        carName: car ? car.name : null
+      };
+    });
+
+    console.log(`💬 Found ${enrichedMessages.length} messages for user ${req.session.userId}`);
+    res.json(enrichedMessages);
+
+  } catch (error) {
+    console.error('❌ Get messages error:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// ✅ ПОЛУЧЕНИЕ ЧАТОВ ПОЛЬЗОВАТЕЛЯ
+app.get('/api/messages/chats', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const userMessages = messages.filter(m => 
+      m.senderId === req.session.userId || m.receiverId === req.session.userId
+    );
+
+    // Группируем сообщения по чатам
+    const chats = {};
+    
+    userMessages.forEach(msg => {
+      const otherUserId = msg.senderId === req.session.userId ? msg.receiverId : msg.senderId;
+      const chatKey = `${Math.min(req.session.userId, otherUserId)}-${Math.max(req.session.userId, otherUserId)}`;
+      
+      if (!chats[chatKey]) {
+        const otherUser = users.find(u => u.id === otherUserId);
+        chats[chatKey] = {
+          id: chatKey,
+          otherUserId: otherUserId,
+          otherUserName: otherUser ? otherUser.username : 'Неизвестный пользователь',
+          messages: [],
+          lastMessage: null,
+          unreadCount: 0
+        };
+      }
+      
+      chats[chatKey].messages.push(msg);
+      
+      // Обновляем последнее сообщение
+      if (!chats[chatKey].lastMessage || new Date(msg.createdAt) > new Date(chats[chatKey].lastMessage.createdAt)) {
+        chats[chatKey].lastMessage = msg;
+      }
+      
+      // Считаем непрочитанные
+      if (!msg.isRead && msg.receiverId === req.session.userId) {
+        chats[chatKey].unreadCount++;
+      }
+    });
+
+    const chatsList = Object.values(chats).sort((a, b) => 
+      new Date(b.lastMessage?.createdAt || 0) - new Date(a.lastMessage?.createdAt || 0)
+    );
+
+    console.log(`💬 Found ${chatsList.length} chats for user ${req.session.userId}`);
+    res.json(chatsList);
+
+  } catch (error) {
+    console.error('❌ Get chats error:', error);
+    res.status(500).json({ error: 'Failed to fetch chats' });
+  }
+});
+
+// ✅ ПОДСЧЕТ НЕПРОЧИТАННЫХ СООБЩЕНИЙ
+app.get('/api/messages/unread-count', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const unreadCount = messages.filter(m => 
+      m.receiverId === req.session.userId && !m.isRead
+    ).length;
+
+    console.log(`📬 User ${req.session.userId} has ${unreadCount} unread messages`);
+    res.json({ count: unreadCount });
+
+  } catch (error) {
+    console.error('❌ Get unread count error:', error);
+    res.status(500).json({ error: 'Failed to get unread count' });
+  }
+});
+
+// ✅ ОТМЕТКА СООБЩЕНИЙ КАК ПРОЧИТАННЫХ
+app.patch('/api/messages/:id/read', (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const messageId = parseInt(req.params.id);
+    const messageIndex = messages.findIndex(m => 
+      m.id === messageId && m.receiverId === req.session.userId
+    );
+
+    if (messageIndex !== -1) {
+      messages[messageIndex].isRead = true;
+      console.log(`✅ Message ${messageId} marked as read`);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Message not found' });
+    }
+
+  } catch (error) {
+    console.error('❌ Mark as read error:', error);
+    res.status(500).json({ error: 'Failed to mark as read' });
   }
 });
 
@@ -556,10 +765,9 @@ app.post('/api/applications', (req, res) => {
       ...req.body,
       createdBy: req.session.userId,
       owner_id: req.session.userId,
-      status: 'pending' // Заявки всегда создаются со статусом "на модерации"
+      status: 'pending'
     };
 
-    // Создаем заявку
     const newApplication = {
       id: applications.length + 1,
       ...applicationData,
@@ -584,7 +792,6 @@ app.get('/api/applications/pending', (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Проверяем что пользователь админ или модератор
     const user = users.find(u => u.id === req.session.userId);
     if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
       return res.status(403).json({ error: 'Access denied' });
@@ -609,7 +816,6 @@ app.patch('/api/applications/:id/status', (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Проверяем что пользователь админ или модератор
     const user = users.find(u => u.id === req.session.userId);
     if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
       return res.status(403).json({ error: 'Access denied' });
@@ -622,18 +828,15 @@ app.patch('/api/applications/:id/status', (req, res) => {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // Находим заявку
     const applicationIndex = applications.findIndex(app => app.id === applicationId);
     if (applicationIndex === -1) {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    // Обновляем статус заявки
     applications[applicationIndex].status = status;
     applications[applicationIndex].moderatedBy = req.session.userId;
     applications[applicationIndex].moderatedAt = new Date().toISOString();
 
-    // Если заявка одобрена - добавляем автомобиль в основной каталог
     if (status === 'approved') {
       const approvedApp = applications[applicationIndex];
       const newCar = {
@@ -694,7 +897,6 @@ app.get('/api/applications', (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Проверяем что пользователь админ или модератор
     const user = users.find(u => u.id === req.session.userId);
     if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
       return res.status(403).json({ error: 'Access denied' });
@@ -723,6 +925,7 @@ app.listen(PORT, async () => {
   await initializeUsers();
   await initializeCars();
   await initializeApplications();
+  await initializeMessages();
   
   console.log(`👤 Ваш логин: "Баунти Миллер" / "Lqlcpyvb555!999#81"`);
   console.log(`👤 Запасной: admin/admin123 или testuser/test123`);
