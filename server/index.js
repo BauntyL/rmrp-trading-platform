@@ -879,7 +879,7 @@ app.patch('/api/applications/:id/status', (req, res) => {
     }
 
     const applicationIndex = applications.findIndex(app => app.id === applicationId);
-    if (applicationIndex === -1) {
+     if (applicationIndex === -1) {
       return res.status(404).json({ error: 'Application not found' });
     }
 
