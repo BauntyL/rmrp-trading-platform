@@ -293,6 +293,51 @@ router.get('/my-cars', requireAuth, async (req, res) => {
   }
 });
 
+// Обновление автомобиля
+router.put('/cars/:id', requireAuth, async (req, res) => {
+  try {
+    const carId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    console.log(`✏️ Update car request: ID ${carId} by user ${req.user.username}`);
+
+    if (!carId || isNaN(carId)) {
+      return res.status(400).json({ error: 'Неверный ID автомобиля' });
+    }
+
+    // Получить информацию об автомобиле
+    const car = await storage.getCarListingById(carId);
+    
+    if (!car) {
+      console.log('❌ Car not found:', carId);
+      return res.status(404).json({ error: 'Автомобиль не найден' });
+    }
+
+    // Проверка прав: владелец или админ
+    const isOwner = car.owner_id === userId;
+    const canEdit = isOwner || userRole === 'admin';
+
+    if (!canEdit) {
+      console.log('❌ Insufficient permissions to edit car:', carId, 'User:', req.user.username);
+      return res.status(403).json({ error: 'Недостаточно прав для редактирования этого автомобиля' });
+    }
+
+    // Обновить автомобиль
+    const updatedCar = await storage.updateCarListing(carId, req.body);
+
+    console.log(`✅ Car ${carId} updated successfully by ${req.user.username}`);
+    res.json(updatedCar);
+
+  } catch (error) {
+    console.error('❌ Error updating car:', error);
+    res.status(500).json({ 
+      error: 'Ошибка при обновлении автомобиля',
+      details: error.message 
+    });
+  }
+});
+
 // Удаление автомобиля
 router.delete('/cars/:id', requireAuth, async (req, res) => {
   try {
@@ -414,46 +459,29 @@ router.post('/messages', requireAuth, async (req, res) => {
     }
     
     if (message.length > 500) {
-      return res.status(400).json({ error: 'Сообщение слишком длинное (максимум 500 символов)' });
+      return res.status(400).json({ error: 'Message too long' });
     }
     
-    // Проверка на запрещенные слова
-    const bannedWords = ['мат', 'политика', 'http', 'www'];
-    const containsBanned = bannedWords.some(word => 
-      message.toLowerCase().includes(word.toLowerCase())
-    );
+    // Простая фильтрация запрещенных слов
+    const bannedWords = ['spam', 'реклама', 'развод', 'мошенник'];
+    const messageText = message.toLowerCase();
+    const containsBannedWord = bannedWords.some(word => messageText.includes(word));
     
-    if (containsBanned) {
-      return res.status(400).json({ 
-        error: 'Сообщение содержит запрещенные слова или ссылки' 
-      });
+    if (containsBannedWord) {
+      return res.status(400).json({ error: 'Message contains prohibited content' });
     }
     
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
+    const messageData = {
+      senderId: req.user.id,
+      receiverId: sellerId,
+      content: message,
+      carId: carId
+    };
     
-    await client.connect();
+    const createdMessage = await storage.createMessage(messageData);
     
-    const insertQuery = `
-      INSERT INTO messages ("senderId", "receiverId", "carId", content, "isRead", "createdAt")
-      VALUES ($1, $2, $3, $4, false, NOW())
-      RETURNING *
-    `;
-    
-    const result = await client.query(insertQuery, [
-      req.user.id,
-      sellerId,     
-      carId,
-      message
-    ]);
-    
-    await client.end();
-    
-    console.log('✅ Message sent successfully:', result.rows[0]);
-    res.status(201).json(result.rows[0]);
+    console.log('✅ Message sent successfully');
+    res.status(201).json(createdMessage);
     
   } catch (error) {
     console.error('❌ Error sending message:', error);
@@ -461,41 +489,25 @@ router.post('/messages', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/messages/mark-read', requireAuth, async (req, res) => {
+router.patch('/messages/:id/read', requireAuth, async (req, res) => {
   try {
-    const { carId } = req.body;
-    console.log('📖 Marking messages as read for car:', carId, 'user:', req.user.id);
+    const messageId = parseInt(req.params.id);
     
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
+    await storage.markMessageAsRead(messageId, req.user.id);
     
-    await client.connect();
-    
-    const updateQuery = `
-      UPDATE messages 
-      SET "isRead" = true 
-      WHERE "carId" = $1 AND "receiverId" = $2 AND "isRead" = false
-    `;
-    
-    await client.query(updateQuery, [carId, req.user.id]);
-    await client.end();
-    
-    console.log('✅ Messages marked as read');
-    res.json({ message: 'Messages marked as read' });
-    
+    console.log(`✅ Message ${messageId} marked as read`);
+    res.json({ success: true });
   } catch (error) {
-    console.error('❌ Error marking messages as read:', error);
-    res.status(500).json({ error: 'Failed to mark messages as read' });
+    console.error('❌ Error marking message as read:', error);
+    res.status(500).json({ error: 'Failed to mark message as read' });
   }
 });
 
 // === ИЗБРАННОЕ ===
 router.get('/favorites', requireAuth, async (req, res) => {
   try {
-    console.log('⭐ Fetching favorites for user:', req.user.username);
+    console.log('❤️ Fetching favorites for user:', req.user.id);
+    
     const favorites = await storage.getUserFavorites(req.user.id);
     
     console.log(`✅ Found ${favorites.length} favorites`);
@@ -509,12 +521,13 @@ router.get('/favorites', requireAuth, async (req, res) => {
 router.post('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
-    console.log('⭐ Adding to favorites:', carId, 'for user:', req.user.username);
+    
+    console.log('❤️ Adding to favorites:', carId, 'for user:', req.user.id);
     
     await storage.addToFavorites(req.user.id, carId);
     
     console.log('✅ Added to favorites successfully');
-    res.json({ message: 'Added to favorites' });
+    res.json({ success: true });
   } catch (error) {
     console.error('❌ Error adding to favorites:', error);
     res.status(500).json({ error: 'Failed to add to favorites' });
@@ -524,63 +537,21 @@ router.post('/favorites/:carId', requireAuth, async (req, res) => {
 router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
-    console.log('⭐ Removing from favorites:', carId, 'for user:', req.user.username);
+    
+    console.log('💔 Removing from favorites:', carId, 'for user:', req.user.id);
     
     await storage.removeFromFavorites(req.user.id, carId);
     
     console.log('✅ Removed from favorites successfully');
-    res.json({ message: 'Removed from favorites' });
+    res.json({ success: true });
   } catch (error) {
     console.error('❌ Error removing from favorites:', error);
     res.status(500).json({ error: 'Failed to remove from favorites' });
   }
 });
 
-// === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для админов) ===
-router.get('/users', requireAuth, requireRole(['admin']), async (req, res) => {
-  try {
-    console.log('👥 Fetching all users for admin:', req.user.username);
-    const users = await storage.getAllUsers();
-    
-    console.log(`✅ Found ${users.length} users`);
-    res.json(users);
-  } catch (error) {
-    console.error('❌ Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
-});
-
-// === МОДЕРАЦИЯ СООБЩЕНИЙ ===
-router.get('/messages/all', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
-  try {
-    console.log('📨 Fetching all messages for moderation by:', req.user.username);
-    const messages = await storage.getAllMessages();
-    
-    console.log(`✅ Found ${messages.length} messages for moderation`);
-    res.json(messages);
-  } catch (error) {
-    console.error('❌ Error fetching all messages:', error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
-});
-
-router.delete('/messages/:id', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
-  try {
-    const messageId = parseInt(req.params.id);
-    console.log('🗑️ Deleting message:', messageId, 'by moderator:', req.user.username);
-    
-    await storage.deleteMessage(messageId);
-    
-    console.log('✅ Message deleted successfully');
-    res.json({ message: 'Message deleted successfully' });
-  } catch (error) {
-    console.error('❌ Error deleting message:', error);
-    res.status(500).json({ error: 'Failed to delete message' });
-  }
-});
-
-// === СТАТИСТИКА ===
-router.get('/stats', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+// === АДМИН/МОДЕРАТОР ===
+router.get('/admin/stats', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
     console.log('📊 Fetching stats for:', req.user.username);
     
@@ -597,6 +568,50 @@ router.get('/stats', requireAuth, requireRole(['moderator', 'admin']), async (re
   } catch (error) {
     console.error('❌ Error fetching stats:', error);
     res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('👥 Fetching all users for admin:', req.user.username);
+    
+    const users = await storage.getAllUsers();
+    
+    console.log(`✅ Found ${users.length} users`);
+    res.json(users);
+  } catch (error) {
+    console.error('❌ Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.get('/admin/messages', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    console.log('💬 Fetching all messages for moderation');
+    
+    const messages = await storage.getAllMessages();
+    
+    console.log(`✅ Found ${messages.length} messages`);
+    res.json(messages);
+  } catch (error) {
+    console.error('❌ Error fetching messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+router.delete('/admin/messages/:id', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    const messageId = parseInt(req.params.id);
+    
+    console.log('🗑️ Deleting message:', messageId, 'by moderator:', req.user.username);
+    
+    await storage.deleteMessage(messageId);
+    
+    console.log('✅ Message deleted successfully');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error deleting message:', error);
+    res.status(500).json({ error: 'Failed to delete message' });
   }
 });
 
