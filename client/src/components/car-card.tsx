@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { ContactSellerModal } from "@/components/contact-seller-modal";
 import { EditCarModal } from "@/components/edit-car-modal";
+import { CarDetailsModal } from "@/components/car-details-modal";
 
 // Константы для отображения
 const SERVER_NAMES = {
@@ -53,6 +54,7 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
   const queryClient = useQueryClient();
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
   // Проверка, является ли автомобиль избранным
   const { data: favorites = [] } = useQueryClient().getQueryData(["/api/favorites"]) || { data: [] };
@@ -143,6 +145,8 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
     },
     onSuccess: (_, action) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications/pending"] });
       toast({
         title: action === 'approve' ? "Объявление одобрено" : "Объявление отклонено",
         description: action === 'approve' 
@@ -159,7 +163,16 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
     },
   });
 
+  // Функции-обработчики
   const handleFavoriteClick = () => {
+    if (!user) {
+      toast({
+        title: "Требуется авторизация",
+        description: "Войдите в систему для добавления в избранное",
+        variant: "destructive",
+      });
+      return;
+    }
     toggleFavoriteMutation.mutate();
   };
 
@@ -179,8 +192,42 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
     }
   };
 
+  // Функция для копирования номера телефона
+  const copyPhoneNumber = () => {
+    if (car.contactInfo) {
+      // Пытаемся извлечь номер телефона из контактной информации
+      let phoneNumber = car.contactInfo;
+      
+      // Если это форматированная строка, извлекаем телефон
+      const phoneMatch = car.contactInfo.match(/📞\s*([^|]*)/);
+      if (phoneMatch) {
+        phoneNumber = phoneMatch[1].trim();
+      }
+      
+      navigator.clipboard.writeText(phoneNumber).then(() => {
+        toast({
+          title: "Номер скопирован!",
+          description: "Номер телефона скопирован в буфер обмена",
+        });
+      }).catch(() => {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось скопировать номер",
+          variant: "destructive",
+        });
+      });
+    } else {
+      toast({
+        title: "Номер не указан",
+        description: "У этого объявления нет номера телефона",
+        variant: "destructive",
+      });
+    }
+  };
+
   const canEdit = user && (user.id === car.userId || user.role === 'admin');
   const canDelete = user && (user.id === car.userId || user.role === 'admin');
+  const isOwner = user?.id === car.userId;
 
   return (
     <>
@@ -207,19 +254,21 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
           )}
 
           {/* Кнопка избранного */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleFavoriteClick}
-            disabled={toggleFavoriteMutation.isPending}
-            className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 border-0"
-          >
-            <Heart 
-              className={`h-4 w-4 ${
-                isFavorite ? 'fill-red-500 text-red-500' : 'text-white'
-              }`} 
-            />
-          </Button>
+          {!isOwner && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleFavoriteClick}
+              disabled={toggleFavoriteMutation.isPending}
+              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 border-0"
+            >
+              <Heart 
+                className={`h-4 w-4 ${
+                  isFavorite ? 'fill-red-500 text-red-500' : 'text-white'
+                }`} 
+              />
+            </Button>
+          )}
         </div>
 
         <CardContent className="p-4">
@@ -259,9 +308,8 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
           {!showModerationActions && (
             <div className="flex space-x-2 w-full">
               <Button 
-                onClick={() => setContactModalOpen(true)}
+                onClick={() => setDetailsModalOpen(true)}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-sm"
-                disabled={user?.id === car.userId}
               >
                 <Eye className="h-4 w-4 mr-2" />
                 Подробнее
@@ -270,9 +318,10 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setContactModalOpen(true)}
-                disabled={user?.id === car.userId}
+                onClick={copyPhoneNumber}
+                disabled={!car.contactInfo}
                 className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                title="Скопировать номер телефона"
               >
                 <Phone className="h-4 w-4" />
               </Button>
@@ -281,8 +330,9 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
                 variant="outline"
                 size="sm"
                 onClick={() => setContactModalOpen(true)}
-                disabled={user?.id === car.userId}
+                disabled={isOwner}
                 className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                title="Написать сообщение"
               >
                 <MessageCircle className="h-4 w-4" />
               </Button>
@@ -295,7 +345,7 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
               {/* Кнопка "Подробнее" для модераторов */}
               <div className="flex space-x-2 w-full">
                 <Button 
-                  onClick={() => setContactModalOpen(true)}
+                  onClick={() => setDetailsModalOpen(true)}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-sm"
                 >
                   <Eye className="h-4 w-4 mr-2" />
@@ -305,8 +355,10 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setContactModalOpen(true)}
+                  onClick={copyPhoneNumber}
+                  disabled={!car.contactInfo}
                   className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                  title="Скопировать номер"
                 >
                   <Phone className="h-4 w-4" />
                 </Button>
@@ -316,6 +368,7 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
                   size="sm"
                   onClick={() => setContactModalOpen(true)}
                   className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                  title="Написать сообщение"
                 >
                   <MessageCircle className="h-4 w-4" />
                 </Button>
@@ -372,6 +425,12 @@ export function CarCard({ car, showEditButton = false, showModerationActions = f
       </Card>
 
       {/* Модалы */}
+      <CarDetailsModal
+        car={car}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+      />
+      
       <ContactSellerModal
         car={car}
         open={contactModalOpen}
