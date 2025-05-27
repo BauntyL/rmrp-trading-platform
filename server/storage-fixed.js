@@ -22,51 +22,69 @@ async function initializeDatabase() {
       )
     `);
 
-    // Создание таблицы заявок
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS applications (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        price INTEGER NOT NULL,
-        description TEXT,
-        category VARCHAR(100),
-        server VARCHAR(100),
-        "maxSpeed" INTEGER,
-        acceleration VARCHAR(50),
-        drive VARCHAR(50),
-        "isPremium" BOOLEAN DEFAULT false,
-        phone VARCHAR(50),
-        telegram VARCHAR(100),
-        discord VARCHAR(100),
-        "imageUrl" TEXT,
-        status VARCHAR(50) DEFAULT 'pending',
-        "createdBy" INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    // ✅ ПРИНУДИТЕЛЬНОЕ ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ ЗАЯВОК
+    try {
+      console.log('🔄 Recreating applications table...');
+      await client.query('DROP TABLE IF EXISTS applications CASCADE');
+      console.log('🗑️ Old applications table dropped');
+      
+      await client.query(`
+        CREATE TABLE applications (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          price INTEGER NOT NULL,
+          description TEXT,
+          category VARCHAR(100),
+          server VARCHAR(100),
+          "maxSpeed" INTEGER,
+          acceleration VARCHAR(50),
+          drive VARCHAR(50),
+          "isPremium" BOOLEAN DEFAULT false,
+          phone VARCHAR(50),
+          telegram VARCHAR(100),
+          discord VARCHAR(100),
+          "imageUrl" TEXT,
+          status VARCHAR(50) DEFAULT 'pending',
+          "createdBy" INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('✅ Applications table recreated with VARCHAR acceleration');
+    } catch (error) {
+      console.error('❌ Error recreating applications table:', error);
+    }
 
-    // Создание таблицы автомобилей
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS car_listings (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        price INTEGER NOT NULL,
-        description TEXT,
-        category VARCHAR(100),
-        server VARCHAR(100),
-        "maxSpeed" INTEGER,
-        acceleration VARCHAR(50),
-        drive VARCHAR(50),
-        "isPremium" BOOLEAN DEFAULT false,
-        phone VARCHAR(50),
-        telegram VARCHAR(100),
-        discord VARCHAR(100),
-        "imageUrl" TEXT,
-        owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    // ✅ ПРИНУДИТЕЛЬНОЕ ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ АВТОМОБИЛЕЙ
+    try {
+      console.log('🔄 Recreating car_listings table...');
+      await client.query('DROP TABLE IF EXISTS car_listings CASCADE');
+      console.log('🗑️ Old car_listings table dropped');
+      
+      await client.query(`
+        CREATE TABLE car_listings (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          price INTEGER NOT NULL,
+          description TEXT,
+          category VARCHAR(100),
+          server VARCHAR(100),
+          "maxSpeed" INTEGER,
+          acceleration VARCHAR(50),
+          drive VARCHAR(50),
+          "isPremium" BOOLEAN DEFAULT false,
+          phone VARCHAR(50),
+          telegram VARCHAR(100),
+          discord VARCHAR(100),
+          "imageUrl" TEXT,
+          owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('✅ Car_listings table recreated with VARCHAR acceleration');
+    } catch (error) {
+      console.error('❌ Error recreating car_listings table:', error);
+    }
 
     // Создание таблицы сообщений
     await client.query(`
@@ -83,11 +101,9 @@ async function initializeDatabase() {
 
     // ПЕРЕСОЗДАНИЕ ТАБЛИЦЫ ИЗБРАННОГО
     try {
-      // Удаляем старую таблицу
       await client.query('DROP TABLE IF EXISTS favorites CASCADE');
       console.log('🗑️ Old favorites table dropped');
       
-      // Создаем новую таблицу с правильной схемой
       await client.query(`
         CREATE TABLE favorites (
           id SERIAL PRIMARY KEY,
@@ -98,7 +114,6 @@ async function initializeDatabase() {
         )
       `);
       console.log('✅ New favorites table created');
-      
     } catch (error) {
       console.error('❌ Error recreating favorites table:', error);
     }
