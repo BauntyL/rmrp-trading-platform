@@ -249,26 +249,39 @@ router.post('/cars', requireAuth, async (req, res) => {
         name TEXT NOT NULL,
         server TEXT NOT NULL,
         category TEXT NOT NULL,
-        "driveType" TEXT,
-        "serverId" TEXT NOT NULL,
+        drive_type TEXT,
+        server_id TEXT NOT NULL,
         price INTEGER NOT NULL,
         description TEXT NOT NULL,
-        "imageUrl" TEXT,
-        "contactInfo" TEXT NOT NULL,
-        "userId" INTEGER REFERENCES users(id),
+        image_url TEXT,
+        contact_info TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id),
         status TEXT DEFAULT 'pending',
-        "createdAt" TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW()
       )
     `);
     
     const insertQuery = `
       INSERT INTO cars (
-        name, server, category, "driveType", "serverId", 
-        price, description, "imageUrl", "contactInfo", 
-        "userId", status, "createdAt"
+        name, server, category, drive_type, server_id, 
+        price, description, image_url, contact_info, 
+        user_id, status, created_at
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-      RETURNING *
+      RETURNING 
+        id,
+        name,
+        server,
+        category,
+        drive_type as "driveType",
+        server_id as "serverId",
+        price,
+        description,
+        image_url as "imageUrl",
+        contact_info as "contactInfo",
+        user_id as "userId",
+        status,
+        created_at as "createdAt"
     `;
     
     const result = await client.query(insertQuery, [
