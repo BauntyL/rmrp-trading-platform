@@ -110,12 +110,12 @@ export default function HomePage() {
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
                   <SelectItem value="all">Все категории</SelectItem>
-                  <SelectItem value="Спорткары">Спорткары</SelectItem>
-                  <SelectItem value="Суперкары">Суперкары</SelectItem>
-                  <SelectItem value="Гиперкары">Гиперкары</SelectItem>
-                  <SelectItem value="Электрокары">Электрокары</SelectItem>
-                  <SelectItem value="Классика">Классика</SelectItem>
-                  <SelectItem value="Другое">Другое</SelectItem>
+                  <SelectItem value="Стандарт">Стандарт</SelectItem>
+                  <SelectItem value="Купе">Купе</SelectItem>
+                  <SelectItem value="Внедорожники">Внедорожники</SelectItem>
+                  <SelectItem value="Спорт">Спорт</SelectItem>
+                  <SelectItem value="Мотоциклы">Мотоциклы</SelectItem>
+                  <SelectItem value="Специальные">Специальные</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedServer} onValueChange={setSelectedServer}>
@@ -124,12 +124,10 @@ export default function HomePage() {
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
                   <SelectItem value="all">Все серверы</SelectItem>
-                  <SelectItem value="Arizona RP">Arizona RP</SelectItem>
-                  <SelectItem value="Radmir RP">Radmir RP</SelectItem>
-                  <SelectItem value="Advance RP">Advance RP</SelectItem>
-                  <SelectItem value="Trinity RP">Trinity RP</SelectItem>
-                  <SelectItem value="Amazing RP">Amazing RP</SelectItem>
-                  <SelectItem value="Другой">Другой</SelectItem>
+                  <SelectItem value="Арбат">Арбат</SelectItem>
+                  <SelectItem value="Патрики">Патрики</SelectItem>
+                  <SelectItem value="Рублевка">Рублевка</SelectItem>
+                  <SelectItem value="Тверской">Тверской</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedSort} onValueChange={setSelectedSort}>
@@ -307,7 +305,11 @@ export default function HomePage() {
                           {application.name}
                         </h3>
                         <p className="text-slate-400 mb-2">{application.description}</p>
-                        <p className="text-emerald-400 font-semibold">
+                        <div className="flex items-center space-x-4 text-sm text-slate-500">
+                          <span>Категория: {application.category}</span>
+                          <span>Сервер: {application.server}</span>
+                        </div>
+                        <p className="text-emerald-400 font-semibold mt-2">
                           {application.price ? `${application.price.toLocaleString()} ₽` : 'Цена не указана'}
                         </p>
                       </div>
