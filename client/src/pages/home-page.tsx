@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import CarCard from "@/components/car-card";
 import { AddCarModal } from "@/components/add-car-modal";
 import { ModerationPanel } from "@/components/moderation-panel";
-import { FavoritesPage } from "@/pages/favorites-page";
+import FavoritesPage from "@/pages/favorites-page";
 import { MessagesPanel } from "@/components/messages-panel";
 import { 
   Car, 
@@ -18,7 +18,7 @@ import {
   Filter
 } from "lucide-react";
 
-export function HomePage() {
+function HomePage() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("catalog");
   const [addCarModalOpen, setAddCarModalOpen] = useState(false);
@@ -400,3 +400,5 @@ export function HomePage() {
     </div>
   );
 }
+
+export default HomePage;
