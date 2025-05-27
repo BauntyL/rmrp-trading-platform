@@ -199,6 +199,17 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
     deleteCarMutation.mutate();
   };
 
+  // ✅ ИСПРАВЛЕННЫЕ ОБРАБОТЧИКИ
+  const handleEditClick = () => {
+    console.log('🖱️ Edit button clicked!');
+    setEditModalOpen(true);
+  };
+
+  const handleDeleteClick = () => {
+    console.log('🖱️ Delete button clicked!');
+    setDeleteModalOpen(true);
+  };
+
   // ✅ ИСПРАВЛЕННЫЕ ПРОВЕРКИ ПРАВ ДОСТУПА
   const isOwner = user && (
     user.id === car.createdBy || 
@@ -218,6 +229,20 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
     user.role === 'admin' || 
     user.role === 'moderator'
   );
+
+  // ✅ ОТЛАДКА ПРАВ ДОСТУПА
+  console.log('🔍 Debug car-card:', {
+    user: user,
+    userId: user?.id,
+    userRole: user?.role,
+    carId: car.id,
+    carCreatedBy: car.createdBy,
+    carOwnerId: car.owner_id,
+    isOwner: isOwner,
+    canEdit: canEdit,
+    canDelete: canDelete,
+    showEditButton: showEditButton
+  });
 
   // ✅ УЛУЧШЕННОЕ ФОРМАТИРОВАНИЕ ДАТЫ
   const formatDate = (dateString: string | null | undefined) => {
@@ -485,12 +510,12 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
             )}
           </div>
 
-          {/* ✅ ОТДЕЛЬНЫЙ РЯД ДЛЯ КНОПОК РЕДАКТИРОВАНИЯ/УДАЛЕНИЯ */}
+          {/* ✅ ИСПРАВЛЕННЫЕ КНОПКИ РЕДАКТИРОВАНИЯ/УДАЛЕНИЯ */}
           {(showEditButton || canEdit || canDelete) && (
             <div className="flex space-x-2 w-full">
               {canEdit && (
                 <Button
-                  onClick={() => setEditModalOpen(true)}
+                  onClick={handleEditClick}
                   variant="outline"
                   className="flex-1 border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
                   size="sm"
@@ -502,7 +527,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
               
               {canDelete && (
                 <Button
-                  onClick={() => setDeleteModalOpen(true)}
+                  onClick={handleDeleteClick}
                   variant="destructive"
                   className="flex-1"
                   size="sm"
@@ -516,33 +541,33 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
         </CardFooter>
       </Card>
 
-      {/* Модальные окна */}
+      {/* ✅ ИСПРАВЛЕННЫЕ МОДАЛЬНЫЕ ОКНА */}
       <ContactSellerModal
-        isOpen={contactModalOpen}
-        onClose={() => setContactModalOpen(false)}
         car={car}
+        open={contactModalOpen}
+        onOpenChange={setContactModalOpen}
       />
 
       <CarDetailsModal
-        isOpen={detailsModalOpen}
-        onClose={() => setDetailsModalOpen(false)}
         car={car}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
       />
 
       {editModalOpen && (
         <EditCarModal
-          isOpen={editModalOpen}
-          onClose={() => setEditModalOpen(false)}
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
           car={car}
         />
       )}
 
       <DeleteConfirmationModal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
         onConfirm={handleDeleteConfirm}
         title="Удалить автомобиль"
-        message="Вы уверены, что хотите удалить это объявление? Это действие нельзя будет отменить."
+        description="Вы уверены, что хотите удалить это объявление? Это действие нельзя будет отменить."
         isLoading={deleteCarMutation.isPending}
       />
     </>
