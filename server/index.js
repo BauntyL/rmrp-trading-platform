@@ -213,13 +213,13 @@ async function initializeApplications() {
   console.log(`📋 Создано ${testApplications.length} тестовых заявок`);
 }
 
-// ✅ ИНИЦИАЛИЗАЦИЯ ТЕСТОВЫХ СООБЩЕНИЙ
+// ✅ ИНИЦИАЛИЗАЦИЯ ТЕСТОВЫХ СООБЩЕНИЙ С ИСПРАВЛЕНИЯМИ
 async function initializeMessages() {
   const testMessages = [
     {
       id: 1,
       senderId: 3, // testuser
-      receiverId: 1, // admin (Баунти Миллер)
+      receiverId: 2, // admin (ИСПРАВЛЕНО)
       carId: 1,
       content: 'Здравствуйте! Интересует ваш BMW M5. Возможен торг?',
       isRead: false,
@@ -227,7 +227,7 @@ async function initializeMessages() {
     },
     {
       id: 2,
-      senderId: 1, // admin (Баунти Миллер)
+      senderId: 2, // admin (ИСПРАВЛЕНО)
       receiverId: 3, // testuser
       carId: 1,
       content: 'Добро пожаловать! Да, небольшой торг возможен. Когда удобно посмотреть?',
@@ -237,11 +237,29 @@ async function initializeMessages() {
     {
       id: 3,
       senderId: 3, // testuser
-      receiverId: 1, // admin
+      receiverId: 2, // admin (ИСПРАВЛЕНО)
       carId: 4,
       content: 'Porsche тоже заинтересовал. Можно узнать состояние двигателя?',
       isRead: true,
       createdAt: new Date(Date.now() - 120000).toISOString() // 2 минуты назад
+    },
+    {
+      id: 4,
+      senderId: 1, // Баунти Миллер
+      receiverId: 2, // admin
+      carId: 2,
+      content: 'Админ, как дела с Mercedes-AMG GT 63S?',
+      isRead: false,
+      createdAt: new Date(Date.now() - 180000).toISOString() // 3 минуты назад
+    },
+    {
+      id: 5,
+      senderId: 2, // admin
+      receiverId: 1, // Баунти Миллер
+      carId: 2,
+      content: 'Привет! Mercedes в отличном состоянии, готов к продаже',
+      isRead: true,
+      createdAt: new Date(Date.now() - 90000).toISOString() // 1.5 минуты назад
     }
   ];
   
@@ -300,6 +318,55 @@ app.get('/api/status', (req, res) => {
     applicationsCount: applications.length,
     messagesCount: messages.length
   });
+});
+
+// ✅ ДИАГНОСТИКА СООБЩЕНИЙ
+app.get('/api/debug/messages', (req, res) => {
+  try {
+    console.log('🔍 DEBUG /api/debug/messages');
+    console.log('👤 Current user ID:', req.session?.userId);
+    console.log('📊 All messages:', messages);
+    console.log('👥 All users:', users.map(u => ({ id: u.id, username: u.username })));
+    
+    const result = {
+      currentUserId: req.session?.userId,
+      totalMessages: messages.length,
+      allMessages: messages,
+      users: users.map(u => ({ id: u.id, username: u.username, role: u.role }))
+    };
+    
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({ error: 'Debug failed' });
+  }
+});
+
+// ✅ БЫСТРЫЙ ВХОД ДЛЯ ТЕСТИРОВАНИЯ
+app.get('/api/quick-login', async (req, res) => {
+  try {
+    console.log('🚀 QUICK LOGIN - автоматический вход');
+    
+    // Находим админа
+    const adminUser = users.find(u => u.username === 'admin');
+    if (!adminUser) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    // Сохраняем в сессию
+    req.session.userId = adminUser.id;
+    console.log('✅ Quick login successful, session set:', req.session.userId);
+
+    const { password: _, ...userWithoutPassword } = adminUser;
+    res.json({ 
+      user: userWithoutPassword,
+      message: 'Успешный автоматический вход как админ'
+    });
+    
+  } catch (error) {
+    console.error('❌ Quick login error:', error);
+    res.status(500).json({ error: 'Quick login failed' });
+  }
 });
 
 // ✅ УПРОЩЕННАЯ АВТОРИЗАЦИЯ
