@@ -18,7 +18,8 @@ import {
   Gauge,
   Settings,
   Crown,
-  Calendar
+  Calendar,
+  Shield
 } from "lucide-react";
 import { ContactSellerModal } from "@/components/contact-seller-modal";
 import { CarDetailsModal } from "@/components/car-details-modal";
@@ -107,6 +108,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
       });
     },
     onError: (error: any) => {
+      setDeleteModalOpen(false);
       toast({
         title: "Ошибка удаления",
         description: error.message,
@@ -190,19 +192,17 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
   };
 
   const handleModeration = (status: 'approved' | 'rejected') => {
-    const confirmMessage = status === 'approved' 
-      ? 'Одобрить эту заявку?' 
-      : 'Отклонить эту заявку?';
-    
-    if (window.confirm(confirmMessage)) {
-      moderateApplicationMutation.mutate(status);
-    }
+    moderateApplicationMutation.mutate(status);
+  };
+
+  const handleDeleteConfirm = () => {
+    deleteCarMutation.mutate();
   };
 
   // Проверки прав доступа
-  const canEdit = user && (user.id === car.createdBy || user.id === car.owner_id || user.role === 'admin');
-  const canDelete = user && (user.id === car.createdBy || user.id === car.owner_id || user.role === 'admin');
   const isOwner = user && (user.id === car.createdBy || user.id === car.owner_id);
+  const canEdit = user && (isOwner || user.role === 'admin');
+  const canDelete = user && (isOwner || user.role === 'admin' || user.role === 'moderator');
 
   // Форматирование даты
   const formatDate = (dateString: string) => {
@@ -270,151 +270,153 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
         </div>
 
         <CardContent className="p-4">
-          {/* Название и цена */}
-          <div className="mb-3">
-            <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">
-              {car.name}
-            </h3>
-            <div className="text-2xl font-bold text-emerald-400">
-              {car.price ? `${car.price.toLocaleString()} ₽` : 'Цена не указана'}
+          {/* Заголовок и цена */}
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-emerald-400 transition-colors">
+                {car.name}
+              </h3>
+              <p className="text-2xl font-bold text-emerald-400">
+                {car.price ? `${car.price.toLocaleString()} ₽` : 'Цена не указана'}
+              </p>
             </div>
           </div>
 
           {/* Категория и сервер */}
-          <div className="flex items-center gap-2 mb-3 text-sm">
-            <Badge variant="secondary" className="bg-slate-700 text-slate-300">
-              {car.category || 'Не указано'}
+          <div className="flex items-center gap-2 mb-3">
+            <Badge variant="secondary" className="bg-slate-700 text-slate-300 border-0">
+              {car.category}
             </Badge>
-            {car.server && (
-              <Badge variant="outline" className="border-slate-600 text-slate-400">
-                {car.server}
-              </Badge>
-            )}
+            <Badge variant="outline" className="border-slate-600 text-slate-400">
+              {car.server}
+            </Badge>
           </div>
 
-          {/* Описание */}
-          {car.description && (
-            <p className="text-slate-400 text-sm mb-3 line-clamp-2">
-              {car.description}
-            </p>
-          )}
-
-          {/* Характеристики (убираем разгон) */}
-          <div className="flex items-center gap-4 text-xs text-slate-400 mb-3">
+          {/* Характеристики */}
+          <div className="grid grid-cols-2 gap-2 text-sm text-slate-400 mb-4">
             {car.maxSpeed && (
-              <div className="flex items-center gap-1">
-                <Zap className="h-3 w-3" />
+              <div className="flex items-center">
+                <Zap className="h-4 w-4 mr-1 text-emerald-400" />
                 <span>{car.maxSpeed} км/ч</span>
               </div>
             )}
             {car.drive && (
-              <div className="flex items-center gap-1">
-                <Settings className="h-3 w-3" />
+              <div className="flex items-center">
+                <Settings className="h-4 w-4 mr-1 text-emerald-400" />
                 <span>{car.drive}</span>
               </div>
             )}
           </div>
 
-          {/* Дата добавления */}
-          <div className="flex items-center gap-1 text-xs text-slate-500">
-            <Calendar className="h-3 w-3" />
+          {/* Описание */}
+          {car.description && (
+            <p className="text-slate-400 text-sm mb-4 line-clamp-2">
+              {car.description}
+            </p>
+          )}
+
+          {/* Дата создания */}
+          <div className="flex items-center text-xs text-slate-500 mb-4">
+            <Calendar className="h-3 w-3 mr-1" />
             <span>Добавлено: {formatDate(car.createdAt)}</span>
           </div>
         </CardContent>
 
         <CardFooter className="p-4 pt-0 space-y-3">
-          {/* Основные кнопки действий */}
-          {!isOwner && (
-            <div className="flex gap-2 w-full">
-              <Button 
-                onClick={() => setDetailsModalOpen(true)}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-sm"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Детали
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyPhone}
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                title="Копировать телефон"
-              >
-                <Phone className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setContactModalOpen(true)}
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-                title="Написать сообщение"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* Кнопки для владельца */}
-          {showEditButton && canEdit && (
-            <div className="flex gap-2 w-full">
-              <Button
-                variant="outline"
-                onClick={() => setEditModalOpen(true)}
-                className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600 text-sm"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Редактировать
-              </Button>
-              
-              {canDelete && (
-                <Button
-                  variant="outline"
-                  onClick={() => setDeleteModalOpen(true)}
-                  className="bg-red-600 border-red-600 text-white hover:bg-red-700"
-                  title="Удалить"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Кнопки модерации */}
-          {showModerationButtons && (user?.role === 'moderator' || user?.role === 'admin') && (
-            <div className="flex gap-2 w-full">
+          {/* Кнопки модерации (для заявок) */}
+          {showModerationButtons && (
+            <div className="flex space-x-2 w-full">
               <Button
                 onClick={() => handleModeration('approved')}
                 disabled={moderateApplicationMutation.isPending}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-sm"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
               >
-                <Check className="h-4 w-4 mr-2" />
+                <Check className="h-4 w-4 mr-1" />
                 Одобрить
               </Button>
-              
               <Button
                 onClick={() => handleModeration('rejected')}
                 disabled={moderateApplicationMutation.isPending}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-sm"
+                variant="destructive"
+                className="flex-1"
+                size="sm"
               >
-                <X className="h-4 w-4 mr-2" />
+                <X className="h-4 w-4 mr-1" />
                 Отклонить
               </Button>
             </div>
           )}
 
-          {/* Статус для владельца */}
-          {isOwner && car.status && (
-            <div className="w-full text-center text-sm">
-              <Badge className={`${
-                car.status === 'pending' ? 'bg-yellow-500 text-yellow-900' :
-                car.status === 'approved' ? 'bg-green-500 text-green-900' :
-                car.status === 'rejected' ? 'bg-red-500 text-red-100' : ''
-              }`}>
-                {car.status === 'pending' && 'Ожидает модерации'}
-                {car.status === 'approved' && 'Опубликовано'}
-                {car.status === 'rejected' && 'Отклонено модератором'}
+          {/* Основные кнопки действий */}
+          <div className="flex space-x-2 w-full">
+            <Button
+              onClick={() => setDetailsModalOpen(true)}
+              variant="outline"
+              className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+              size="sm"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              Подробнее
+            </Button>
+
+            {car.phone && (
+              <Button
+                onClick={handleCopyPhone}
+                variant="outline"
+                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                size="sm"
+              >
+                <Phone className="h-4 w-4" />
+              </Button>
+            )}
+
+            {!isOwner && (
+              <Button
+                onClick={() => setContactModalOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                size="sm"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Кнопки управления (для владельца/админа/модератора) */}
+          {(canEdit || canDelete) && (
+            <div className="flex space-x-2 w-full">
+              {canEdit && (
+                <Button
+                  onClick={() => setEditModalOpen(true)}
+                  variant="outline"
+                  className="flex-1 bg-blue-600 border-blue-500 text-white hover:bg-blue-700"
+                  size="sm"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Редактировать
+                </Button>
+              )}
+
+              {canDelete && (
+                <Button
+                  onClick={() => setDeleteModalOpen(true)}
+                  variant="destructive"
+                  className={`${canEdit ? 'flex-1' : 'w-full'} bg-red-600 hover:bg-red-700`}
+                  size="sm"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {user?.role === 'admin' || user?.role === 'moderator' ? 'Удалить' : 'Удалить'}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Значок модератора/админа */}
+          {(user?.role === 'admin' || user?.role === 'moderator') && canDelete && (
+            <div className="flex justify-center">
+              <Badge className="bg-purple-600 text-purple-100 border-0 text-xs">
+                <Shield className="h-3 w-3 mr-1" />
+                {user.role === 'admin' ? 'Администратор' : 'Модератор'}
               </Badge>
             </div>
           )}
@@ -423,31 +425,31 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
 
       {/* Модальные окна */}
       <ContactSellerModal
-        car={car}
         open={contactModalOpen}
         onOpenChange={setContactModalOpen}
-      />
-      
-      <CarDetailsModal
         car={car}
+      />
+
+      <CarDetailsModal
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
+        car={car}
       />
-      
-      {editModalOpen && (
+
+      {canEdit && (
         <EditCarModal
-          car={car}
           open={editModalOpen}
           onOpenChange={setEditModalOpen}
+          car={car}
         />
       )}
 
       <DeleteConfirmationModal
         open={deleteModalOpen}
         onOpenChange={setDeleteModalOpen}
-        onConfirm={() => deleteCarMutation.mutate()}
+        onConfirm={handleDeleteConfirm}
         isLoading={deleteCarMutation.isPending}
-        title="Удалить автомобиль"
+        title="Подтвердите удаление автомобиля"
         description={`Вы уверены, что хотите удалить "${car.name}"? Это действие нельзя отменить.`}
       />
     </>
