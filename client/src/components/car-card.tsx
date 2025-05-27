@@ -23,6 +23,7 @@ import {
 import { ContactSellerModal } from "@/components/contact-seller-modal";
 import { CarDetailsModal } from "@/components/car-details-modal";
 import { EditCarModal } from "@/components/edit-car-modal";
+import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 
 interface CarCardProps {
   car: any;
@@ -37,6 +38,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   // Получаем данные избранного
   const { data: favorites = [] } = useQuery({
@@ -98,6 +100,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-cars"] });
+      setDeleteModalOpen(false);
       toast({
         title: "Автомобиль удален",
         description: "Объявление успешно удалено",
@@ -183,12 +186,6 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
         description: "Не удалось скопировать номер телефона",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleDeleteClick = () => {
-    if (window.confirm('Вы уверены, что хотите удалить это объявление?')) {
-      deleteCarMutation.mutate();
     }
   };
 
@@ -302,18 +299,12 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
             </p>
           )}
 
-          {/* Характеристики */}
+          {/* Характеристики (убираем разгон) */}
           <div className="flex items-center gap-4 text-xs text-slate-400 mb-3">
             {car.maxSpeed && (
               <div className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
                 <span>{car.maxSpeed} км/ч</span>
-              </div>
-            )}
-            {car.acceleration && (
-              <div className="flex items-center gap-1">
-                <Gauge className="h-3 w-3" />
-                <span>{car.acceleration}</span>
               </div>
             )}
             {car.drive && (
@@ -380,8 +371,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
               {canDelete && (
                 <Button
                   variant="outline"
-                  onClick={handleDeleteClick}
-                  disabled={deleteCarMutation.isPending}
+                  onClick={() => setDeleteModalOpen(true)}
                   className="bg-red-600 border-red-600 text-white hover:bg-red-700"
                   title="Удалить"
                 >
@@ -451,6 +441,15 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
           onOpenChange={setEditModalOpen}
         />
       )}
+
+      <DeleteConfirmationModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={() => deleteCarMutation.mutate()}
+        isLoading={deleteCarMutation.isPending}
+        title="Удалить автомобиль"
+        description={`Вы уверены, что хотите удалить "${car.name}"? Это действие нельзя отменить.`}
+      />
     </>
   );
 }
