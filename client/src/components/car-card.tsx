@@ -382,7 +382,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
             )}
           </div>
 
-          {/* Кнопки управления (для владельца/админа/модератора) */}
+          {/* Кнопки управления (для владельца/админа/модератора) - ИСПРАВЛЕНО */}
           {(canEdit || canDelete) && (
             <div className="flex space-x-2 w-full">
               {canEdit && (
