@@ -204,13 +204,94 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
   const canEdit = user && (isOwner || user.role === 'admin');
   const canDelete = user && (isOwner || user.role === 'admin' || user.role === 'moderator');
 
-  // Форматирование даты
-  const formatDate = (dateString: string) => {
+  // ✅ УЛУЧШЕННОЕ ФОРМАТИРОВАНИЕ ДАТЫ
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Дата не указана';
+    
     try {
-      return new Date(dateString).toLocaleDateString('ru-RU', {
+      const date = new Date(dateString);
+      
+      // Проверка на валидность даты
+      if (isNaN(date.getTime())) {
+        return 'Некорректная дата';
+      }
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      // Только что (менее 1 минуты)
+      if (diffMinutes < 1) {
+        return 'Только что';
+      }
+      
+      // Минуты назад (1-59 минут)
+      if (diffMinutes < 60) {
+        return `${diffMinutes} мин. назад`;
+      }
+      
+      // Часы назад (1-23 часа)
+      if (diffHours < 24) {
+        return `${diffHours} ч. назад`;
+      }
+      
+      // Дни назад (1-6 дней)
+      if (diffDays < 7) {
+        return `${diffDays} дн. назад`;
+      }
+      
+      // Если дата сегодня - показываем время
+      const today = new Date();
+      const isToday = date.toDateString() === today.toDateString();
+      
+      if (isToday) {
+        return `Сегодня в ${date.toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })}`;
+      }
+      
+      // Если дата вчера
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday = date.toDateString() === yesterday.toDateString();
+      
+      if (isYesterday) {
+        return `Вчера в ${date.toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })}`;
+      }
+      
+      // Для остальных дат - полный формат
+      return date.toLocaleDateString('ru-RU', {
         day: '2-digit',
-        month: '2-digit',
+        month: 'long',
         year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Ошибка форматирования даты:', error);
+      return 'Дата не указана';
+    }
+  };
+
+  // ✅ ФУНКЦИЯ ДЛЯ ПОЛНОЙ ДАТЫ В TOOLTIP
+  const getFullDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Дата не указана';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Некорректная дата';
+      
+      return date.toLocaleDateString('ru-RU', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
     } catch {
       return 'Дата не указана';
@@ -315,10 +396,15 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
             </p>
           )}
 
-          {/* Дата создания */}
+          {/* ✅ УЛУЧШЕННАЯ ДАТА СОЗДАНИЯ С TOOLTIP */}
           <div className="flex items-center text-xs text-slate-500 mb-4">
             <Calendar className="h-3 w-3 mr-1" />
-            <span>Добавлено: {formatDate(car.createdAt || car.created_at)}</span>
+            <span 
+              title={getFullDate(car.createdAt || car.created_at)}
+              className="cursor-help"
+            >
+              Добавлено: {formatDate(car.createdAt || car.created_at)}
+            </span>
           </div>
         </CardContent>
 
@@ -350,58 +436,60 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
 
           {/* Основные кнопки действий */}
           <div className="flex space-x-2 w-full">
+            {/* Кнопка "Подробнее" */}
             <Button
               onClick={() => setDetailsModalOpen(true)}
               variant="outline"
-              className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
               size="sm"
             >
               <Eye className="h-4 w-4 mr-1" />
               Подробнее
             </Button>
 
+            {/* Кнопка "Связаться" */}
+            <Button
+              onClick={() => setContactModalOpen(true)}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              size="sm"
+            >
+              <MessageCircle className="h-4 w-4 mr-1" />
+              Связаться
+            </Button>
+
+            {/* Кнопка телефона */}
             {car.phone && (
               <Button
                 onClick={handleCopyPhone}
                 variant="outline"
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
                 size="sm"
+                className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
               >
                 <Phone className="h-4 w-4" />
               </Button>
             )}
-
-            {!isOwner && (
-              <Button
-                onClick={() => setContactModalOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                size="sm"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            )}
           </div>
 
-          {/* Кнопки управления (для владельца/админа/модератора) - ИСПРАВЛЕНО */}
-          {(canEdit || canDelete) && (
+          {/* Кнопки редактирования/удаления */}
+          {(showEditButton || canEdit || canDelete) && (
             <div className="flex space-x-2 w-full">
               {canEdit && (
                 <Button
                   onClick={() => setEditModalOpen(true)}
                   variant="outline"
-                  className="flex-1 bg-blue-600 border-blue-500 text-white hover:bg-blue-700"
+                  className="flex-1 border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
                   size="sm"
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Редактировать
                 </Button>
               )}
-
+              
               {canDelete && (
                 <Button
                   onClick={() => setDeleteModalOpen(true)}
                   variant="destructive"
-                  className={`${canEdit ? 'flex-1' : 'w-full'} bg-red-600 hover:bg-red-700`}
+                  className="flex-1"
                   size="sm"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
@@ -410,47 +498,37 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
               )}
             </div>
           )}
-
-          {/* Значок модератора/админа */}
-          {(user?.role === 'admin' || user?.role === 'moderator') && canDelete && (
-            <div className="flex justify-center">
-              <Badge className="bg-purple-600 text-purple-100 border-0 text-xs">
-                <Shield className="h-3 w-3 mr-1" />
-                {user.role === 'admin' ? 'Администратор' : 'Модератор'}
-              </Badge>
-            </div>
-          )}
         </CardFooter>
       </Card>
 
       {/* Модальные окна */}
       <ContactSellerModal
-        open={contactModalOpen}
-        onOpenChange={setContactModalOpen}
+        isOpen={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
         car={car}
       />
 
       <CarDetailsModal
-        open={detailsModalOpen}
-        onOpenChange={setDetailsModalOpen}
+        isOpen={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
         car={car}
       />
 
-      {canEdit && (
+      {editModalOpen && (
         <EditCarModal
-          open={editModalOpen}
-          onOpenChange={setEditModalOpen}
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
           car={car}
         />
       )}
 
       <DeleteConfirmationModal
-        open={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDeleteConfirm}
+        title="Удалить автомобиль"
+        message="Вы уверены, что хотите удалить это объявление? Это действие нельзя будет отменить."
         isLoading={deleteCarMutation.isPending}
-        title="Подтвердите удаление автомобиля"
-        description={`Вы уверены, что хотите удалить "${car.name}"? Это действие нельзя отменить.`}
       />
     </>
   );
