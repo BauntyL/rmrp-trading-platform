@@ -353,6 +353,6 @@ function CarCard({
   );
 }
 
-// Экспортируем и как default, и как именованный экспорт
+// Экспортируем и как default, и как именованный экспорт для совместимости
 export default CarCard;
 export { CarCard };
