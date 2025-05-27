@@ -40,14 +40,19 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   // Получаем данные избранного
-  const { data: favorites = [] } = queryClient.getQueryData(["/api/favorites"]) || [];
+  const { data: favorites = [] } = useQuery({
+    queryKey: ["/api/favorites"],
+    refetchInterval: 30000,
+  }) || { data: [] };
+  
   const isFavorite = Array.isArray(favorites) && favorites.some((fav: any) => fav.id === car.id);
 
   // Мутация для добавления/удаления из избранного
   const toggleFavoriteMutation = useMutation({
     mutationFn: async () => {
+      const method = isFavorite ? 'DELETE' : 'POST';
       const response = await fetch(`/api/favorites/${car.id}`, {
-        method: isFavorite ? 'DELETE' : 'POST',
+        method,
         credentials: 'include',
       });
 
@@ -60,7 +65,6 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       toast({
         title: isFavorite ? "Удалено из избранного" : "Добавлено в избранное",
         description: isFavorite 
@@ -109,7 +113,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
     },
   });
 
-  // Мутация для модерации
+  // Мутация для модерации заявок
   const moderateApplicationMutation = useMutation({
     mutationFn: async (status: 'approved' | 'rejected') => {
       const response = await fetch(`/api/applications/${car.id}/status`, {
@@ -127,8 +131,8 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
       return response.json();
     },
     onSuccess: (_, status) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/applications/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       toast({
         title: status === 'approved' ? "Заявка одобрена" : "Заявка отклонена",
         description: status === 'approved' 
@@ -276,7 +280,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
               {car.name}
             </h3>
             <div className="text-2xl font-bold text-emerald-400">
-              {car.price ? `$${car.price.toLocaleString()}` : 'Цена не указана'}
+              {car.price ? `${car.price.toLocaleString()} ₽` : 'Цена не указана'}
             </div>
           </div>
 
@@ -310,7 +314,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
             {car.acceleration && (
               <div className="flex items-center gap-1">
                 <Gauge className="h-3 w-3" />
-                <span>{car.acceleration}с</span>
+                <span>{car.acceleration}</span>
               </div>
             )}
             {car.drive && (
@@ -330,7 +334,7 @@ export function CarCard({ car, showEditButton = false, showModerationButtons = f
 
         <CardFooter className="p-4 pt-0 space-y-3">
           {/* Основные кнопки действий */}
-          {!isOwner && (
+          {!isOwner && !showModerationButtons && (
             <div className="flex gap-2 w-full">
               <Button 
                 onClick={() => setDetailsModalOpen(true)}
