@@ -57,7 +57,6 @@ export default function CarCard({
   const queryClient = useQueryClient();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Получаем избранное пользователя
   const { data: favorites = [] } = useQuery({
