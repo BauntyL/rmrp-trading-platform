@@ -162,6 +162,19 @@ router.post('/applications', requireAuth, async (req, res) => {
     console.log('📝 Creating application for user:', req.user.username);
     console.log('📋 RAW request body:', req.body);
     
+    // ✅ ДОБАВЛЕНА ВАЛИДАЦИЯ
+    if (!req.body.name || !req.body.category || !req.body.server || !req.body.price) {
+      return res.status(400).json({ 
+        error: 'Обязательные поля не заполнены',
+        missing: {
+          name: !req.body.name,
+          category: !req.body.category,
+          server: !req.body.server,
+          price: !req.body.price
+        }
+      });
+    }
+    
     const applicationData = {
       ...req.body,
       createdBy: req.user.id,
@@ -177,6 +190,7 @@ router.post('/applications', requireAuth, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error creating application:', error);
+    console.error('❌ Stack trace:', error.stack); // ✅ ДОБАВЛЕН СТЕК ТРЕЙС
     res.status(500).json({ 
       error: 'Ошибка создания заявки',
       details: error.message 
@@ -384,291 +398,35 @@ router.delete('/cars/:id', requireAuth, async (req, res) => {
 });
 
 // === СООБЩЕНИЯ ===
-
-// Получение чатов пользователя
-router.get('/messages/chats', requireAuth, async (req, res) => {
-  try {
-    console.log('💬 Fetching chats for user:', req.user.id);
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    // Получаем все чаты где пользователь участвует
-    const query = `
-      WITH chat_participants AS (
-        SELECT DISTINCT
-          m."carId",
-          CASE 
-            WHEN m."senderId" = $1 THEN m."receiverId"
-            ELSE m."senderId"
-          END as other_user_id,
-          cl.name as car_name,
-          cl.owner_id as seller_id,
-          MAX(m."createdAt") as last_message_time
-        FROM messages m
-        LEFT JOIN car_listings cl ON m."carId" = cl.id
-        WHERE (m."senderId" = $1 OR m."receiverId" = $1)
-          AND cl.id IS NOT NULL
-        GROUP BY m."carId", CASE WHEN m."senderId" = $1 THEN m."receiverId" ELSE m."senderId" END, cl.name, cl.owner_id
-      ),
-      latest_messages AS (
-        SELECT DISTINCT ON (m."carId", 
-          CASE WHEN m."senderId" = $1 THEN m."receiverId" ELSE m."senderId" END)
-          m."carId",
-          CASE WHEN m."senderId" = $1 THEN m."receiverId" ELSE m."senderId" END as other_user_id,
-          m.content as latest_message,
-          m."createdAt" as latest_time
-        FROM messages m
-        WHERE m."senderId" = $1 OR m."receiverId" = $1
-        ORDER BY m."carId", 
-          CASE WHEN m."senderId" = $1 THEN m."receiverId" ELSE m."senderId" END,
-          m."createdAt" DESC
-      ),
-      unread_counts AS (
-        SELECT 
-          m."carId",
-          CASE WHEN m."senderId" = $1 THEN m."receiverId" ELSE m."senderId" END as other_user_id,
-          COUNT(*) as unread_count
-        FROM messages m
-        WHERE m."receiverId" = $1 AND (m."isRead" = false OR m."isRead" IS NULL)
-        GROUP BY m."carId", CASE WHEN m."senderId" = $1 THEN m."receiverId" ELSE m."senderId" END
-      )
-      SELECT 
-        cp.*,
-        lm.latest_message,
-        lm.latest_time,
-        COALESCE(uc.unread_count, 0) as unread_count,
-        seller.username as seller_name,
-        other.username as other_user_name
-      FROM chat_participants cp
-      LEFT JOIN latest_messages lm ON cp."carId" = lm."carId" AND cp.other_user_id = lm.other_user_id
-      LEFT JOIN unread_counts uc ON cp."carId" = uc."carId" AND cp.other_user_id = uc.other_user_id
-      LEFT JOIN users seller ON cp.seller_id = seller.id
-      LEFT JOIN users other ON cp.other_user_id = other.id
-      ORDER BY cp.last_message_time DESC
-    `;
-    
-    const result = await client.query(query, [req.user.id]);
-    
-    const chats = result.rows.map(row => {
-      const isUserSeller = row.seller_id === req.user.id;
-      
-      return {
-        id: `${row.carId}-${row.other_user_id}`,
-        carId: row.carId,
-        carName: row.car_name,
-        sellerId: row.seller_id,
-        buyerId: isUserSeller ? row.other_user_id : req.user.id,
-        sellerName: row.seller_name,
-        buyerName: isUserSeller ? row.other_user_name : req.user.username,
-        lastMessage: row.latest_message,
-        lastMessageTime: row.latest_time || row.last_message_time,
-        unreadCount: parseInt(row.unread_count) || 0
-      };
-    });
-    
-    await client.end();
-    
-    console.log(`✅ Found ${chats.length} chats for user ${req.user.id}`);
-    res.json(chats);
-    
-  } catch (error) {
-    console.error('❌ Error fetching chats:', error);
-    res.status(500).json({ error: 'Failed to fetch chats' });
-  }
-});
-
-// Получение сообщений конкретного чата
-router.get('/messages/:chatId', requireAuth, async (req, res) => {
-  try {
-    const chatId = req.params.chatId;
-    console.log('💬 Fetching messages for chat:', chatId, 'user:', req.user.id);
-    
-    // Парсим chatId (формат: carId-otherUserId)
-    const [carId, otherUserId] = chatId.split('-').map(id => parseInt(id));
-    
-    if (!carId || !otherUserId) {
-      return res.status(400).json({ error: 'Invalid chat ID' });
-    }
-    
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const query = `
-      SELECT 
-        m.*,
-        sender.username as sender_name,
-        receiver.username as receiver_name
-      FROM messages m
-      LEFT JOIN users sender ON m."senderId" = sender.id
-      LEFT JOIN users receiver ON m."receiverId" = receiver.id
-      WHERE m."carId" = $1 
-        AND ((m."senderId" = $2 AND m."receiverId" = $3) 
-          OR (m."senderId" = $3 AND m."receiverId" = $2))
-      ORDER BY m."createdAt" ASC
-    `;
-    
-    const result = await client.query(query, [carId, req.user.id, otherUserId]);
-    
-    // Отмечаем сообщения как прочитанные
-    await client.query(
-      'UPDATE messages SET "isRead" = true WHERE "carId" = $1 AND "receiverId" = $2 AND "senderId" = $3',
-      [carId, req.user.id, otherUserId]
-    );
-    
-    await client.end();
-    
-    console.log(`✅ Found ${result.rows.length} messages for chat ${chatId}`);
-    res.json(result.rows);
-    
-  } catch (error) {
-    console.error('❌ Error fetching messages for chat:', error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
-});
-
-// Отправка сообщения
 router.post('/messages', requireAuth, async (req, res) => {
   try {
-    const { carId, sellerId, message, chatId, content } = req.body;
-    
-    // Поддерживаем два формата: старый (carId, sellerId, message) и новый (chatId, content)
-    let finalCarId, finalReceiverId, finalContent;
-    
-    if (chatId && content) {
-      // Новый формат из MessagesPanel
-      const [parsedCarId, otherUserId] = chatId.split('-').map(id => parseInt(id));
-      finalCarId = parsedCarId;
-      finalReceiverId = otherUserId;
-      finalContent = content;
-    } else if (carId && sellerId && message) {
-      // Старый формат из ContactSellerModal
-      finalCarId = carId;
-      finalReceiverId = sellerId;
-      finalContent = message;
-    } else {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    console.log('📤 Sending message:', { 
-      finalCarId, 
-      finalReceiverId, 
-      finalContent, 
-      fromUser: req.user.id 
-    });
-    
-    if (!finalCarId || !finalReceiverId || !finalContent) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    if (finalContent.length > 500) {
-      return res.status(400).json({ error: 'Message too long' });
-    }
-    
-    // Простая фильтрация запрещенных слов
-    const bannedWords = ['spam', 'реклама', 'развод', 'мошенник', 'http', 'https', 'www'];
-    const messageText = finalContent.toLowerCase();
-    const containsBannedWord = bannedWords.some(word => messageText.includes(word));
-    
-    if (containsBannedWord) {
-      return res.status(400).json({ error: 'Message contains prohibited content' });
-    }
+    console.log('💌 Creating message from:', req.user.username);
     
     const messageData = {
       senderId: req.user.id,
-      receiverId: finalReceiverId,
-      content: finalContent,
-      carId: finalCarId
+      receiverId: req.body.receiverId,
+      carId: req.body.carId,
+      content: req.body.content
     };
     
-    const createdMessage = await storage.createMessage(messageData);
+    console.log('📋 Message data:', messageData);
     
-    console.log('✅ Message sent successfully');
-    res.status(201).json(createdMessage);
+    const message = await storage.createMessage(messageData);
+    
+    console.log('✅ Message created successfully');
+    res.status(201).json(message);
     
   } catch (error) {
-    console.error('❌ Error sending message:', error);
-    res.status(500).json({ error: 'Failed to send message' });
+    console.error('❌ Error creating message:', error);
+    res.status(500).json({ error: 'Failed to create message' });
   }
 });
 
-// Количество непрочитанных сообщений
-router.get('/messages/unread-count', requireAuth, async (req, res) => {
-  try {
-    const count = await storage.getUnreadMessageCount(req.user.id);
-    res.json({ count });
-  } catch (error) {
-    console.error('❌ Error getting unread count:', error);
-    res.status(500).json({ error: 'Failed to get unread count' });
-  }
-});
-
-// Старый эндпоинт для совместимости
 router.get('/messages', requireAuth, async (req, res) => {
   try {
-    console.log('📨 Fetching messages for user:', req.user.id);
+    console.log('📬 Fetching messages for user:', req.user.username);
     
-    const { Client } = require('pg');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-    
-    await client.connect();
-    
-    const query = `
-      SELECT 
-        m.id,
-        m."carId",
-        m."senderId",
-        m."receiverId",
-        m.content,
-        m."isRead",
-        m."createdAt",
-        cl.name as "carName",
-        cl.owner_id as "sellerId",
-        sender.username as "senderName",
-        receiver.username as "receiverName",
-        CASE 
-          WHEN m."senderId" = $1 THEN m."receiverId"
-          ELSE m."senderId"
-        END as "otherUserId"
-      FROM messages m
-      LEFT JOIN car_listings cl ON m."carId" = cl.id
-      LEFT JOIN users sender ON m."senderId" = sender.id
-      LEFT JOIN users receiver ON m."receiverId" = receiver.id
-      WHERE m."senderId" = $1 OR m."receiverId" = $1
-      ORDER BY m."createdAt" DESC
-    `;
-    
-    const result = await client.query(query, [req.user.id]);
-    
-    const messages = result.rows.map(row => ({
-      id: row.id,
-      carId: row.carId,
-      buyerId: row.senderId === row.sellerId ? row.receiverId : row.senderId,
-      sellerId: row.sellerId,
-      senderId: row.senderId,
-      recipientId: row.receiverId,
-      content: row.content,
-      isRead: row.isRead,
-      createdAt: row.createdAt,
-      carName: row.carName,
-      buyerName: row.senderId === row.sellerId ? row.receiverName : row.senderName,
-      sellerName: row.senderName
-    }));
-    
-    await client.end();
+    const messages = await storage.getMessages(req.user.id);
     
     console.log(`✅ Found ${messages.length} messages for user ${req.user.id}`);
     res.json(messages);
@@ -679,45 +437,92 @@ router.get('/messages', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/messages/all', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+  try {
+    console.log('📬 Fetching all messages for:', req.user.username);
+    
+    const messages = await storage.getAllMessages();
+    
+    console.log(`✅ Found ${messages.length} total messages`);
+    res.json(messages);
+    
+  } catch (error) {
+    console.error('❌ Error fetching all messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
 router.patch('/messages/:id/read', requireAuth, async (req, res) => {
   try {
     const messageId = parseInt(req.params.id);
     
-    await storage.markMessageAsRead(messageId, req.user.id);
+    console.log(`📖 Marking message ${messageId} as read by ${req.user.username}`);
     
-    console.log(`✅ Message ${messageId} marked as read`);
-    res.json({ success: true });
+    const message = await storage.markMessageAsRead(messageId, req.user.id);
+    
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found or access denied' });
+    }
+    
+    console.log('✅ Message marked as read');
+    res.json(message);
+    
   } catch (error) {
     console.error('❌ Error marking message as read:', error);
     res.status(500).json({ error: 'Failed to mark message as read' });
   }
 });
 
-// === ИЗБРАННОЕ ===
-router.get('/favorites', requireAuth, async (req, res) => {
+router.delete('/messages/:id', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
-    console.log('❤️ Fetching favorites for user:', req.user.id);
+    const messageId = parseInt(req.params.id);
     
-    const favorites = await storage.getUserFavorites(req.user.id);
+    console.log(`🗑️ Deleting message ${messageId} by ${req.user.username}`);
     
-    console.log(`✅ Found ${favorites.length} favorites`);
-    res.json(favorites);
+    const deletedMessage = await storage.deleteMessage(messageId);
+    
+    if (!deletedMessage) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    
+    console.log('✅ Message deleted successfully');
+    res.json({ message: 'Message deleted successfully' });
+    
   } catch (error) {
-    console.error('❌ Error fetching favorites:', error);
-    res.status(500).json({ error: 'Failed to fetch favorites' });
+    console.error('❌ Error deleting message:', error);
+    res.status(500).json({ error: 'Failed to delete message' });
   }
 });
 
+// ✅ ДОБАВЛЕН НЕДОСТАЮЩИЙ ENDPOINT
+router.get('/messages/unread-count', requireAuth, async (req, res) => {
+  try {
+    console.log('📊 Getting unread message count for user:', req.user.username);
+    
+    const count = await storage.getUnreadMessageCount(req.user.id);
+    
+    console.log(`✅ Unread count for ${req.user.username}: ${count}`);
+    res.json({ count });
+    
+  } catch (error) {
+    console.error('❌ Error getting unread message count:', error);
+    res.status(500).json({ error: 'Failed to get unread message count' });
+  }
+});
+
+// === ИЗБРАННОЕ ===
 router.post('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
+    const userId = req.user.id;
     
-    console.log('❤️ Adding to favorites:', carId, 'for user:', req.user.id);
+    console.log(`❤️ Adding car ${carId} to favorites for user ${req.user.username}`);
     
-    await storage.addToFavorites(req.user.id, carId);
+    const favorite = await storage.addToFavorites(userId, carId);
     
-    console.log('✅ Added to favorites successfully');
-    res.json({ success: true });
+    console.log('✅ Car added to favorites');
+    res.status(201).json(favorite);
+    
   } catch (error) {
     console.error('❌ Error adding to favorites:', error);
     res.status(500).json({ error: 'Failed to add to favorites' });
@@ -727,40 +532,37 @@ router.post('/favorites/:carId', requireAuth, async (req, res) => {
 router.delete('/favorites/:carId', requireAuth, async (req, res) => {
   try {
     const carId = parseInt(req.params.carId);
+    const userId = req.user.id;
     
-    console.log('💔 Removing from favorites:', carId, 'for user:', req.user.id);
+    console.log(`💔 Removing car ${carId} from favorites for user ${req.user.username}`);
     
-    await storage.removeFromFavorites(req.user.id, carId);
+    const removedFavorite = await storage.removeFromFavorites(userId, carId);
     
-    console.log('✅ Removed from favorites successfully');
-    res.json({ success: true });
+    console.log('✅ Car removed from favorites');
+    res.json({ message: 'Removed from favorites' });
+    
   } catch (error) {
     console.error('❌ Error removing from favorites:', error);
     res.status(500).json({ error: 'Failed to remove from favorites' });
   }
 });
 
-// === АДМИН/МОДЕРАТОР ===
-router.get('/admin/stats', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.get('/favorites', requireAuth, async (req, res) => {
   try {
-    console.log('📊 Fetching stats for:', req.user.username);
+    console.log('❤️ Fetching favorites for user:', req.user.username);
     
-    const pendingApplications = await storage.getPendingApplicationsCount();
-    const unmoderatedMessages = await storage.getUnmoderatedMessagesCount();
+    const favorites = await storage.getUserFavorites(req.user.id);
     
-    const stats = {
-      pendingApplications,
-      unmoderatedMessages
-    };
+    console.log(`✅ Found ${favorites.length} favorites for user ${req.user.id}`);
+    res.json(favorites);
     
-    console.log('✅ Stats fetched:', stats);
-    res.json(stats);
   } catch (error) {
-    console.error('❌ Error fetching stats:', error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    console.error('❌ Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
   }
 });
 
+// === АДМИН ПАНЕЛЬ ===
 router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     console.log('👥 Fetching all users for admin:', req.user.username);
@@ -769,39 +571,33 @@ router.get('/admin/users', requireAuth, requireRole(['admin']), async (req, res)
     
     console.log(`✅ Found ${users.length} users`);
     res.json(users);
+    
   } catch (error) {
     console.error('❌ Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
-router.get('/admin/messages', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
+router.get('/admin/stats', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
   try {
-    console.log('💬 Fetching all messages for moderation');
+    console.log('📊 Fetching admin stats for:', req.user.username);
     
-    const messages = await storage.getAllMessages();
+    const [pendingApplicationsCount, unmoderatedMessagesCount] = await Promise.all([
+      storage.getPendingApplicationsCount(),
+      storage.getUnmoderatedMessagesCount()
+    ]);
     
-    console.log(`✅ Found ${messages.length} messages`);
-    res.json(messages);
+    const stats = {
+      pendingApplications: pendingApplicationsCount,
+      unmoderatedMessages: unmoderatedMessagesCount
+    };
+    
+    console.log('✅ Admin stats:', stats);
+    res.json(stats);
+    
   } catch (error) {
-    console.error('❌ Error fetching messages:', error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
-});
-
-router.delete('/admin/messages/:id', requireAuth, requireRole(['moderator', 'admin']), async (req, res) => {
-  try {
-    const messageId = parseInt(req.params.id);
-    
-    console.log('🗑️ Deleting message:', messageId, 'by moderator:', req.user.username);
-    
-    await storage.deleteMessage(messageId);
-    
-    console.log('✅ Message deleted successfully');
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Error deleting message:', error);
-    res.status(500).json({ error: 'Failed to delete message' });
+    console.error('❌ Error fetching admin stats:', error);
+    res.status(500).json({ error: 'Failed to fetch admin stats' });
   }
 });
 
